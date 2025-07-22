@@ -121,7 +121,7 @@ if not boites_non_vides_gestion:
 else:
     for box_index, box_content in enumerate(st.session_state.main_list):
         if box_index > 0 and box_content:
-            st.subheader(f"Boîte n°{box_index} ####################")
+            st.subheader(f"--------- Boîte n°{box_index} ---------")
             # On parcourt chaque carte pour l'afficher avec ses boutons de gestion
             for card_index, carte in enumerate(box_content):
                 col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
