@@ -29,12 +29,17 @@ class Carte:
             main_list[self.index].append(self)
             self.flip()
 
+    # La nouvelle méthode
     def backward(self, main_list: list):
+        """Renvoie la carte à la boîte précédente ou la retourne si elle est dans la boîte 1."""
+        # Si la carte n'est pas dans la première boîte, on la déplace
         if self.index > 1:
             main_list[self.index].remove(self)
             self.index -= 1
             main_list[self.index].append(self)
-            self.flip()
+        
+        # Dans tous les cas (même si elle est dans la boîte 1), on la retourne
+        self.flip()
 
 SAVE_FILE = "flashcards.json"
 
