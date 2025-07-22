@@ -1,5 +1,3 @@
-# Application de flashcards avec Streamlit
-# Ce code permet de créer, réviser et gérer des flashcards avec une interface utilisateur simple
 import streamlit as st
 import json
 import os
@@ -67,8 +65,8 @@ if 'main_list' not in st.session_state:
 with st.expander("➡️ Ajouter une nouvelle carte"):
     # ... (code du formulaire inchangé) ...
     with st.form("new_card_form", clear_on_submit=True):
-        recto_content = st.text_input("Recto (la question)")
-        verso_content = st.text_input("Verso (la réponse)")
+        recto_content = st.text_area("Recto (la question)")
+        verso_content = st.text_area("Verso (la réponse)")
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
     if submitted and recto_content and verso_content:
