@@ -151,7 +151,14 @@
     [],
     [],
     [],
-    [],
+    [
+        {
+            "recto": "D\u00e9partement 45",
+            "verso": "Loiret",
+            "index": 23,
+            "is_recto_visible": true
+        }
+    ],
     [],
     [],
     [],
