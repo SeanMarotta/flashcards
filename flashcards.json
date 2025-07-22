@@ -2,33 +2,140 @@
     [],
     [
         {
-            "recto": "Capitale de la France ?",
-            "verso": "Paris",
-            "index": 1
+            "recto": "623 \u00e0 639 (roi)",
+            "verso": "Dagobert 1er",
+            "index": 1,
+            "is_recto_visible": true
         },
         {
-            "recto": "2 + 2 ?",
-            "verso": "4",
-            "index": 1
+            "recto": "7 villes connues de Belgique",
+            "verso": "Ostende\nBruges\nBruxelles\nAnvers\nLi\u00e8ges \nNamur\nCharleroi",
+            "index": 1,
+            "is_recto_visible": true
         },
+        {
+            "recto": "1824 \u00e0 1830 (dernier roi de France)",
+            "verso": "Charles X",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "1830 \u00e0 1848 (dernier roi des fran\u00e7ais)",
+            "verso": "Louis-Philippe 1er",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "R\u00e9alisateur de The Walking Dead, The Green Mile",
+            "verso": "Frank Darabont",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "\u0152uvre de Honor\u00e9 de Balzac",
+            "verso": "P\u00e8re Goriot",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Nic\u00e9phore Ni\u00e8pce en 1824",
+            "verso": "Cr\u00e9ateur de la photographie",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Renomm\u00e9 pour \"Les Proph\u00e9ties\" en 1555",
+            "verso": "Nostradamus (date et oeuvre)",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "La bise (vent)",
+            "verso": "Vent froid du nord ou NE",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Vent fort du nord, NO en Provence",
+            "verso": "Le mistral",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Vent humide (Provence, Corse)",
+            "verso": "Le levant",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Vent sec et chaud dans les Alpes ou Vosges",
+            "verso": "Le foehn",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Vent froid du nord, NO (Languedoc Rousillon)",
+            "verso": "La tramontane",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "1713 \u00e0 1784 (auteur)",
+            "verso": "Denis Diderot",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Oeuvre r\u00e9dig\u00e9 par D. Diderot et d'Alembert mi-XVIII\u00b0",
+            "verso": "Qui a cr\u00e9\u00e9 \"L'Encyclop\u00e9die\"",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Napol\u00e9on III (date)",
+            "verso": "Dernier monarque de France (1852 \u00e0 1870)",
+            "index": 1,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "3 optimisations fiscales",
+            "verso": "1 - R\u00e9alisation de travaux d\u00e9ductibles\n2 - Location en r\u00e9gime de conventionnement Anah\n3 - Location en meubl\u00e9 sous le r\u00e9gime LMNP",
+            "index": 1,
+            "is_recto_visible": true
+        }
+    ],
+    [],
+    [
         {
             "recto": "1492",
             "verso": "D\u00e9couverte am\u00e9rique Christophe Colomb",
-            "index": 1
+            "index": 3,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "1769 \u00e0 1821",
+            "verso": "Naissance et mort Napol\u00e9on Bonaparte",
+            "index": 3,
+            "is_recto_visible": true
+        },
+        {
+            "recto": "Capitale de la France ?",
+            "verso": "Paris",
+            "index": 3,
+            "is_recto_visible": true
         }
     ],
+    [],
     [],
     [],
     [
         {
-            "recto": "1769 \u00e0 1821",
-            "verso": "Naissance et mort Napol\u00e9on Bonaparte",
-            "index": 4
+            "recto": "2 + 2 ?",
+            "verso": "4",
+            "index": 7,
+            "is_recto_visible": true
         }
     ],
-    [],
-    [],
-    [],
     [],
     [],
     [],
