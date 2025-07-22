@@ -135,7 +135,7 @@ else:
                         # On utilise un formulaire pour l'édition
                         with st.form(f"edit_form_{box_index}_{card_index}"):
                             st.write(f"Modification de la carte : {carte.recto}")
-                            new_recto = st.text_input("Recto", value=carte.recto)
+                            new_recto = st.text_area("Recto", value=carte.recto)
                             new_verso = st.text_area("Verso", value=carte.verso)
                             new_box = st.number_input("Boîte", min_value=1, max_value=60, value=carte.index)
                             
