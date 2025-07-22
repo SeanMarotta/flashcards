@@ -1,3 +1,5 @@
+# Application de flashcards avec Streamlit
+# Ce code permet de créer, réviser et gérer des flashcards avec une interface utilisateur simple
 import streamlit as st
 import json
 import os
