@@ -85,14 +85,14 @@ else:
     if boites_a_reviser:
         # ... (logique de révision inchangée) ...
         for box_num in boites_a_reviser:
-            st.subheader(f"--- Boîte n°{box_num} ---")
+            st.subheader(f"📦 Boîte n°{box_num} 📦")
             for carte in list(st.session_state.main_list[box_num]):
                 with st.container(border=True):
                     if carte.is_recto_visible:
                         question, reponse = carte.recto, carte.verso
                     else:
                         question, reponse = carte.verso, carte.recto
-                    st.markdown(f"**Question :** {question}")
+                    st.markdown(f"❔ **Question :** {question}")
                     carte_id = id(carte)
                     if st.button("Révéler la réponse", key=f"reveal_{carte_id}"):
                         st.session_state[f"answer_visible_{carte_id}"] = True
@@ -121,7 +121,7 @@ if not boites_non_vides_gestion:
 else:
     for box_index, box_content in enumerate(st.session_state.main_list):
         if box_index > 0 and box_content:
-            st.subheader(f"--------- Boîte n°{box_index} ---------")
+            st.subheader(f"📦 Boîte n°{box_index} 📦")
             # On parcourt chaque carte pour l'afficher avec ses boutons de gestion
             for card_index, carte in enumerate(box_content):
                 col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
