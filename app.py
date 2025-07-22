@@ -2,18 +2,25 @@ import streamlit as st
 import json
 import os
 
-# --- Classe Carte et fonctions de sauvegarde/chargement (inchangées) ---
+# --- CHANGEMENT MAJEUR : Nouvelle structure de la classe Carte ---
 class Carte:
-    def __init__(self, recto: str, verso: str, index: int, image_url: str = ""):
-        self.recto = recto
-        self.verso = verso
+    def __init__(self, index: int,
+                 recto_text: str = "", recto_image_url: str = "",
+                 verso_text: str = "", verso_image_url: str = ""):
         self.index = index
+        # Face Recto
+        self.recto_text = recto_text
+        self.recto_image_url = recto_image_url
+        # Face Verso
+        self.verso_text = verso_text
+        self.verso_image_url = verso_image_url
+        # État de la carte
         self.is_recto_visible = True
-        self.image_url = image_url
 
     def __repr__(self):
         face = "Recto" if self.is_recto_visible else "Verso"
-        return f"Carte('{self.recto}', index={self.index}, face='{face}')"
+        content = self.recto_text if self.recto_text else "[Image]"
+        return f"Carte('{content}', index={self.index}, face='{face}')"
 
     def flip(self):
         self.is_recto_visible = not self.is_recto_visible
@@ -51,10 +58,11 @@ def load_data():
             if i > 0:
                 for card_dict in box:
                     carte = Carte(
-                        recto=card_dict.get('recto'),
-                        verso=card_dict.get('verso'),
                         index=card_dict.get('index'),
-                        image_url=card_dict.get('image_url', '')
+                        recto_text=card_dict.get('recto_text', card_dict.get('recto', '')), # Migration depuis l'ancien format
+                        recto_image_url=card_dict.get('recto_image_url', ''),
+                        verso_text=card_dict.get('verso_text', card_dict.get('verso', '')), # Migration
+                        verso_image_url=card_dict.get('verso_image_url', card_dict.get('image_url', '')) # Migration
                     )
                     carte.is_recto_visible = card_dict.get('is_recto_visible', True)
                     main_list_loaded[i].append(carte)
@@ -64,62 +72,86 @@ st.title("Mon Système de Flashcards")
 if 'main_list' not in st.session_state:
     st.session_state.main_list = load_data()
     if not any(st.session_state.main_list):
-         st.session_state.main_list[1].append(Carte("Quel est ce monument ?", "La Tour Eiffel", 1, "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/800px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg"))
+         st.session_state.main_list[1].append(Carte(index=1, recto_text="Quel est ce monument ?", verso_image_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/800px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg"))
          save_data(st.session_state.main_list)
 
-# --- Section de création de carte (inchangée) ---
+# --- CHANGEMENT MAJEUR : Formulaire de création ---
 with st.expander("➡️ Ajouter une nouvelle carte"):
     with st.form("new_card_form", clear_on_submit=True):
-        recto_content = st.text_input("Recto (la question)")
-        verso_content = st.text_area("Verso (la réponse)")
-        image_url_content = st.text_input("URL de l'image (optionnel)")
+        st.write("**Face Recto**")
+        recto_type = st.radio("Type de contenu (Recto)", ["Texte", "Image"], key="recto_type")
+        recto_text_content = ""
+        recto_image_url_content = ""
+        if recto_type == "Texte":
+            recto_text_content = st.text_input("Texte du Recto")
+        else:
+            recto_image_url_content = st.text_input("URL de l'image du Recto")
+
+        st.write("**Face Verso**")
+        verso_type = st.radio("Type de contenu (Verso)", ["Texte", "Image"], key="verso_type")
+        verso_text_content = ""
+        verso_image_url_content = ""
+        if verso_type == "Texte":
+            verso_text_content = st.text_area("Texte du Verso")
+        else:
+            verso_image_url_content = st.text_input("URL de l'image du Verso")
+
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
 
-    if submitted and recto_content and verso_content:
-        nouvelle_carte = Carte(recto_content, verso_content, box_number, image_url_content)
+    if submitted:
+        nouvelle_carte = Carte(
+            index=box_number,
+            recto_text=recto_text_content, recto_image_url=recto_image_url_content,
+            verso_text=verso_text_content, verso_image_url=verso_image_url_content
+        )
         st.session_state.main_list[box_number].append(nouvelle_carte)
         save_data(st.session_state.main_list)
-        st.success(f"Carte ajoutée dans la boîte n°{box_number} !")
+        st.success(f"Carte ajoutée !")
 
-# --- Section de Révision (inchangée) ---
+# --- CHANGEMENT MAJEUR : Logique d'affichage ---
 st.header("🧠 Session de Révision")
 boites_non_vides_revision = [i for i, box in enumerate(st.session_state.main_list) if i > 0 and box]
 if not boites_non_vides_revision:
     st.info("Aucune carte à réviser.")
 else:
-    boites_a_reviser = st.multiselect("Choisissez les boîtes que vous voulez réviser aujourd'hui :", options=boites_non_vides_revision)
+    boites_a_reviser = st.multiselect("Choisissez les boîtes à réviser :", options=boites_non_vides_revision)
     if boites_a_reviser:
         for box_num in boites_a_reviser:
             st.subheader(f"--- Boîte n°{box_num} ---")
             for carte in list(st.session_state.main_list[box_num]):
                 with st.container(border=True):
-                    if carte.image_url:
-                        st.image(carte.image_url)
-                    
+                    # Déterminer quelle face est la question et quelle face est la réponse
                     if carte.is_recto_visible:
-                        question, reponse = carte.recto, carte.verso
+                        q_text, q_img = carte.recto_text, carte.recto_image_url
+                        r_text, r_img = carte.verso_text, carte.verso_image_url
                     else:
-                        question, reponse = carte.verso, carte.recto
-                    st.markdown(f"**Question :** {question}")
+                        q_text, q_img = carte.verso_text, carte.verso_image_url
+                        r_text, r_img = carte.recto_text, carte.recto_image_url
+                    
+                    # Afficher la question
+                    st.markdown("**Question :**")
+                    if q_img: st.image(q_img)
+                    if q_text: st.markdown(q_text)
+
                     carte_id = id(carte)
                     if st.button("Révéler la réponse", key=f"reveal_{carte_id}"):
                         st.session_state[f"answer_visible_{carte_id}"] = True
                     if st.session_state.get(f"answer_visible_{carte_id}", False):
-                        st.markdown(f"**Réponse :** *{reponse}*")
+                        # Afficher la réponse
+                        st.markdown("**Réponse :**")
+                        if r_img: st.image(r_img)
+                        if r_text: st.markdown(f"*{r_text}*")
+                        
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✅ Correct", key=f"correct_{carte_id}", use_container_width=True):
                                 carte.forward(st.session_state.main_list)
-                                save_data(st.session_state.main_list)
-                                st.session_state[f"answer_visible_{carte_id}"] = False
-                                st.rerun()
+                                save_data(st.session_state.main_list); st.session_state[f"answer_visible_{carte_id}"] = False; st.rerun()
                         with col2:
                             if st.button("❌ Incorrect", key=f"incorrect_{carte_id}", use_container_width=True):
                                 carte.backward(st.session_state.main_list)
-                                save_data(st.session_state.main_list)
-                                st.session_state[f"answer_visible_{carte_id}"] = False
-                                st.rerun()
+                                save_data(st.session_state.main_list); st.session_state[f"answer_visible_{carte_id}"] = False; st.rerun()
 
 # --- CHANGEMENT : La section de gestion est maintenant dans un expander ---
 with st.expander("⚙️ Gérer les Cartes"):
