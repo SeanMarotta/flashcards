@@ -158,7 +158,14 @@
     [],
     [],
     [],
-    [],
+    [
+        {
+            "recto": "1998 : espace",
+            "verso": "D\u00e9but de l'assemblage de l'ISS",
+            "index": 30,
+            "is_recto_visible": true
+        }
+    ],
     [],
     [],
     [],
