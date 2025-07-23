@@ -3,198 +3,11 @@
     [
         {
             "index": 1,
-            "recto_text": "623 \u00e0 639 (roi)",
-            "recto_image_url": "",
-            "verso_text": "Dagobert 1er",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "7 villes connues de Belgique",
-            "recto_image_url": "",
-            "verso_text": "Ostende,\nBruges,\nBruxelles,\nAnvers,\nLi\u00e8ges,\nNamur,\nCharleroi",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "1824 \u00e0 1830 (dernier roi de France)",
-            "recto_image_url": "",
-            "verso_text": "Charles X",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "1830 \u00e0 1848 (dernier roi des fran\u00e7ais)",
-            "recto_image_url": "",
-            "verso_text": "Louis-Philippe 1er",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "R\u00e9alisateur de The Walking Dead, The Green Mile",
-            "recto_image_url": "",
-            "verso_text": "Frank Darabont",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "\u0152uvre de Honor\u00e9 de Balzac",
-            "recto_image_url": "",
-            "verso_text": "P\u00e8re Goriot",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Nic\u00e9phore Ni\u00e8pce en 1824",
-            "recto_image_url": "",
-            "verso_text": "Cr\u00e9ateur de la photographie",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Renomm\u00e9 pour \"Les Proph\u00e9ties\" en 1555",
-            "recto_image_url": "",
-            "verso_text": "Nostradamus (date et oeuvre)",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "La bise (vent)",
-            "recto_image_url": "",
-            "verso_text": "Vent froid du nord ou NE",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Vent fort du nord, NO en Provence",
-            "recto_image_url": "",
-            "verso_text": "Le mistral",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Vent humide (Provence, Corse)",
-            "recto_image_url": "",
-            "verso_text": "Le levant",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Vent sec et chaud dans les Alpes ou Vosges",
-            "recto_image_url": "",
-            "verso_text": "Le foehn",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Vent froid du nord, NO (Languedoc Rousillon)",
-            "recto_image_url": "",
-            "verso_text": "La tramontane",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "1713 \u00e0 1784 (auteur)",
-            "recto_image_url": "",
-            "verso_text": "Denis Diderot",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Oeuvre r\u00e9dig\u00e9 par D. Diderot et d'Alembert mi-XVIII\u00b0",
-            "recto_image_url": "",
-            "verso_text": "Qui a cr\u00e9\u00e9 \"L'Encyclop\u00e9die\"",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Napol\u00e9on III (date)",
-            "recto_image_url": "",
-            "verso_text": "Dernier monarque de France (1852 \u00e0 1870)",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "3 optimisations fiscales",
-            "recto_image_url": "",
-            "verso_text": "1 - R\u00e9alisation de travaux d\u00e9ductibles\n2 - Location en r\u00e9gime de conventionnement Anah\n3 - Location en meubl\u00e9 sous le r\u00e9gime LMNP",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Coup de pouce ou manipulation de l'attention (ex : autocollant mouche WC)",
-            "recto_image_url": "",
-            "verso_text": "Nudge",
-            "verso_image_url": "",
-            "is_recto_visible": false
-        },
-        {
-            "index": 1,
-            "recto_text": "RDF T\u00e9l\u00e9vision Fran\u00e7aise (1944)",
-            "recto_image_url": "",
-            "verso_text": "Ancien nom de TF1 (1975)",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "4 janvier 1937 (technologie)",
-            "recto_image_url": "",
-            "verso_text": "Naissance de la 1\u00e8re cha\u00eene fran\u00e7aise",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 1,
-            "recto_text": "Code Hammurabi",
+            "recto_text": "Vvk",
             "recto_image_url": "",
             "verso_text": "",
-            "verso_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/P1050763_Louvre_code_Hammurabi_face_rwk.JPG/1200px-P1050763_Louvre_code_Hammurabi_face_rwk.JPG",
-            "is_recto_visible": true
-        }
-    ],
-    [],
-    [
-        {
-            "index": 3,
-            "recto_text": "1492",
-            "recto_image_url": "",
-            "verso_text": "D\u00e9couverte am\u00e9rique Christophe Colomb",
             "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 3,
-            "recto_text": "1769 \u00e0 1821",
-            "recto_image_url": "",
-            "verso_text": "Naissance et mort Napol\u00e9on Bonaparte",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        },
-        {
-            "index": 3,
-            "recto_text": "Capitale de la France ?",
-            "recto_image_url": "",
-            "verso_text": "Paris",
-            "verso_image_url": "",
-            "is_recto_visible": true
+            "is_recto_visible": false
         }
     ],
     [],
@@ -216,32 +29,6 @@
     [],
     [],
     [],
-    [
-        {
-            "index": 23,
-            "recto_text": "D\u00e9partement 45",
-            "recto_image_url": "",
-            "verso_text": "Loiret",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        }
-    ],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [
-        {
-            "index": 30,
-            "recto_text": "1998 : espace",
-            "recto_image_url": "",
-            "verso_text": "D\u00e9but de l'assemblage de l'ISS",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        }
-    ],
     [],
     [],
     [],
@@ -251,16 +38,6 @@
     [],
     [],
     [],
-    [
-        {
-            "index": 40,
-            "recto_text": "Mus\u00e9e du Louvre",
-            "recto_image_url": "",
-            "verso_text": "Plus grand mus\u00e9e du monde",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        }
-    ],
     [],
     [],
     [],
@@ -270,16 +47,18 @@
     [],
     [],
     [],
-    [
-        {
-            "index": 50,
-            "recto_text": "Simone Veil",
-            "recto_image_url": "",
-            "verso_text": "Premi\u00e8re pr\u00e9sident du Parlement Europ\u00e9en",
-            "verso_image_url": "",
-            "is_recto_visible": true
-        }
-    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
     [],
     [],
     [],
