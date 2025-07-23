@@ -3,11 +3,91 @@
     [
         {
             "index": 1,
-            "recto_text": "Vvk",
-            "recto_image_url": "",
-            "verso_text": "",
+            "recto_text": "",
+            "recto_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Code_of_Hammurabi_IMG_1932.JPG/800px-Code_of_Hammurabi_IMG_1932.JPG",
+            "verso_text": "Code Hammurabi",
             "verso_image_url": "",
-            "is_recto_visible": false
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://fr.web.img5.acsta.net/r_1920_1080/pictures/19/11/25/12/00/2230200.jpg",
+            "verso_text": "Chantal Lauby",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://img-4.linternaute.com/X5l1mXHRelcd1lc4u3T8UQ9e5nw=/300x/smart/36be9638eac64b21aad662010b201944/ccmcms-linternaute/10657825.jpg",
+            "verso_text": "Medi Sadoun",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://img-4.linternaute.com/t1GYfax8pt4ihIDVlfHrHJQVjOo=/300x/smart/005d10ae92e1419e8a430acf93ead095/ccmcms-linternaute/10657826.jpg",
+            "verso_text": "Philippe Lacheau",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://img-4.linternaute.com/yf9Szb6TjS_TjboKZoi-2F7GbZs=/300x/smart/123c9360680a49f0acb802868e65b75a/ccmcms-linternaute/10657829.jpg",
+            "verso_text": "Tarek Boudali",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://fr.web.img2.acsta.net/r_1920_1080/pictures/20/01/10/12/10/4606145.jpg",
+            "verso_text": "Fr\u00e9d\u00e9ric Chau",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://i.f1g.fr/media/cms/304x406_cropupscale/2024/11/15/79ddd8d2fff2e1de7c4fbb052392fddab74f2e8b2d5e14fad6e7bb0fd57202c8.jpg",
+            "verso_text": "Elodie Fontan",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Julia_Piaton_2022.jpg/800px-Julia_Piaton_2022.jpg",
+            "verso_text": "Julia Piation",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://static1.purepeople.com/articles/6/37/21/16/@/5369765-exclusif-alice-david-soiree-de-remis-580x0-2.jpg",
+            "verso_text": "Alice David",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://fr.web.img6.acsta.net/c_310_420/pictures/16/01/11/16/40/241390.jpg",
+            "verso_text": "Michel Drucker",
+            "verso_image_url": "",
+            "is_recto_visible": true
+        },
+        {
+            "index": 1,
+            "recto_text": "",
+            "recto_image_url": "https://www.programme-tv.net/imgre/fit/~1~tel~2023~06~22~2f3063bf-2df3-4504-97f9-d6ee9380a988.jpeg/720x405/crop-from/top/quality/80/anne-elisabeth-lemoine-surprise-par-des-images-d-elle-en-maillot-de-bain-sur-le-plateau-de-c-a-vous.jpg",
+            "verso_text": "Anne-\u00c9lisabeth Lemoine",
+            "verso_image_url": "",
+            "is_recto_visible": true
         }
     ],
     [],
