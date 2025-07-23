@@ -83,16 +83,16 @@ with st.expander("➡️ Ajouter une nouvelle carte"):
         recto_type = st.radio("Type de contenu (Recto)", ["Texte", "Image"], key="recto_type")
         recto_text_content, recto_image_url_content = "", ""
         if recto_type == "Texte":
-            recto_text_content = st.text_input("Texte du Recto")
+            recto_text_content = st.text_area("Texte du Recto")
         else:
-            recto_image_url_content = st.text_input("URL de l'image du Recto")
+            recto_image_url_content = st.text_area("URL de l'image du Recto")
         st.write("**Face Verso**")
         verso_type = st.radio("Type de contenu (Verso)", ["Texte", "Image"], key="verso_type")
         verso_text_content, verso_image_url_content = "", ""
         if verso_type == "Texte":
             verso_text_content = st.text_area("Texte du Verso")
         else:
-            verso_image_url_content = st.text_input("URL de l'image du Verso")
+            verso_image_url_content = st.text_area("URL de l'image du Verso")
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
     if submitted:
@@ -165,16 +165,16 @@ with st.expander("⚙️ Gérer les Cartes"):
                                 new_recto_type = st.radio("Type Recto", ["Texte", "Image"], index=1 if carte.recto_image_url else 0, key=f"edit_recto_{box_index}_{card_index}")
                                 new_recto_text, new_recto_image_url = "", ""
                                 if new_recto_type == "Texte":
-                                    new_recto_text = st.text_input("Texte Recto", value=carte.recto_text, key=f"edit_recto_text_{box_index}_{card_index}")
+                                    new_recto_text = st.text_area("Texte Recto", value=carte.recto_text, key=f"edit_recto_text_{box_index}_{card_index}")
                                 else:
-                                    new_recto_image_url = st.text_input("URL Image Recto", value=carte.recto_image_url, key=f"edit_recto_img_{box_index}_{card_index}")
+                                    new_recto_image_url = st.text_area("URL Image Recto", value=carte.recto_image_url, key=f"edit_recto_img_{box_index}_{card_index}")
                                 # Logique d'édition pour le Verso
                                 new_verso_type = st.radio("Type Verso", ["Texte", "Image"], index=1 if carte.verso_image_url else 0, key=f"edit_verso_{box_index}_{card_index}")
                                 new_verso_text, new_verso_image_url = "", ""
                                 if new_verso_type == "Texte":
                                     new_verso_text = st.text_area("Texte Verso", value=carte.verso_text, key=f"edit_verso_text_{box_index}_{card_index}")
                                 else:
-                                    new_verso_image_url = st.text_input("URL Image Verso", value=carte.verso_image_url, key=f"edit_verso_img_{box_index}_{card_index}")
+                                    new_verso_image_url = st.text_area("URL Image Verso", value=carte.verso_image_url, key=f"edit_verso_img_{box_index}_{card_index}")
 
                                 new_box = st.number_input("Boîte", min_value=1, max_value=60, value=carte.index, key=f"edit_box_{box_index}_{card_index}")
                                 if st.form_submit_button("Enregistrer"):
