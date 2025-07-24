@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Allez dans le répertoire de votre projet
-cd /home/flashcards || exit
+cd /root/flashcards || exit
 
 # Vérifiez s'il y a des changements à commiter
 if [ -n "$(git status --porcelain)" ]; then
