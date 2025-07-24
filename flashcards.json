@@ -9,5 +9,16 @@
         "creation_date": "2025-07-24",
         "next_review_date": "2025-07-26",
         "current_face": "verso"
+    },
+    {
+        "id": "d8daf96b-131a-4f98-bb58-9856278b1f52",
+        "recto_path": "https://media.gettyimages.com/id/1398608308/fr/photo/cannes-france-woody-harrelson-attends-the-photocall-for-triangle-of-sadness-during-the-75th.webp?s=2048x2048&w=gi&k=20&c=R9BssVU0mf9QYQ4oT3PjO9mHKx1oc0VQA3XMibqbuiU=",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Woody Harrelson",
+        "box": 1,
+        "creation_date": "2025-07-24",
+        "next_review_date": "2025-07-25",
+        "current_face": "recto"
     }
 ]
