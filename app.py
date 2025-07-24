@@ -87,7 +87,7 @@ if uploaded_file is not None:
         file_name = f"{uuid.uuid4()}.jpg"
         file_path = os.path.join(IMAGE_DIR, file_name)
         img.save(file_path, "JPEG")
-        full_url = f"http://VOTRE_IP_PUBLIQUE/media/{file_name}"
+        full_url = f"http://217.154.124.169/media/{file_name}"
         st.success("Image envoyée ! Copiez le lien ci-dessous pour l'utiliser :")
         st.code(full_url, language=None)
         st.image(img, width=200)
@@ -96,9 +96,9 @@ if uploaded_file is not None:
 
 with st.expander("➡️ Ajouter une nouvelle carte"):
     with st.form("new_card_form", clear_on_submit=True):
-        recto_content = st.text_input("Recto (la question)")
+        recto_content = st.text_area("Recto (la question)")
         verso_content = st.text_area("Verso (la réponse)")
-        image_url_content = st.text_input("URL de l'image (optionnel)")
+        image_url_content = st.text_area("URL de l'image (optionnel)")
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
     if submitted and recto_content and verso_content:
@@ -154,9 +154,9 @@ with st.expander("⚙️ Gérer les Cartes"):
                         with st.popover("Modifier"):
                             with st.form(f"edit_form_{box_index}_{card_index}"):
                                 st.write("Modification de la carte")
-                                new_recto = st.text_input("Recto", value=carte.recto, key=f"edit_recto_{box_index}_{card_index}")
+                                new_recto = st.text_area("Recto", value=carte.recto, key=f"edit_recto_{box_index}_{card_index}")
                                 new_verso = st.text_area("Verso", value=carte.verso, key=f"edit_verso_{box_index}_{card_index}")
-                                new_image_url = st.text_input("URL de l'image", value=carte.image_url, key=f"edit_img_{box_index}_{card_index}")
+                                new_image_url = st.text_area("URL de l'image", value=carte.image_url, key=f"edit_img_{box_index}_{card_index}")
                                 new_box = st.number_input("Boîte", value=carte.index, key=f"edit_box_{box_index}_{card_index}")
                                 if st.form_submit_button("Enregistrer"):
                                     carte.recto, carte.verso, carte.image_url = new_recto, new_verso, new_image_url
