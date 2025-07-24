@@ -20,5 +20,16 @@
         "creation_date": "2025-07-24",
         "next_review_date": "2025-07-25",
         "current_face": "recto"
+    },
+    {
+        "id": "7734008d-805c-4ca6-9974-eb3a535b38c3",
+        "recto_path": "https://media.gettyimages.com/id/1246371821/fr/photo/jesse-eisenberg-on-thursday-january-19-2023.webp?s=2048x2048&w=gi&k=20&c=PdhcmhIT8EwWB-9PWxRB4W5CmcwpliXAUQhJcEt9sS8=",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Jesse Eisenberg",
+        "box": 1,
+        "creation_date": "2025-07-24",
+        "next_review_date": "2025-07-25",
+        "current_face": "recto"
     }
 ]
