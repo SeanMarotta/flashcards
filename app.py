@@ -1,6 +1,15 @@
 import streamlit as st
 import json
 import os
+from PIL import Image # Bibliothèque pour gérer les images
+import uuid # Pour générer des noms de fichiers uniques
+
+# --- CONFIGURATION ---
+# Le dossier où les images seront stockées sur le VPS
+IMAGE_DIR = "static_images"
+# Crée le dossier s'il n'existe pas
+os.makedirs(IMAGE_DIR, exist_ok=True)
+
 
 # --- Classe Carte et fonctions de sauvegarde/chargement (inchangées) ---
 class Carte:
@@ -13,93 +22,99 @@ class Carte:
         self.verso_text = verso_text
         self.verso_image_url = verso_image_url
         self.is_recto_visible = True
-
+    # ... (les autres méthodes de la classe restent identiques)
     def __repr__(self):
         face = "Recto" if self.is_recto_visible else "Verso"
         content = self.recto_text if self.recto_text else "[Image]"
         return f"Carte('{content}', index={self.index}, face='{face}')"
-
     def flip(self):
         self.is_recto_visible = not self.is_recto_visible
-
     def forward(self, main_list: list):
         if self.index < 60:
-            main_list[self.index].remove(self)
-            self.index += 1
-            main_list[self.index].append(self)
-            self.flip()
-
-    # La nouvelle méthode
+            main_list[self.index].remove(self); self.index += 1; main_list[self.index].append(self); self.flip()
     def backward(self, main_list: list):
-        """Renvoie la carte à la boîte précédente ou la retourne si elle est dans la boîte 1."""
-        # Si la carte n'est pas dans la première boîte, on la déplace
         if self.index > 1:
-            main_list[self.index].remove(self)
-            self.index -= 1
-            main_list[self.index].append(self)
-        
-        # Dans tous les cas (même si elle est dans la boîte 1), on la retourne
+            main_list[self.index].remove(self); self.index -= 1; main_list[self.index].append(self)
         self.flip()
 
+# ... (les fonctions save_data et load_data restent identiques)
 SAVE_FILE = "flashcards.json"
-
 def save_data(main_list):
     data_to_save = []
     for box in main_list:
         data_to_save.append([vars(carte) for carte in box])
-    with open(SAVE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data_to_save, f, indent=4)
-
+    with open(SAVE_FILE, "w", encoding="utf-8") as f: json.dump(data_to_save, f, indent=4)
 def load_data():
-    if not os.path.exists(SAVE_FILE):
-        return [[] for _ in range(61)]
+    if not os.path.exists(SAVE_FILE): return [[] for _ in range(61)]
     with open(SAVE_FILE, "r", encoding="utf-8") as f:
         data_from_file = json.load(f)
         main_list_loaded = [[] for _ in range(61)]
         for i, box in enumerate(data_from_file):
             if i > 0:
                 for card_dict in box:
-                    carte = Carte(
-                        index=card_dict.get('index'),
-                        recto_text=card_dict.get('recto_text', card_dict.get('recto', '')),
-                        recto_image_url=card_dict.get('recto_image_url', ''),
-                        verso_text=card_dict.get('verso_text', card_dict.get('verso', '')),
-                        verso_image_url=card_dict.get('verso_image_url', card_dict.get('image_url', ''))
-                    )
+                    carte = Carte(index=card_dict.get('index'), recto_text=card_dict.get('recto_text', card_dict.get('recto', '')), recto_image_url=card_dict.get('recto_image_url', ''), verso_text=card_dict.get('verso_text', card_dict.get('verso', '')), verso_image_url=card_dict.get('verso_image_url', card_dict.get('image_url', '')))
                     carte.is_recto_visible = card_dict.get('is_recto_visible', True)
                     main_list_loaded[i].append(carte)
         return main_list_loaded
 
+
 st.title("Mon Système de Flashcards")
 if 'main_list' not in st.session_state:
     st.session_state.main_list = load_data()
-    if not any(st.session_state.main_list):
-         st.session_state.main_list[1].append(Carte(index=1, recto_text="Quel est ce monument ?", verso_image_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/800px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg"))
-         save_data(st.session_state.main_list)
 
+# --- NOUVEAU : Section pour la capture d'image ---
+st.header("📸 Capturer une image")
+img_file_buffer = st.camera_input("Prenez une photo pour vos cartes")
+
+if img_file_buffer is not None:
+    # Sauvegarde l'image sur le disque du VPS avec un nom unique
+    img = Image.open(img_file_buffer)
+    file_name = f"{uuid.uuid4()}.jpg"
+    file_path = os.path.join(IMAGE_DIR, file_name)
+    img.save(file_path, "JPEG")
+    st.success(f"Image sauvegardée sous le nom : {file_name}")
+
+# --- MODIFICATION : Formulaire de création ---
 with st.expander("➡️ Ajouter une nouvelle carte"):
+    # Récupère la liste des images disponibles
+    available_images = [""] + sorted(os.listdir(IMAGE_DIR))
+
     with st.form("new_card_form", clear_on_submit=True):
         st.write("**Face Recto**")
         recto_type = st.radio("Type de contenu (Recto)", ["Texte", "Image"], key="recto_type")
         recto_text_content, recto_image_url_content = "", ""
         if recto_type == "Texte":
-            recto_text_content = st.text_area("Texte du Recto")
+            recto_text_content = st.text_input("Texte du Recto")
         else:
-            recto_image_url_content = st.text_area("URL de l'image du Recto")
+            # On affiche un menu déroulant des images sauvegardées
+            selected_image = st.selectbox("Choisir une image (Recto)", options=available_images)
+            if selected_image:
+                recto_image_url_content = f"/media/{selected_image}" # URL relative que Nginx comprendra
+
+        # ... (logique similaire pour le Verso) ...
         st.write("**Face Verso**")
         verso_type = st.radio("Type de contenu (Verso)", ["Texte", "Image"], key="verso_type")
         verso_text_content, verso_image_url_content = "", ""
         if verso_type == "Texte":
             verso_text_content = st.text_area("Texte du Verso")
         else:
-            verso_image_url_content = st.text_area("URL de l'image du Verso")
+            selected_image = st.selectbox("Choisir une image (Verso)", options=available_images)
+            if selected_image:
+                verso_image_url_content = f"/media/{selected_image}"
+
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
+
     if submitted:
         nouvelle_carte = Carte(index=box_number, recto_text=recto_text_content, recto_image_url=recto_image_url_content, verso_text=verso_text_content, verso_image_url=verso_image_url_content)
         st.session_state.main_list[box_number].append(nouvelle_carte)
         save_data(st.session_state.main_list)
         st.success("Carte ajoutée !")
+
+
+# (Le reste du code pour la révision et la gestion reste similaire,
+# il fonctionnera car il utilise déjà les URL pour afficher les images)
+# ...
 
 st.header("🧠 Session de Révision")
 boites_non_vides_revision = [i for i, box in enumerate(st.session_state.main_list) if i > 0 and box]
