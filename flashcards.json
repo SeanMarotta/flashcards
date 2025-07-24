@@ -19,7 +19,7 @@
         "box": 1,
         "creation_date": "2025-07-24",
         "next_review_date": "2025-07-25",
-        "current_face": "recto"
+        "current_face": "verso"
     },
     {
         "id": "7734008d-805c-4ca6-9974-eb3a535b38c3",
@@ -30,6 +30,6 @@
         "box": 1,
         "creation_date": "2025-07-24",
         "next_review_date": "2025-07-25",
-        "current_face": "recto"
+        "current_face": "verso"
     }
 ]
