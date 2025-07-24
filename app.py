@@ -1,26 +1,23 @@
 import streamlit as st
 import json
 import os
-from PIL import Image
-import uuid
 
-# --- CONFIGURATION ---
-IMAGE_DIR = "static_images"
-os.makedirs(IMAGE_DIR, exist_ok=True)
-SAVE_FILE = "flashcards.json"
-
-# --- Classe Carte (version simplifiée) ---
+# --- Classe Carte et fonctions de sauvegarde/chargement (inchangées) ---
 class Carte:
-    def __init__(self, recto: str, verso: str, index: int, image_url: str = ""):
-        self.recto = recto
-        self.verso = verso
+    def __init__(self, index: int,
+                 recto_text: str = "", recto_image_url: str = "",
+                 verso_text: str = "", verso_image_url: str = ""):
         self.index = index
+        self.recto_text = recto_text
+        self.recto_image_url = recto_image_url
+        self.verso_text = verso_text
+        self.verso_image_url = verso_image_url
         self.is_recto_visible = True
-        self.image_url = image_url
 
     def __repr__(self):
         face = "Recto" if self.is_recto_visible else "Verso"
-        return f"Carte('{self.recto}', index={self.index}, face='{face}')"
+        content = self.recto_text if self.recto_text else "[Image]"
+        return f"Carte('{content}', index={self.index}, face='{face}')"
 
     def flip(self):
         self.is_recto_visible = not self.is_recto_visible
@@ -30,24 +27,32 @@ class Carte:
             main_list[self.index].remove(self)
             self.index += 1
             main_list[self.index].append(self)
-        self.flip()
+            self.flip()
 
+    # La nouvelle méthode
     def backward(self, main_list: list):
+        """Renvoie la carte à la boîte précédente ou la retourne si elle est dans la boîte 1."""
+        # Si la carte n'est pas dans la première boîte, on la déplace
         if self.index > 1:
             main_list[self.index].remove(self)
             self.index -= 1
             main_list[self.index].append(self)
+        
+        # Dans tous les cas (même si elle est dans la boîte 1), on la retourne
         self.flip()
 
-# --- Fonctions de sauvegarde/chargement ---
+SAVE_FILE = "flashcards.json"
+
 def save_data(main_list):
     data_to_save = []
     for box in main_list:
         data_to_save.append([vars(carte) for carte in box])
-    with open(SAVE_FILE, "w", encoding="utf-8") as f: json.dump(data_to_save, f, indent=4)
+    with open(SAVE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, indent=4)
 
 def load_data():
-    if not os.path.exists(SAVE_FILE): return [[] for _ in range(61)]
+    if not os.path.exists(SAVE_FILE):
+        return [[] for _ in range(61)]
     with open(SAVE_FILE, "r", encoding="utf-8") as f:
         data_from_file = json.load(f)
         main_list_loaded = [[] for _ in range(61)]
@@ -55,10 +60,11 @@ def load_data():
             if i > 0:
                 for card_dict in box:
                     carte = Carte(
-                        recto=card_dict.get('recto', ''),
-                        verso=card_dict.get('verso', ''),
                         index=card_dict.get('index'),
-                        image_url=card_dict.get('image_url', '')
+                        recto_text=card_dict.get('recto_text', card_dict.get('recto', '')),
+                        recto_image_url=card_dict.get('recto_image_url', ''),
+                        verso_text=card_dict.get('verso_text', card_dict.get('verso', '')),
+                        verso_image_url=card_dict.get('verso_image_url', card_dict.get('image_url', ''))
                     )
                     carte.is_recto_visible = card_dict.get('is_recto_visible', True)
                     main_list_loaded[i].append(carte)
@@ -67,39 +73,34 @@ def load_data():
 st.title("Mon Système de Flashcards")
 if 'main_list' not in st.session_state:
     st.session_state.main_list = load_data()
+    if not any(st.session_state.main_list):
+         st.session_state.main_list[1].append(Carte(index=1, recto_text="Quel est ce monument ?", verso_image_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/800px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg"))
+         save_data(st.session_state.main_list)
 
-# --- Section pour l'envoi de fichiers ---
-st.header("📤 Envoyer une image")
-uploaded_file = st.file_uploader("Choisissez une image sur votre appareil", type=['png', 'jpg', 'jpeg'])
-if uploaded_file is not None:
-    try:
-        img = Image.open(uploaded_file)
-        file_name = f"{uuid.uuid4()}.jpg"
-        file_path = os.path.join(IMAGE_DIR, file_name)
-        img.save(file_path, "JPEG")
-        # NOTE : Remplacez VOTRE_IP_PUBLIQUE par votre IP si ce n'est pas déjà fait.
-        full_url = f"http://217.154.124.169/media/{file_name}"
-        st.success("Image envoyée ! Copiez le lien ci-dessous pour l'utiliser :")
-        st.code(full_url, language=None)
-        st.image(img, width=200)
-    except Exception as e:
-        st.error(f"Une erreur est survenue : {e}")
-
-# --- Formulaire de création ---
 with st.expander("➡️ Ajouter une nouvelle carte"):
     with st.form("new_card_form", clear_on_submit=True):
-        recto_content = st.text_input("Recto (la question)")
-        verso_content = st.text_area("Verso (la réponse)")
-        image_url_content = st.text_input("URL de l'image (optionnel)")
+        st.write("**Face Recto**")
+        recto_type = st.radio("Type de contenu (Recto)", ["Texte", "Image"], key="recto_type")
+        recto_text_content, recto_image_url_content = "", ""
+        if recto_type == "Texte":
+            recto_text_content = st.text_area("Texte du Recto")
+        else:
+            recto_image_url_content = st.text_area("URL de l'image du Recto")
+        st.write("**Face Verso**")
+        verso_type = st.radio("Type de contenu (Verso)", ["Texte", "Image"], key="verso_type")
+        verso_text_content, verso_image_url_content = "", ""
+        if verso_type == "Texte":
+            verso_text_content = st.text_area("Texte du Verso")
+        else:
+            verso_image_url_content = st.text_area("URL de l'image du Verso")
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
-    if submitted and recto_content and verso_content:
-        nouvelle_carte = Carte(recto_content, verso_content, box_number, image_url_content)
+    if submitted:
+        nouvelle_carte = Carte(index=box_number, recto_text=recto_text_content, recto_image_url=recto_image_url_content, verso_text=verso_text_content, verso_image_url=verso_image_url_content)
         st.session_state.main_list[box_number].append(nouvelle_carte)
         save_data(st.session_state.main_list)
         st.success("Carte ajoutée !")
 
-# --- Session de Révision ---
 st.header("🧠 Session de Révision")
 boites_non_vides_revision = [i for i, box in enumerate(st.session_state.main_list) if i > 0 and box]
 if not boites_non_vides_revision:
@@ -111,17 +112,20 @@ else:
             st.subheader(f"--- Boîte n°{box_num} ---")
             for carte in list(st.session_state.main_list[box_num]):
                 with st.container(border=True):
-                    if carte.image_url: st.image(carte.image_url)
                     if carte.is_recto_visible:
-                        question, reponse = carte.recto, carte.verso
+                        q_text, q_img, r_text, r_img = carte.recto_text, carte.recto_image_url, carte.verso_text, carte.verso_image_url
                     else:
-                        question, reponse = carte.verso, carte.recto
-                    st.markdown(f"**Question :** {question}")
+                        q_text, q_img, r_text, r_img = carte.verso_text, carte.verso_image_url, carte.recto_text, carte.recto_image_url
+                    st.markdown("**Question :**")
+                    if q_img: st.image(q_img)
+                    if q_text: st.markdown(q_text)
                     carte_id = id(carte)
                     if st.button("Révéler la réponse", key=f"reveal_{carte_id}"):
                         st.session_state[f"answer_visible_{carte_id}"] = True
                     if st.session_state.get(f"answer_visible_{carte_id}", False):
-                        st.markdown(f"**Réponse :** *{reponse}*")
+                        st.markdown("**Réponse :**")
+                        if r_img: st.image(r_img)
+                        if r_text: st.markdown(f"*{r_text}*")
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✅ Correct", key=f"correct_{carte_id}", use_container_width=True):
@@ -130,7 +134,7 @@ else:
                             if st.button("❌ Incorrect", key=f"incorrect_{carte_id}", use_container_width=True):
                                 carte.backward(st.session_state.main_list); save_data(st.session_state.main_list); st.session_state[f"answer_visible_{carte_id}"] = False; st.rerun()
 
-# --- Gestion des Cartes ---
+# --- CORRECTION DE LA SECTION DE GESTION ---
 with st.expander("⚙️ Gérer les Cartes"):
     boites_non_vides_gestion = [i for i, box in enumerate(st.session_state.main_list) if i > 0 and box]
     if not boites_non_vides_gestion:
@@ -142,18 +146,40 @@ with st.expander("⚙️ Gérer les Cartes"):
                 for card_index, carte in enumerate(box_content):
                     col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
                     with col1:
-                        if carte.image_url: st.image(carte.image_url, width=100)
-                        st.markdown(f"**{carte.recto}** *({carte.verso})*")
+                        # Affichage du contenu Recto
+                        if carte.recto_image_url:
+                            st.image(carte.recto_image_url, width=100)
+                        elif carte.recto_text:
+                            st.markdown(f"**{carte.recto_text}**")
+                        # Affichage du contenu Verso
+                        if carte.verso_image_url:
+                            st.image(carte.verso_image_url, width=100)
+                        elif carte.verso_text:
+                            st.markdown(f"*{carte.verso_text}*")
+                    
                     with col2:
                         with st.popover("Modifier"):
                             with st.form(f"edit_form_{box_index}_{card_index}"):
                                 st.write("Modification de la carte")
-                                new_recto = st.text_input("Recto", value=carte.recto, key=f"edit_recto_{box_index}_{card_index}")
-                                new_verso = st.text_area("Verso", value=carte.verso, key=f"edit_verso_{box_index}_{card_index}")
-                                new_image_url = st.text_input("URL de l'image", value=carte.image_url, key=f"edit_img_{box_index}_{card_index}")
-                                new_box = st.number_input("Boîte", value=carte.index, key=f"edit_box_{box_index}_{card_index}")
+                                # Logique d'édition pour le Recto
+                                new_recto_type = st.radio("Type Recto", ["Texte", "Image"], index=1 if carte.recto_image_url else 0, key=f"edit_recto_{box_index}_{card_index}")
+                                new_recto_text, new_recto_image_url = "", ""
+                                if new_recto_type == "Texte":
+                                    new_recto_text = st.text_area("Texte Recto", value=carte.recto_text, key=f"edit_recto_text_{box_index}_{card_index}")
+                                else:
+                                    new_recto_image_url = st.text_area("URL Image Recto", value=carte.recto_image_url, key=f"edit_recto_img_{box_index}_{card_index}")
+                                # Logique d'édition pour le Verso
+                                new_verso_type = st.radio("Type Verso", ["Texte", "Image"], index=1 if carte.verso_image_url else 0, key=f"edit_verso_{box_index}_{card_index}")
+                                new_verso_text, new_verso_image_url = "", ""
+                                if new_verso_type == "Texte":
+                                    new_verso_text = st.text_area("Texte Verso", value=carte.verso_text, key=f"edit_verso_text_{box_index}_{card_index}")
+                                else:
+                                    new_verso_image_url = st.text_area("URL Image Verso", value=carte.verso_image_url, key=f"edit_verso_img_{box_index}_{card_index}")
+
+                                new_box = st.number_input("Boîte", min_value=1, max_value=60, value=carte.index, key=f"edit_box_{box_index}_{card_index}")
                                 if st.form_submit_button("Enregistrer"):
-                                    carte.recto, carte.verso, carte.image_url = new_recto, new_verso, new_image_url
+                                    carte.recto_text, carte.recto_image_url = new_recto_text, new_recto_image_url
+                                    carte.verso_text, carte.verso_image_url = new_verso_text, new_verso_image_url
                                     if new_box != carte.index:
                                         st.session_state.main_list[carte.index].remove(carte)
                                         st.session_state.main_list[new_box].append(carte)
