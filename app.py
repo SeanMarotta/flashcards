@@ -9,18 +9,22 @@ IMAGE_DIR = "static_images"
 os.makedirs(IMAGE_DIR, exist_ok=True)
 SAVE_FILE = "flashcards.json"
 
-# --- Classe Carte (version simplifiée) ---
+# --- CHANGEMENT : Retour à la classe Carte "complexe" ---
 class Carte:
-    def __init__(self, recto: str, verso: str, index: int, image_url: str = ""):
-        self.recto = recto
-        self.verso = verso
+    def __init__(self, index: int,
+                 recto_text: str = "", recto_image_url: str = "",
+                 verso_text: str = "", verso_image_url: str = ""):
         self.index = index
+        self.recto_text = recto_text
+        self.recto_image_url = recto_image_url
+        self.verso_text = verso_text
+        self.verso_image_url = verso_image_url
         self.is_recto_visible = True
-        self.image_url = image_url
 
     def __repr__(self):
         face = "Recto" if self.is_recto_visible else "Verso"
-        return f"Carte('{self.recto}', index={self.index}, face='{face}')"
+        content = self.recto_text if self.recto_text else "[Image]"
+        return f"Carte('{content}', index={self.index}, face='{face}')"
 
     def flip(self):
         self.is_recto_visible = not self.is_recto_visible
@@ -44,41 +48,36 @@ def save_data(main_list):
     data_to_save = []
     for box in main_list:
         data_to_save.append([vars(carte) for carte in box])
-    with open(SAVE_FILE, "w", encoding="utf-8") as f: json.dump(data_to_save, f, indent=4)
+    with open(SAVE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, indent=4)
 
-# --- CHANGEMENT : Fonction de chargement intelligente ---
+# --- CHANGEMENT : Fonction de chargement multi-formats ---
 def load_data():
     if not os.path.exists(SAVE_FILE):
         return [[] for _ in range(61)]
-    
     with open(SAVE_FILE, "r", encoding="utf-8") as f:
         data_from_file = json.load(f)
         main_list_loaded = [[] for _ in range(61)]
-        
         for i, box in enumerate(data_from_file):
             if i > 0:
                 for card_dict in box:
-                    # Logique de migration : cherche dans les anciens champs si les nouveaux n'existent pas
-                    recto_content = card_dict.get('recto', card_dict.get('recto_text', ''))
-                    verso_content = card_dict.get('verso', card_dict.get('verso_text', ''))
-                    image_content = card_dict.get('image_url', card_dict.get('recto_image_url', card_dict.get('verso_image_url', '')))
-
+                    # Logique de migration : lit les anciens et nouveaux formats
                     carte = Carte(
-                        recto=recto_content,
-                        verso=verso_content,
                         index=card_dict.get('index'),
-                        image_url=image_content
+                        recto_text=card_dict.get('recto_text', card_dict.get('recto', '')),
+                        recto_image_url=card_dict.get('recto_image_url', ''),
+                        verso_text=card_dict.get('verso_text', card_dict.get('verso', '')),
+                        verso_image_url=card_dict.get('verso_image_url', card_dict.get('image_url', ''))
                     )
                     carte.is_recto_visible = card_dict.get('is_recto_visible', True)
                     main_list_loaded[i].append(carte)
-                    
         return main_list_loaded
 
 st.title("Mon Système de Flashcards")
 if 'main_list' not in st.session_state:
     st.session_state.main_list = load_data()
 
-# Le reste du code est inchangé
+# --- Section d'envoi de fichiers ---
 st.header("📤 Envoyer une image")
 uploaded_file = st.file_uploader("Choisissez une image sur votre appareil", type=['png', 'jpg', 'jpeg'])
 if uploaded_file is not None:
@@ -87,26 +86,42 @@ if uploaded_file is not None:
         file_name = f"{uuid.uuid4()}.jpg"
         file_path = os.path.join(IMAGE_DIR, file_name)
         img.save(file_path, "JPEG")
-        full_url = f"http://217.154.124.169/media/{file_name}"
-        st.success("Image envoyée ! Copiez le lien ci-dessous pour l'utiliser :")
+        full_url = f"http://VOTRE_IP_PUBLIQUE/media/{file_name}" # Mettez votre IP ici
+        st.success("Image envoyée ! Copiez le lien ci-dessous :")
         st.code(full_url, language=None)
         st.image(img, width=200)
     except Exception as e:
         st.error(f"Une erreur est survenue : {e}")
 
+# --- Formulaire de création avec le sélecteur Texte/Image ---
 with st.expander("➡️ Ajouter une nouvelle carte"):
     with st.form("new_card_form", clear_on_submit=True):
-        recto_content = st.text_area("Recto (la question)")
-        verso_content = st.text_area("Verso (la réponse)")
-        image_url_content = st.text_area("URL de l'image (optionnel)")
+        st.write("**Face Recto**")
+        recto_type = st.radio("Type de contenu (Recto)", ["Texte", "Image"], key="recto_type")
+        recto_text_content, recto_image_url_content = "", ""
+        if recto_type == "Texte":
+            recto_text_content = st.text_area("Texte du Recto")
+        else:
+            recto_image_url_content = st.text_area("URL de l'image du Recto")
+
+        st.write("**Face Verso**")
+        verso_type = st.radio("Type de contenu (Verso)", ["Texte", "Image"], key="verso_type")
+        verso_text_content, verso_image_url_content = "", ""
+        if verso_type == "Texte":
+            verso_text_content = st.text_area("Texte du Verso")
+        else:
+            verso_image_url_content = st.text_area("URL de l'image du Verso")
+
         box_number = st.number_input("Dans quelle boîte la placer ?", min_value=1, max_value=60, step=1)
         submitted = st.form_submit_button("Créer la carte")
-    if submitted and recto_content and verso_content:
-        nouvelle_carte = Carte(recto_content, verso_content, box_number, image_url_content)
+
+    if submitted:
+        nouvelle_carte = Carte(index=box_number, recto_text=recto_text_content, recto_image_url=recto_image_url_content, verso_text=verso_text_content, verso_image_url=verso_image_url_content)
         st.session_state.main_list[box_number].append(nouvelle_carte)
         save_data(st.session_state.main_list)
         st.success("Carte ajoutée !")
 
+# --- Session de Révision ---
 st.header("🧠 Session de Révision")
 boites_non_vides_revision = [i for i, box in enumerate(st.session_state.main_list) if i > 0 and box]
 if not boites_non_vides_revision:
@@ -118,17 +133,23 @@ else:
             st.subheader(f"--- Boîte n°{box_num} ---")
             for carte in list(st.session_state.main_list[box_num]):
                 with st.container(border=True):
-                    if carte.image_url: st.image(carte.image_url)
                     if carte.is_recto_visible:
-                        question, reponse = carte.recto, carte.verso
+                        q_text, q_img, r_text, r_img = carte.recto_text, carte.recto_image_url, carte.verso_text, carte.verso_image_url
                     else:
-                        question, reponse = carte.verso, carte.recto
-                    st.markdown(f"**Question :** {question}")
+                        q_text, q_img, r_text, r_img = carte.verso_text, carte.verso_image_url, carte.recto_text, carte.recto_image_url
+                    
+                    st.markdown("**Question :**")
+                    if q_img: st.image(q_img)
+                    if q_text: st.markdown(q_text)
+
                     carte_id = id(carte)
                     if st.button("Révéler la réponse", key=f"reveal_{carte_id}"):
                         st.session_state[f"answer_visible_{carte_id}"] = True
                     if st.session_state.get(f"answer_visible_{carte_id}", False):
-                        st.markdown(f"**Réponse :** *{reponse}*")
+                        st.markdown("**Réponse :**")
+                        if r_img: st.image(r_img)
+                        if r_text: st.markdown(f"*{r_text}*")
+                        
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✅ Correct", key=f"correct_{carte_id}", use_container_width=True):
