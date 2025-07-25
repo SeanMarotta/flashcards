@@ -99,12 +99,10 @@ def display_content(content, title):
     st.subheader(title)
     if not content:
         st.warning("Contenu introuvable.")
-    # Si le contenu est une URL ou un chemin de fichier local valide
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
-    # Si c'est du texte
     elif isinstance(content, str):
-         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #f9f9f9;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: black;'>{content}</div>", unsafe_allow_html=True)
     else:
         st.warning(f"Contenu inattendu ou chemin d'image invalide : {content}")
 
@@ -170,8 +168,7 @@ def display_review_session():
             if st.session_state.show_answer:
                 display_content(answer_content, answer_title)
                 st.markdown("---")
-                btn_col1, btn_col2 = st.columns(2)
-                
+
                 def handle_response(correct):
                     all_cards = load_flashcards()
                     for i, c in enumerate(all_cards):
@@ -193,12 +190,24 @@ def display_review_session():
                     st.session_state.show_answer = False
                     st.rerun()
 
+                def handle_pass():
+                    """Passe à la carte suivante sans la modifier."""
+                    st.toast("Carte passée.", icon="⏭️")
+                    st.session_state.current_card_index += 1
+                    st.session_state.show_answer = False
+                    st.rerun()
+
+                btn_col1, btn_col2, btn_col3 = st.columns(3)
+
                 with btn_col1:
                     if st.button("✅ Correct", use_container_width=True, type="primary"):
                         handle_response(correct=True)
                 with btn_col2:
                     if st.button("❌ Incorrect", use_container_width=True):
                         handle_response(correct=False)
+                with btn_col3:
+                    if st.button("⏭️ Pass", use_container_width=True, type="secondary"):
+                        handle_pass()
             else:
                 if st.button("Afficher la réponse", use_container_width=True):
                     st.session_state.show_answer = True
