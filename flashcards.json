@@ -16,10 +16,10 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "Woody Harrelson",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-24",
-        "next_review_date": "2025-07-25",
-        "current_face": "verso"
+        "next_review_date": "2025-07-27",
+        "current_face": "recto"
     },
     {
         "id": "7734008d-805c-4ca6-9974-eb3a535b38c3",
@@ -27,9 +27,97 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "Jesse Eisenberg",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-24",
-        "next_review_date": "2025-07-25",
+        "next_review_date": "2025-07-27",
+        "current_face": "recto"
+    },
+    {
+        "id": "26a913a2-d34f-48c5-9199-f6ec9a189b55",
+        "recto_path": "https://upload.wikimedia.org/wikipedia/commons/4/49/%22The_School_of_Athens%22_by_Raffaello_Sanzio_da_Urbino.jpg",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "L'école d'Athènes- Raphaël (1511)",
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "32c9d064-5ab4-4f6f-83fd-fb7e821b4237",
+        "recto_path": "images/930c0352-4d5b-487d-b6fc-b95fa81d74e8.jpg",
+        "recto_text": null,
+        "verso_path": "images/1903a8f2-6137-4aba-b982-1b318cb8d5f0.jpg",
+        "verso_text": null,
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "4e1d4b55-a7cb-4650-8eb1-d610cbaed4be",
+        "recto_path": "images/21f15cbd-9464-49a2-8fdd-3f458b3c5e8b.jpg",
+        "recto_text": null,
+        "verso_path": "images/8bbdaeba-4cf2-4c94-a9e6-05ad6170fa11.jpg",
+        "verso_text": null,
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "e9c96464-a0f0-4af1-b49e-7d60ca0aa443",
+        "recto_path": "images/f983e33f-b62d-4020-8ce0-ad10b7bd97e4.jpg",
+        "recto_text": null,
+        "verso_path": "images/10aa7b44-b377-4f99-ad65-d4621ef63c58.jpg",
+        "verso_text": null,
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "619d5112-0d5c-43a6-9cbf-7cca61ed42dc",
+        "recto_path": "images/7a9f7f48-e7f4-416d-8fb4-f11b5e484351.jpg",
+        "recto_text": null,
+        "verso_path": "images/62654aea-ac6d-443c-b22e-790a0b004f1c.jpg",
+        "verso_text": null,
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "a205b018-a410-43cc-8eb6-7663c4c8962f",
+        "recto_path": "images/7fc14f51-2832-4e2b-9520-1893d6b3e513.jpg",
+        "recto_text": null,
+        "verso_path": "images/9936da60-765d-4940-a67f-d4efa47e01ab.jpg",
+        "verso_text": null,
+        "box": 19,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-13",
+        "current_face": "recto"
+    },
+    {
+        "id": "0d474b70-a4f4-49a4-86b1-42c5a5af4d32",
+        "recto_path": "images/ec6f259b-e554-43ea-8ea9-fdabe85c3426.jpg",
+        "recto_text": null,
+        "verso_path": "images/2bbfcea9-7224-44e0-9b19-c306694638a3.jpg",
+        "verso_text": null,
+        "box": 17,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-08-11",
+        "current_face": "recto"
+    },
+    {
+        "id": "7ae6a0e5-13b6-41d0-b628-f3bf74c2a462",
+        "recto_path": "https://media.gettyimages.com/id/2154441091/fr/photo/cannes-france-gilles-lellouche-attends-the-lamour-ouf-photocall-at-the-77th-annual-cannes.webp?s=612x612&w=gi&k=20&c=pIiK2utasvVHeYpZUs7RPVFc-KlXYH0R0jA6zgS6CiE=",
+        "recto_text": null,
+        "verso_path": "Gilles Lellouche",
+        "verso_text": null,
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
         "current_face": "verso"
     }
 ]
