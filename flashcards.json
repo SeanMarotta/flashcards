@@ -1351,5 +1351,71 @@
         "creation_date": "2025-07-25",
         "next_review_date": "2025-07-29",
         "current_face": "recto"
+    },
+    {
+        "id": "0548b3b3-8246-4f05-9a2e-97629c2fe81b",
+        "recto_path": null,
+        "recto_text": "Éperlan",
+        "verso_path": "https://www.academiedugout.fr/images/5461/1200-auto/eperlan-copy.jpg?poix=50&poiy=50",
+        "verso_text": null,
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
+    },
+    {
+        "id": "51e407c8-93f7-4458-add1-f3a9224313dc",
+        "recto_path": null,
+        "recto_text": "Carlos Goshn",
+        "verso_path": null,
+        "verso_text": "Ancien PDG de Nissan Renault",
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
+    },
+    {
+        "id": "2b8d95b6-74b8-413e-9219-f2934320e65f",
+        "recto_path": null,
+        "recto_text": "Prix Nobel de Littérature en 1953",
+        "verso_path": null,
+        "verso_text": "Winston Churchill (prix Nobel ?)",
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
+    },
+    {
+        "id": "ff60bd56-6750-46bf-a581-de8fd92001ba",
+        "recto_path": null,
+        "recto_text": "Premier Ministre de UK pendant Second Guerre Mondiale",
+        "verso_path": null,
+        "verso_text": "Winston Churchill (rôle État)",
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
+    },
+    {
+        "id": "df69bbf2-6d2e-4d6e-9a23-8ee4880c2f0a",
+        "recto_path": null,
+        "recto_text": "Popularisé l'expression \"Rideau de feu\"",
+        "verso_path": null,
+        "verso_text": "Winston Churchill (expression)",
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
+    },
+    {
+        "id": "c82656d5-e880-4633-b65c-34d7ac83c8de",
+        "recto_path": null,
+        "recto_text": "Albert Moukheiber",
+        "verso_path": "https://upload.wikimedia.org/wikipedia/commons/1/14/Albert-moukheiber.jpg",
+        "verso_text": null,
+        "box": 1,
+        "creation_date": "2025-07-25",
+        "next_review_date": "2025-07-26",
+        "current_face": "recto"
     }
 ]
