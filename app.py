@@ -244,25 +244,51 @@ def display_card_management():
         display_edit_form()
         return
 
-    for card in sorted(all_cards, key=lambda x: x['box']):
-        face = card.get('current_face', 'recto').capitalize()
-        exp_title = f"Boîte n°{card['box']} - Face: {face} - Prochaine révision: {card.get('next_review_date', 'N/A')}"
-        with st.expander(exp_title):
-            c1, c2, c3 = st.columns([2, 2, 1])
-            display_card_face_content(c1, "Recto", card.get('recto_path'), card.get('recto_text'))
-            display_card_face_content(c2, "Verso", card.get('verso_path'), card.get('verso_text'))
-            with c3:
-                st.markdown("**Actions**")
-                if st.button("Modifier", key=f"edit_{card['id']}", use_container_width=True):
-                    st.session_state.editing_card_id = card['id']
-                    st.rerun()
-                if st.button("Supprimer", key=f"del_{card['id']}", use_container_width=True, type="secondary"):
-                    delete_image_file(card.get('recto_path'))
-                    delete_image_file(card.get('verso_path'))
-                    new_cards = [c for c in all_cards if c['id'] != card['id']]
-                    save_flashcards(new_cards)
-                    st.toast("Carte supprimée !", icon="🗑️")
-                    st.rerun()
+    # 1. Sélection de la boîte
+    existing_boxes = sorted(list(set(c['box'] for c in all_cards)))
+    box_options = ["-- Choisir une boîte --"] + existing_boxes
+    selected_box = st.selectbox("Choisissez une boîte à inspecter:", options=box_options)
+
+    if selected_box != "-- Choisir une boîte --":
+        cards_in_box = [c for c in all_cards if c['box'] == int(selected_box)]
+        
+        # 2. Sélection de la carte dans la boîte
+        card_labels = ["-- Choisir une carte --"]
+        for i, card in enumerate(cards_in_box):
+            # Créer un label plus descriptif pour chaque carte
+            recto_content = card.get('recto_text') or os.path.basename(card.get('recto_path', ''))
+            label = f"Carte {i+1}: {str(recto_content)[:30]}..." if recto_content else f"Carte {i+1}"
+            card_labels.append(f"{label} ({card['id']})")
+        
+        selected_card_label = st.selectbox("Choisissez une carte:", options=card_labels)
+
+        if selected_card_label != "-- Choisir une carte --":
+            # Extraire l'ID du label pour trouver la bonne carte
+            card_id_to_display = selected_card_label.split('(')[-1].replace(')', '')
+            card_to_display = next((c for c in cards_in_box if c['id'] == card_id_to_display), None)
+            
+            if card_to_display:
+                # 3. Affichage de la carte sélectionnée
+                st.markdown("---")
+                face = card_to_display.get('current_face', 'recto').capitalize()
+                st.subheader(f"Détails de la carte (Boîte n°{card_to_display['box']} - Face: {face})")
+
+                c1, c2, c3 = st.columns([2, 2, 1])
+                display_card_face_content(c1, "Recto", card_to_display.get('recto_path'), card_to_display.get('recto_text'))
+                display_card_face_content(c2, "Verso", card_to_display.get('verso_path'), card_to_display.get('verso_text'))
+                
+                with c3:
+                    st.markdown("**Actions**")
+                    if st.button("Modifier", key=f"edit_{card_to_display['id']}", use_container_width=True):
+                        st.session_state.editing_card_id = card_to_display['id']
+                        st.rerun()
+                    if st.button("Supprimer", key=f"del_{card_to_display['id']}", use_container_width=True, type="secondary"):
+                        delete_image_file(card_to_display.get('recto_path'))
+                        delete_image_file(card_to_display.get('verso_path'))
+                        new_cards = [c for c in all_cards if c['id'] != card_to_display['id']]
+                        save_flashcards(new_cards)
+                        st.toast("Carte supprimée !", icon="🗑️")
+                        st.rerun()
 
 # --- Section 3: Modifier une carte ---
 def display_edit_form():
