@@ -1,9 +1,37 @@
-
 import streamlit as st
 import json
 import os
 import uuid
 from datetime import datetime, timedelta
+
+# --- Fonction de vérification du mot de passe ---
+def check_password():
+    """Retourne True si l'utilisateur a entré le bon mot de passe."""
+
+    def password_entered():
+        """Vérifie si le mot de passe entré par l'utilisateur est correct."""
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Ne pas garder le mot de passe en mémoire
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # Première exécution, demander le mot de passe.
+        st.text_input(
+            "Mot de passe", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Mot de passe incorrect, redemander.
+        st.text_input(
+            "Mot de passe", type="password", on_change=password_entered, key="password"
+        )
+        st.error("😕 Mot de passe incorrect.")
+        return False
+    else:
+        # Mot de passe correct.
+        return True
 
 # --- Configuration et Initialisation ---
 # Constantes pour les noms de fichiers et de répertoires
@@ -65,40 +93,34 @@ def initialize_session_state():
     if 'editing_card_id' not in st.session_state:
         st.session_state.editing_card_id = None
 
-initialize_session_state()
-
-
 # --- Fonctions d'affichage de contenu ---
 def display_content(content, title):
     """Affiche du texte ou une image (locale ou URL) avec un titre."""
     st.subheader(title)
     if not content:
         st.warning("Contenu introuvable.")
-    # Si le contenu est une URL ou un chemin de fichier local
+    # Si le contenu est une URL ou un chemin de fichier local valide
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
-    # Sinon, suppose que c'est du texte
+    # Si c'est du texte
+    elif isinstance(content, str):
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #f9f9f9;'>{content}</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: black;'>{content}</div>", unsafe_allow_html=True)
+        st.warning(f"Contenu inattendu ou chemin d'image invalide : {content}")
 
 def display_card_face_content(col, title, path, text):
     """Affiche le contenu (texte ou image) d'une face de carte dans une colonne."""
     with col:
         st.markdown(f"**{title}**")
         if path:
-            st.image(path, use_container_width=True)
+            if path.startswith(('http://', 'https://')) or os.path.exists(path):
+                st.image(path, use_container_width=True)
+            else:
+                st.error(f"Image locale introuvable : {os.path.basename(path)}")
         elif text:
             st.markdown(text)
         else:
             st.warning("Contenu vide")
-
-
-# --- Interface Utilisateur (UI) ---
-st.set_page_config(layout="wide", page_title="Révision Espacée")
-st.title("🧠 Application de Révision à Répétition Espacée")
-
-menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
-st.sidebar.markdown("---")
 
 
 # --- Section 1: Séance de révision ---
@@ -252,7 +274,6 @@ def display_edit_form():
                     all_cards[i]['box'] = new_box
                     all_cards[i]['next_review_date'] = (datetime.now() + timedelta(days=new_box)).strftime('%Y-%m-%d')
                     
-                    # Logique de mise à jour pour Recto (Priorité: Upload > URL > Texte)
                     if new_recto_upload:
                         delete_image_file(c.get('recto_path'))
                         all_cards[i]['recto_path'] = save_uploaded_file(new_recto_upload)
@@ -265,8 +286,11 @@ def display_edit_form():
                         delete_image_file(c.get('recto_path'))
                         all_cards[i]['recto_path'] = None
                         all_cards[i]['recto_text'] = new_recto_text
+                    else:
+                        delete_image_file(c.get('recto_path'))
+                        all_cards[i]['recto_path'] = None
+                        all_cards[i]['recto_text'] = None
 
-                    # Logique de mise à jour pour Verso (Priorité: Upload > URL > Texte)
                     if new_verso_upload:
                         delete_image_file(c.get('verso_path'))
                         all_cards[i]['verso_path'] = save_uploaded_file(new_verso_upload)
@@ -279,6 +303,10 @@ def display_edit_form():
                         delete_image_file(c.get('verso_path'))
                         all_cards[i]['verso_path'] = None
                         all_cards[i]['verso_text'] = new_verso_text
+                    else:
+                        delete_image_file(c.get('verso_path'))
+                        all_cards[i]['verso_path'] = None
+                        all_cards[i]['verso_text'] = None
                     break
             
             save_flashcards(all_cards)
@@ -295,37 +323,31 @@ def display_create_card():
     st.header("➕ Créer une nouvelle carte")
     with st.form("new_card_form"):
         st.subheader("Contenu du Recto (Question)")
-        recto_text = st.text_area("🇦 Écrire du texte pour le recto", key="recto_txt")
-        recto_url = st.text_input("🔗 Entrer un lien vers une image web", key="recto_url")
-        st.write("ou")
-        recto_upload = st.file_uploader("🖼️ Importer une image locale", type=['png', 'jpg', 'jpeg'], key="recto_up")
+        recto_text = st.text_input("Écrire du texte pour le recto", key="recto_txt")
+        recto_url = st.text_input("Ou entrer un lien vers une image web", key="recto_url")
+        recto_upload = st.file_uploader("Importer une image locale", type=['png', 'jpg', 'jpeg'], key="recto_up")
         st.markdown("---")
         
         st.subheader("Contenu du Verso (Réponse)")
-        verso_text = st.text_area("🇦 Écrire du texte pour le verso", key="verso_txt")
-        verso_url = st.text_input("🔗 Entrer un lien vers une image web", key="verso_url")
-        st.write("ou")
-        verso_upload = st.file_uploader("🖼️ Importer une image locale", type=['png', 'jpg', 'jpeg'], key="verso_up")
+        verso_text = st.text_input("Écrire du texte pour le verso", key="verso_txt")
+        verso_url = st.text_input("Ou entrer un lien vers une image web", key="verso_url")
+        verso_upload = st.file_uploader("Importer une image locale", type=['png', 'jpg', 'jpeg'], key="verso_up")
         st.markdown("---")
 
         initial_box = st.number_input("Placer dans la boîte n°", min_value=1, max_value=60, value=1)
         
         if st.form_submit_button("Ajouter la carte"):
-            # Déterminer le contenu du Recto (Priorité: Upload > Camera > URL > Texte)
             recto_path_val, recto_text_val = None, None
-            recto_file = recto_upload
-            if recto_file:
-                recto_path_val = save_uploaded_file(recto_file)
+            if recto_upload:
+                recto_path_val = save_uploaded_file(recto_upload)
             elif recto_url:
                 recto_path_val = recto_url
             elif recto_text:
                 recto_text_val = recto_text
 
-            # Déterminer le contenu du Verso (Priorité: Upload > Camera > URL > Texte)
             verso_path_val, verso_text_val = None, None
-            verso_file = verso_upload
-            if verso_file:
-                verso_path_val = save_uploaded_file(verso_file)
+            if verso_upload:
+                verso_path_val = save_uploaded_file(verso_upload)
             elif verso_url:
                 verso_path_val = verso_url
             elif verso_text:
@@ -350,10 +372,18 @@ def display_create_card():
                 st.error("Veuillez fournir un contenu (texte ou image) pour le recto ET pour le verso.")
 
 
-# --- Routage principal ---
-if menu == "Séance de révision":
-    display_review_session()
-elif menu == "Gérer les cartes":
-    display_card_management()
-elif menu == "Créer une nouvelle carte":
-    display_create_card()
+# --- Interface Utilisateur (UI) ---
+st.set_page_config(layout="wide", page_title="Révision Espacée")
+st.title("🧠 Application de Révision à Répétition Espacée")
+
+if check_password():
+    initialize_session_state()
+    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
+    st.sidebar.markdown("---")
+
+    if menu == "Séance de révision":
+        display_review_session()
+    elif menu == "Gérer les cartes":
+        display_card_management()
+    elif menu == "Créer une nouvelle carte":
+        display_create_card()

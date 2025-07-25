@@ -108,16 +108,5 @@
         "creation_date": "2025-07-25",
         "next_review_date": "2025-08-11",
         "current_face": "recto"
-    },
-    {
-        "id": "7ae6a0e5-13b6-41d0-b628-f3bf74c2a462",
-        "recto_path": "https://media.gettyimages.com/id/2154441091/fr/photo/cannes-france-gilles-lellouche-attends-the-lamour-ouf-photocall-at-the-77th-annual-cannes.webp?s=612x612&w=gi&k=20&c=pIiK2utasvVHeYpZUs7RPVFc-KlXYH0R0jA6zgS6CiE=",
-        "recto_text": null,
-        "verso_path": "Gilles Lellouche",
-        "verso_text": null,
-        "box": 1,
-        "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "verso"
     }
 ]
