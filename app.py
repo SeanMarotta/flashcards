@@ -105,7 +105,7 @@ def display_content(content, title):
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
-         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #333;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #f9f9f9;'>{content}</div>", unsafe_allow_html=True)
     else:
         st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
@@ -336,7 +336,8 @@ def display_edit_form():
 # --- Section 4: Créer une carte ---
 def display_create_card():
     st.header("➕ Créer une nouvelle carte")
-    with st.form("new_card_form"):
+    # L'option clear_on_submit=True vide automatiquement les champs du formulaire après validation.
+    with st.form("new_card_form", clear_on_submit=True):
         st.subheader("Recto (Question)")
         recto_text = st.text_area("Texte", key="recto_txt")
         recto_url = st.text_input("Lien image web", key="recto_url")
@@ -349,7 +350,8 @@ def display_create_card():
         
         initial_box = st.number_input("Boîte de départ", min_value=1, max_value=60, value=1)
         
-        if st.form_submit_button("Ajouter la carte"):
+        submitted = st.form_submit_button("Ajouter la carte")
+        if submitted:
             recto_path, recto_text_val = (save_uploaded_file(recto_upload), None) if recto_upload else (recto_url, None) if recto_url else (None, recto_text)
             verso_path, verso_text_val = (save_uploaded_file(verso_upload), None) if verso_upload else (verso_url, None) if verso_url else (None, verso_text)
 
@@ -366,8 +368,7 @@ def display_create_card():
                 }
                 all_cards.append(new_card)
                 save_flashcards(all_cards)
-                st.success("Carte ajoutée !")
-                st.rerun()
+                st.success("Carte ajoutée ! Le formulaire a été réinitialisé.")
             else:
                 st.error("Le recto et le verso doivent avoir un contenu.")
 
