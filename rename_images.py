@@ -1,4 +1,5 @@
 import os
+import uuid
 
 # --- Configuration ---
 # Extensions de fichiers image prises en charge.
@@ -8,12 +9,12 @@ def main():
     """
     Fonction principale du script de renommage.
     """
-    print("--- Script de renommage séquentiel d'images (recto/verso) ---")
+    print("--- Script de renommage séquentiel d'images (recto/verso) avec ID unique ---")
 
     # 1. Demander le chemin du dossier source
     source_folder = input("Veuillez entrer le chemin complet du dossier contenant les images à renommer : ")
     if not os.path.isdir(source_folder):
-        print(f"❌ Erreur : Le dossier '{source_folder}' n'existe pas ou n'est pas un dossier valide.")
+        print(f"❌ Erreur : Le dossier '{source_folder}' n'est pas un dossier valide.")
         return
 
     # 2. Récupérer et trier les images pour assurer un ordre cohérent
@@ -30,16 +31,23 @@ def main():
     # 3. Prévisualiser les changements prévus
     print("\nLes fichiers suivants seront renommés :")
     rename_plan = []
+    pair_id = ""
     for i, filename in enumerate(image_files):
-        # Déterminer le numéro de la paire et le type (recto/verso)
+        # Déterminer le numéro de la paire
         pair_number = (i // 2) + 1
+        
+        # Générer un ID unique pour chaque NOUVELLE paire (au moment du recto)
+        if i % 2 == 0:
+            # On utilise les 8 premiers caractères de l'UUID pour un ID plus court et lisible
+            pair_id = uuid.uuid4().hex[:8]
+            
         tag = "recto" if i % 2 == 0 else "verso"
         
         # Conserver l'extension originale du fichier
         original_extension = os.path.splitext(filename)[1]
         
-        # Construire le nouveau nom de fichier
-        new_filename = f"{pair_number:02d}_{tag}{original_extension}"
+        # Construire le nouveau nom de fichier avec le numéro, le tag et l'ID unique
+        new_filename = f"{pair_number:02d}_{tag}_{pair_id}{original_extension}"
         
         rename_plan.append((filename, new_filename))
         print(f"  '{filename}'  ->  '{new_filename}'")
