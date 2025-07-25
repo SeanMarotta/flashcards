@@ -34,18 +34,15 @@ def check_password():
         return True
 
 # --- Configuration et Initialisation ---
-# Constantes pour les noms de fichiers et de répertoires
 CARDS_FILE = "flashcards.json"
 IMAGE_DIR = "images"
-
-# Création du répertoire pour les images s'il n'existe pas
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
-# --- Fonctions Utilitaires pour la gestion des données ---
+# --- Fonctions Utilitaires ---
 
 def load_flashcards():
-    """Charge les flashcards depuis le fichier JSON. Retourne une liste vide si le fichier n'existe pas."""
+    """Charge les flashcards depuis le fichier JSON."""
     if not os.path.exists(CARDS_FILE):
         return []
     try:
@@ -60,7 +57,7 @@ def save_flashcards(cards):
         json.dump(cards, f, indent=4, ensure_ascii=False)
 
 def save_uploaded_file(uploaded_file):
-    """Sauvegarde un fichier (image) dans le répertoire des images et retourne son chemin."""
+    """Sauvegarde un fichier uploadé et retourne son chemin."""
     if uploaded_file is not None:
         file_extension = os.path.splitext(uploaded_file.name)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
@@ -71,19 +68,25 @@ def save_uploaded_file(uploaded_file):
     return None
 
 def delete_image_file(image_path):
-    """Supprime un fichier image s'il est local et existe."""
+    """Supprime un fichier image local s'il existe."""
     if image_path and not image_path.startswith('http') and os.path.exists(image_path):
         os.remove(image_path)
 
-def get_cards_for_review(box_number):
-    """Retourne une liste de cartes à réviser pour une boîte spécifique."""
+def get_cards_for_box_review(box_number):
+    """Retourne les cartes pour une boîte spécifique."""
     all_cards = load_flashcards()
     return [card for card in all_cards if card.get('box') == box_number]
+
+def get_cards_for_daily_review():
+    """Retourne les cartes dont la date de révision est aujourd'hui ou passée."""
+    all_cards = load_flashcards()
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    return [card for card in all_cards if card.get('next_review_date', '') <= today_str]
 
 
 # --- Initialisation du Session State ---
 def initialize_session_state():
-    """Initialise les variables nécessaires dans le state de la session."""
+    """Initialise les variables de session."""
     if 'review_cards' not in st.session_state:
         st.session_state.review_cards = []
     if 'current_card_index' not in st.session_state:
@@ -93,21 +96,21 @@ def initialize_session_state():
     if 'editing_card_id' not in st.session_state:
         st.session_state.editing_card_id = None
 
-# --- Fonctions d'affichage de contenu ---
+# --- Fonctions d'affichage ---
 def display_content(content, title):
-    """Affiche du texte ou une image (locale ou URL) avec un titre."""
+    """Affiche le contenu (texte ou image)."""
     st.subheader(title)
     if not content:
         st.warning("Contenu introuvable.")
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
-         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: black;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #333;'>{content}</div>", unsafe_allow_html=True)
     else:
-        st.warning(f"Contenu inattendu ou chemin d'image invalide : {content}")
+        st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
 def display_card_face_content(col, title, path, text):
-    """Affiche le contenu (texte ou image) d'une face de carte dans une colonne."""
+    """Affiche le contenu d'une face de carte."""
     with col:
         st.markdown(f"**{title}**")
         if path:
@@ -127,16 +130,33 @@ def display_review_session():
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.subheader("Choisissez une boîte")
+        st.subheader("Choisissez un mode de révision")
+
+        # Mode 1: Révision du jour
+        st.markdown("**Révision du Jour**")
+        cards_due_today = get_cards_for_daily_review()
+        if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, type="primary"):
+            if cards_due_today:
+                st.session_state.review_cards = cards_due_today
+                st.session_state.current_card_index = 0
+                st.session_state.show_answer = False
+                st.rerun()
+            else:
+                st.toast("Aucune carte à réviser pour aujourd'hui. Reposez-vous !", icon="🌴")
+
+        st.markdown("---")
+
+        # Mode 2: Révision par boîte
+        st.markdown("**Révision par Boîte**")
         all_cards = load_flashcards()
         if all_cards:
             existing_boxes = sorted(list(set(c['box'] for c in all_cards)))
             box_options = ["-- Choisir une boîte --"] + existing_boxes
             box_to_review = st.selectbox("Boîtes disponibles:", options=box_options)
 
-            if st.button("Démarrer la révision", use_container_width=True):
+            if st.button("Démarrer la révision de la boîte", use_container_width=True):
                 if box_to_review != "-- Choisir une boîte --":
-                    st.session_state.review_cards = get_cards_for_review(box_number=int(box_to_review))
+                    st.session_state.review_cards = get_cards_for_box_review(box_number=int(box_to_review))
                     st.session_state.current_card_index = 0
                     st.session_state.show_answer = False
                     if not st.session_state.review_cards:
@@ -157,7 +177,7 @@ def display_review_session():
 
             is_recto_question = card.get('current_face', 'recto') == 'recto'
             
-            question_content = card.get('recto_path') or card.get('recto_text') if is_recto_question else card.get('verso_path') or card.get('verso_text')
+            question_content = card.get('recto_path') if is_recto_question else card.get('verso_path') or card.get('verso_text')
             answer_content = card.get('verso_path') or card.get('verso_text') if is_recto_question else card.get('recto_path') or card.get('recto_text')
             question_title = "Recto (Question)" if is_recto_question else "Verso (Question)"
             answer_title = "Verso (Réponse)" if is_recto_question else "Recto (Réponse)"
@@ -191,23 +211,18 @@ def display_review_session():
                     st.rerun()
 
                 def handle_pass():
-                    """Passe à la carte suivante sans la modifier."""
                     st.toast("Carte passée.", icon="⏭️")
                     st.session_state.current_card_index += 1
                     st.session_state.show_answer = False
                     st.rerun()
 
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
-
                 with btn_col1:
-                    if st.button("✅ Correct", use_container_width=True, type="primary"):
-                        handle_response(correct=True)
+                    if st.button("✅ Correct", use_container_width=True, type="primary"): handle_response(correct=True)
                 with btn_col2:
-                    if st.button("❌ Incorrect", use_container_width=True):
-                        handle_response(correct=False)
+                    if st.button("❌ Incorrect", use_container_width=True): handle_response(correct=False)
                 with btn_col3:
-                    if st.button("⏭️ Pass", use_container_width=True, type="secondary"):
-                        handle_pass()
+                    if st.button("⏭️ Pass", use_container_width=True, type="secondary"): handle_pass()
             else:
                 if st.button("Afficher la réponse", use_container_width=True):
                     st.session_state.show_answer = True
@@ -217,13 +232,12 @@ def display_review_session():
             st.success("🎉 Session de révision terminée ! Bravo !")
             st.session_state.review_cards = []
 
-
 # --- Section 2: Gérer les cartes ---
 def display_card_management():
     st.header("🗂️ Gérer les cartes existantes")
     all_cards = load_flashcards()
     if not all_cards:
-        st.info("Aucune carte n'a été créée. Allez dans 'Créer une nouvelle carte' pour commencer.")
+        st.info("Aucune carte créée. Allez dans 'Créer une nouvelle carte'.")
         return
 
     if st.session_state.editing_card_id:
@@ -231,13 +245,13 @@ def display_card_management():
         return
 
     for card in sorted(all_cards, key=lambda x: x['box']):
-        current_face_str = card.get('current_face', 'recto').capitalize()
-        expander_title = f"Boîte n°{card['box']} - Face actuelle: {current_face_str} - Prochaine révision: {card.get('next_review_date', 'N/A')}"
-        with st.expander(expander_title):
-            col1, col2, col3 = st.columns([2, 2, 1])
-            display_card_face_content(col1, "Recto", card.get('recto_path'), card.get('recto_text'))
-            display_card_face_content(col2, "Verso", card.get('verso_path'), card.get('verso_text'))
-            with col3:
+        face = card.get('current_face', 'recto').capitalize()
+        exp_title = f"Boîte n°{card['box']} - Face: {face} - Prochaine révision: {card.get('next_review_date', 'N/A')}"
+        with st.expander(exp_title):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            display_card_face_content(c1, "Recto", card.get('recto_path'), card.get('recto_text'))
+            display_card_face_content(c2, "Verso", card.get('verso_path'), card.get('verso_text'))
+            with c3:
                 st.markdown("**Actions**")
                 if st.button("Modifier", key=f"edit_{card['id']}", use_container_width=True):
                     st.session_state.editing_card_id = card['id']
@@ -245,11 +259,10 @@ def display_card_management():
                 if st.button("Supprimer", key=f"del_{card['id']}", use_container_width=True, type="secondary"):
                     delete_image_file(card.get('recto_path'))
                     delete_image_file(card.get('verso_path'))
-                    cards_after_deletion = [c for c in all_cards if c['id'] != card['id']]
-                    save_flashcards(cards_after_deletion)
+                    new_cards = [c for c in all_cards if c['id'] != card['id']]
+                    save_flashcards(new_cards)
                     st.toast("Carte supprimée !", icon="🗑️")
                     st.rerun()
-
 
 # --- Section 3: Modifier une carte ---
 def display_edit_form():
@@ -257,117 +270,95 @@ def display_edit_form():
     all_cards = load_flashcards()
     card_to_edit = next((c for c in all_cards if c['id'] == st.session_state.editing_card_id), None)
     if not card_to_edit:
-        st.error("Carte non trouvée. Retour à la liste.")
+        st.error("Carte non trouvée.")
         st.session_state.editing_card_id = None
         return
 
     with st.form("edit_card_form"):
         st.write(f"Modification de la carte de la boîte n°{card_to_edit['box']}")
-        new_box = st.number_input("Changer la boîte (1-60)", min_value=1, max_value=60, value=card_to_edit['box'])
+        new_box = st.number_input("Changer la boîte", min_value=1, max_value=60, value=card_to_edit['box'])
         
         st.markdown("**Contenu Recto**")
         display_card_face_content(st, "", card_to_edit.get('recto_path'), card_to_edit.get('recto_text'))
-        new_recto_text = st.text_area("Changer le texte du Recto", value=card_to_edit.get('recto_text', ''), key="edit_recto_text")
-        new_recto_url = st.text_input("Ou changer le lien de l'image web", value=card_to_edit.get('recto_path', '') if card_to_edit.get('recto_path','').startswith('http') else '', key="edit_recto_url")
-        new_recto_upload = st.file_uploader("Ou changer l'image locale", type=['png', 'jpg', 'jpeg'], key="edit_recto_img")
+        new_recto_text = st.text_area("Texte Recto", value=card_to_edit.get('recto_text', ''), key="edit_recto_text")
+        new_recto_url = st.text_input("Lien image Recto", value=card_to_edit.get('recto_path', '') if card_to_edit.get('recto_path','').startswith('http') else '', key="edit_recto_url")
+        new_recto_upload = st.file_uploader("Image locale Recto", type=['png', 'jpg', 'jpeg'], key="edit_recto_img")
         
         st.markdown("**Contenu Verso**")
         display_card_face_content(st, "", card_to_edit.get('verso_path'), card_to_edit.get('verso_text'))
-        new_verso_text = st.text_area("Changer le texte du Verso", value=card_to_edit.get('verso_text', ''), key="edit_verso_text")
-        new_verso_url = st.text_input("Ou changer le lien de l'image web", value=card_to_edit.get('verso_path', '') if card_to_edit.get('verso_path','').startswith('http') else '', key="edit_verso_url")
-        new_verso_upload = st.file_uploader("Ou changer l'image locale", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
+        new_verso_text = st.text_area("Texte Verso", value=card_to_edit.get('verso_text', ''), key="edit_verso_text")
+        new_verso_url = st.text_input("Lien image Verso", value=card_to_edit.get('verso_path', '') if card_to_edit.get('verso_path','').startswith('http') else '', key="edit_verso_url")
+        new_verso_upload = st.file_uploader("Image locale Verso", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
 
-        if st.form_submit_button("Sauvegarder les modifications"):
-            for i, c in enumerate(all_cards):
-                if c['id'] == st.session_state.editing_card_id:
-                    all_cards[i]['box'] = new_box
-                    all_cards[i]['next_review_date'] = (datetime.now() + timedelta(days=new_box)).strftime('%Y-%m-%d')
-                    
-                    if new_recto_upload:
-                        delete_image_file(c.get('recto_path'))
-                        all_cards[i]['recto_path'] = save_uploaded_file(new_recto_upload)
-                        all_cards[i]['recto_text'] = None
-                    elif new_recto_url:
-                        delete_image_file(c.get('recto_path'))
-                        all_cards[i]['recto_path'] = new_recto_url
-                        all_cards[i]['recto_text'] = None
-                    elif new_recto_text:
-                        delete_image_file(c.get('recto_path'))
-                        all_cards[i]['recto_path'] = None
-                        all_cards[i]['recto_text'] = new_recto_text
-                    else:
-                        delete_image_file(c.get('recto_path'))
-                        all_cards[i]['recto_path'] = None
-                        all_cards[i]['recto_text'] = None
+        if st.form_submit_button("Sauvegarder"):
+            idx = next((i for i, c in enumerate(all_cards) if c['id'] == st.session_state.editing_card_id), -1)
+            if idx != -1:
+                all_cards[idx]['box'] = new_box
+                all_cards[idx]['next_review_date'] = (datetime.now() + timedelta(days=new_box)).strftime('%Y-%m-%d')
+                
+                # Mise à jour Recto
+                if new_recto_upload:
+                    delete_image_file(all_cards[idx].get('recto_path'))
+                    all_cards[idx]['recto_path'] = save_uploaded_file(new_recto_upload)
+                    all_cards[idx]['recto_text'] = None
+                elif new_recto_url:
+                    delete_image_file(all_cards[idx].get('recto_path'))
+                    all_cards[idx]['recto_path'] = new_recto_url
+                    all_cards[idx]['recto_text'] = None
+                else:
+                    delete_image_file(all_cards[idx].get('recto_path'))
+                    all_cards[idx]['recto_path'] = None
+                    all_cards[idx]['recto_text'] = new_recto_text
+                
+                # Mise à jour Verso
+                if new_verso_upload:
+                    delete_image_file(all_cards[idx].get('verso_path'))
+                    all_cards[idx]['verso_path'] = save_uploaded_file(new_verso_upload)
+                    all_cards[idx]['verso_text'] = None
+                elif new_verso_url:
+                    delete_image_file(all_cards[idx].get('verso_path'))
+                    all_cards[idx]['verso_path'] = new_verso_url
+                    all_cards[idx]['verso_text'] = None
+                else:
+                    delete_image_file(all_cards[idx].get('verso_path'))
+                    all_cards[idx]['verso_path'] = None
+                    all_cards[idx]['verso_text'] = new_verso_text
 
-                    if new_verso_upload:
-                        delete_image_file(c.get('verso_path'))
-                        all_cards[i]['verso_path'] = save_uploaded_file(new_verso_upload)
-                        all_cards[i]['verso_text'] = None
-                    elif new_verso_url:
-                        delete_image_file(c.get('verso_path'))
-                        all_cards[i]['verso_path'] = new_verso_url
-                        all_cards[i]['verso_text'] = None
-                    elif new_verso_text:
-                        delete_image_file(c.get('verso_path'))
-                        all_cards[i]['verso_path'] = None
-                        all_cards[i]['verso_text'] = new_verso_text
-                    else:
-                        delete_image_file(c.get('verso_path'))
-                        all_cards[i]['verso_path'] = None
-                        all_cards[i]['verso_text'] = None
-                    break
-            
-            save_flashcards(all_cards)
-            st.toast("Carte modifiée avec succès !", icon="✅")
-            st.session_state.editing_card_id = None
-            st.rerun()
-    if st.button("Annuler l'édition"):
+                save_flashcards(all_cards)
+                st.toast("Carte modifiée !", icon="✅")
+                st.session_state.editing_card_id = None
+                st.rerun()
+
+    if st.button("Annuler"):
         st.session_state.editing_card_id = None
         st.rerun()
 
-
-# --- Section 4: Créer une nouvelle carte ---
+# --- Section 4: Créer une carte ---
 def display_create_card():
     st.header("➕ Créer une nouvelle carte")
     with st.form("new_card_form"):
-        st.subheader("Contenu du Recto (Question)")
-        recto_text = st.text_input("Écrire du texte pour le recto", key="recto_txt")
-        recto_url = st.text_input("Ou entrer un lien vers une image web", key="recto_url")
-        recto_upload = st.file_uploader("Importer une image locale", type=['png', 'jpg', 'jpeg'], key="recto_up")
-        st.markdown("---")
+        st.subheader("Recto (Question)")
+        recto_text = st.text_area("Texte", key="recto_txt")
+        recto_url = st.text_input("Lien image web", key="recto_url")
+        recto_upload = st.file_uploader("Image locale", type=['png', 'jpg', 'jpeg'], key="recto_up")
         
-        st.subheader("Contenu du Verso (Réponse)")
-        verso_text = st.text_input("Écrire du texte pour le verso", key="verso_txt")
-        verso_url = st.text_input("Ou entrer un lien vers une image web", key="verso_url")
-        verso_upload = st.file_uploader("Importer une image locale", type=['png', 'jpg', 'jpeg'], key="verso_up")
-        st.markdown("---")
-
-        initial_box = st.number_input("Placer dans la boîte n°", min_value=1, max_value=60, value=1)
+        st.subheader("Verso (Réponse)")
+        verso_text = st.text_area("Texte", key="verso_txt")
+        verso_url = st.text_input("Lien image web", key="verso_url")
+        verso_upload = st.file_uploader("Image locale", type=['png', 'jpg', 'jpeg'], key="verso_up")
+        
+        initial_box = st.number_input("Boîte de départ", min_value=1, max_value=60, value=1)
         
         if st.form_submit_button("Ajouter la carte"):
-            recto_path_val, recto_text_val = None, None
-            if recto_upload:
-                recto_path_val = save_uploaded_file(recto_upload)
-            elif recto_url:
-                recto_path_val = recto_url
-            elif recto_text:
-                recto_text_val = recto_text
+            recto_path, recto_text_val = (save_uploaded_file(recto_upload), None) if recto_upload else (recto_url, None) if recto_url else (None, recto_text)
+            verso_path, verso_text_val = (save_uploaded_file(verso_upload), None) if verso_upload else (verso_url, None) if verso_url else (None, verso_text)
 
-            verso_path_val, verso_text_val = None, None
-            if verso_upload:
-                verso_path_val = save_uploaded_file(verso_upload)
-            elif verso_url:
-                verso_path_val = verso_url
-            elif verso_text:
-                verso_text_val = verso_text
-
-            if (recto_path_val or recto_text_val) and (verso_path_val or verso_text_val):
+            if (recto_path or recto_text_val) and (verso_path or verso_text_val):
                 all_cards = load_flashcards()
                 new_card = {
                     "id": str(uuid.uuid4()),
-                    "recto_path": recto_path_val, "recto_text": recto_text_val,
-                    "verso_path": verso_path_val, "verso_text": verso_text_val,
+                    "recto_path": recto_path, "recto_text": recto_text_val,
+                    "verso_path": verso_path, "verso_text": verso_text_val,
                     "box": initial_box,
                     "creation_date": datetime.now().strftime('%Y-%m-%d'),
                     "next_review_date": (datetime.now() + timedelta(days=initial_box)).strftime('%Y-%m-%d'),
@@ -375,13 +366,12 @@ def display_create_card():
                 }
                 all_cards.append(new_card)
                 save_flashcards(all_cards)
-                st.success("Nouvelle carte ajoutée avec succès !")
+                st.success("Carte ajoutée !")
                 st.rerun()
             else:
-                st.error("Veuillez fournir un contenu (texte ou image) pour le recto ET pour le verso.")
+                st.error("Le recto et le verso doivent avoir un contenu.")
 
-
-# --- Interface Utilisateur (UI) ---
+# --- Point d'entrée principal ---
 st.set_page_config(layout="wide", page_title="Révision Espacée")
 st.title("🧠 Application de Révision à Répétition Espacée")
 

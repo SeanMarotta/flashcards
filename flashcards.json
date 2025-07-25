@@ -5,10 +5,10 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "Brigitte Bardot",
-        "box": 2,
+        "box": 1,
         "creation_date": "2025-07-24",
         "next_review_date": "2025-07-26",
-        "current_face": "verso"
+        "current_face": "recto"
     },
     {
         "id": "d8daf96b-131a-4f98-bb58-9856278b1f52",
@@ -38,10 +38,10 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "L'école d'Athènes- Raphaël (1511)",
-        "box": 19,
+        "box": 18,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-08-13",
-        "current_face": "recto"
+        "next_review_date": "2025-08-12",
+        "current_face": "verso"
     },
     {
         "id": "32c9d064-5ab4-4f6f-83fd-fb7e821b4237",
