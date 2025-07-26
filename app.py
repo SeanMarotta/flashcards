@@ -54,7 +54,7 @@ def load_flashcards():
 def save_flashcards(cards):
     """Sauvegarde la liste des flashcards dans le fichier JSON."""
     with open(CARDS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cards, f, indent=4, ensure_ascii=False)
+        json.dump(cards, f, indent=4, ensure_ascii=False, sort_keys=True)
 
 def save_uploaded_file(uploaded_file):
     """Sauvegarde un fichier uploadé et retourne son chemin."""
@@ -178,7 +178,6 @@ def display_review_session():
 
             is_recto_question = card.get('current_face', 'recto') == 'recto'
             
-            # --- FIX: Check for path OR text for the question side ---
             question_content = (card.get('recto_path') or card.get('recto_text')) if is_recto_question else (card.get('verso_path') or card.get('verso_text'))
             answer_content = (card.get('verso_path') or card.get('verso_text')) if is_recto_question else (card.get('recto_path') or card.get('recto_text'))
             question_title = "Recto (Question)" if is_recto_question else "Verso (Question)"
@@ -193,6 +192,10 @@ def display_review_session():
 
                 def handle_response(correct):
                     all_cards = load_flashcards()
+                    # La date de la révision actuelle est la base pour les calculs
+                    review_date = datetime.now()
+                    
+
                     for i, c in enumerate(all_cards):
                         if c['id'] == card['id']:
                             if correct:
@@ -203,7 +206,12 @@ def display_review_session():
                                 icon, message = "📚", f"Pas de souci. Carte déplacée vers la boîte n°{new_box}."
                             
                             all_cards[i]['box'] = new_box
-                            all_cards[i]['next_review_date'] = (datetime.now() + timedelta(days=new_box)).strftime('%Y-%m-%d')
+                            # === MODIFICATION ===
+                            # La date de révision devient la date du jour.
+                            all_cards[i]['last_reviewed_date'] = review_date.strftime('%Y-%m-%d')
+                            # La prochaine révision est calculée à partir de la date de révision actuelle.
+                            all_cards[i]['next_review_date'] = (review_date + timedelta(days=new_box)).strftime('%Y-%m-%d')
+                            # ====================
                             all_cards[i]['current_face'] = 'verso' if c.get('current_face', 'recto') == 'recto' else 'recto'
                             break
                     save_flashcards(all_cards)
@@ -257,7 +265,6 @@ def display_card_management():
         # 2. Sélection de la carte dans la boîte
         card_labels = ["-- Choisir une carte --"]
         for i, card in enumerate(cards_in_box):
-            # Créer un label plus descriptif pour chaque carte
             recto_content = card.get('recto_text') or os.path.basename(card.get('recto_path', ''))
             label = f"Carte {i+1}: {str(recto_content)[:30]}..." if recto_content else f"Carte {i+1}"
             card_labels.append(f"{label} ({card['id']})")
@@ -265,15 +272,26 @@ def display_card_management():
         selected_card_label = st.selectbox("Choisissez une carte:", options=card_labels)
 
         if selected_card_label != "-- Choisir une carte --":
-            # Extraire l'ID du label pour trouver la bonne carte
             card_id_to_display = selected_card_label.split('(')[-1].replace(')', '')
             card_to_display = next((c for c in cards_in_box if c['id'] == card_id_to_display), None)
             
             if card_to_display:
                 # 3. Affichage de la carte sélectionnée
                 st.markdown("---")
+                st.subheader(f"Détails de la carte (Boîte n°{card_to_display['box']})")
+
+                creation_date = card_to_display.get('creation_date', 'N/A')
+                last_review = card_to_display.get('last_reviewed_date') or 'Jamais'
+                next_review = card_to_display.get('next_review_date', 'N/A')
                 face = card_to_display.get('current_face', 'recto').capitalize()
-                st.subheader(f"Détails de la carte (Boîte n°{card_to_display['box']} - Face: {face})")
+                
+                st.markdown(f"""
+                - **Date de création :** `{creation_date}`
+                - **Dernière révision :** `{last_review}`
+                - **Prochaine révision :** `{next_review}`
+                - **Face pour la question :** `{face}`
+                """)
+                st.markdown("---")
 
                 c1, c2, c3 = st.columns([2, 2, 1])
                 display_card_face_content(c1, "Recto", card_to_display.get('recto_path'), card_to_display.get('recto_text'))
@@ -322,8 +340,19 @@ def display_edit_form():
             idx = next((i for i, c in enumerate(all_cards) if c['id'] == st.session_state.editing_card_id), -1)
             if idx != -1:
                 all_cards[idx]['box'] = new_box
-                all_cards[idx]['next_review_date'] = (datetime.now() + timedelta(days=new_box)).strftime('%Y-%m-%d')
-                
+
+                # === MODIFICATION ===
+                # Pour le recalcul manuel, on se base sur la dernière date de révision si elle existe,
+                # sinon sur la date de création.
+                base_date_str = all_cards[idx].get('last_reviewed_date') or all_cards[idx].get('creation_date')
+                if base_date_str:
+                    base_date = datetime.strptime(base_date_str, '%Y-%m-%d')
+                else:
+                    # Fallback au cas où aucune date n'existe
+                    base_date = datetime.now()
+                all_cards[idx]['next_review_date'] = (base_date + timedelta(days=new_box)).strftime('%Y-%m-%d')
+                # ====================
+
                 # Mise à jour Recto
                 if new_recto_upload:
                     delete_image_file(all_cards[idx].get('recto_path'))
@@ -364,7 +393,6 @@ def display_edit_form():
 # --- Section 4: Créer une carte ---
 def display_create_card():
     st.header("➕ Créer une nouvelle carte")
-    # L'option clear_on_submit=True vide automatiquement les champs du formulaire après validation.
     with st.form("new_card_form", clear_on_submit=True):
         st.subheader("Recto (Question)")
         recto_text = st.text_area("Texte", key="recto_txt")
@@ -385,14 +413,18 @@ def display_create_card():
 
             if (recto_path or recto_text_val) and (verso_path or verso_text_val):
                 all_cards = load_flashcards()
+                creation_date = datetime.now()
                 new_card = {
-                    "id": str(uuid.uuid4()),
-                    "recto_path": recto_path, "recto_text": recto_text_val,
-                    "verso_path": verso_path, "verso_text": verso_text_val,
                     "box": initial_box,
-                    "creation_date": datetime.now().strftime('%Y-%m-%d'),
-                    "next_review_date": (datetime.now() + timedelta(days=initial_box)).strftime('%Y-%m-%d'),
-                    "current_face": "recto"
+                    "creation_date": creation_date.strftime('%Y-%m-%d'),
+                    "current_face": "recto",
+                    "id": str(uuid.uuid4()),
+                    "last_reviewed_date": None,
+                    "next_review_date": (creation_date + timedelta(days=initial_box)).strftime('%Y-%m-%d'),
+                    "recto_path": recto_path, 
+                    "recto_text": recto_text_val,
+                    "verso_path": verso_path, 
+                    "verso_text": verso_text_val
                 }
                 all_cards.append(new_card)
                 save_flashcards(all_cards)
