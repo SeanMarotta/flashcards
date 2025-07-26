@@ -105,23 +105,24 @@ def display_content(content, title):
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
-         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: black;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #f9f9f9;'>{content}</div>", unsafe_allow_html=True)
     else:
         st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
-def display_card_face_content(col, title, path, text):
-    """Affiche le contenu d'une face de carte."""
-    with col:
-        st.markdown(f"**{title}**")
-        if path:
-            if path.startswith(('http://', 'https://')) or os.path.exists(path):
-                st.image(path, use_container_width=True)
-            else:
-                st.error(f"Image locale introuvable : {os.path.basename(path)}")
-        elif text:
-            st.markdown(text)
+def display_card_face_content(container, title, path, text):
+    """Affiche le contenu d'une face de carte dans un conteneur donné (st, col, etc.)."""
+    if title:
+        container.markdown(f"**{title}**")
+        
+    if path:
+        if path.startswith(('http://', 'https://')) or os.path.exists(path):
+            container.image(path, use_container_width=True)
         else:
-            st.warning("Contenu vide")
+            container.error(f"Image locale introuvable : {os.path.basename(path)}")
+    elif text:
+        container.markdown(text)
+    else:
+        container.warning("Contenu vide")
 
 
 # --- Section 1: Séance de révision ---
@@ -304,17 +305,17 @@ def display_edit_form():
         st.write(f"Modification de la carte de la boîte n°{card_to_edit['box']}")
         new_box = st.number_input("Changer la boîte", min_value=1, max_value=60, value=card_to_edit['box'])
         
-        st.markdown("**Contenu Recto**")
+        st.markdown("**Contenu Recto Actuel**")
         display_card_face_content(st, "", card_to_edit.get('recto_path'), card_to_edit.get('recto_text'))
-        new_recto_text = st.text_area("Texte Recto", value=card_to_edit.get('recto_text', ''), key="edit_recto_text")
-        new_recto_url = st.text_input("Lien image Recto", value=card_to_edit.get('recto_path', '') if card_to_edit.get('recto_path','').startswith('http') else '', key="edit_recto_url")
-        new_recto_upload = st.file_uploader("Image locale Recto", type=['png', 'jpg', 'jpeg'], key="edit_recto_img")
+        new_recto_text = st.text_area("Nouveau Texte Recto", value=card_to_edit.get('recto_text', ''), key="edit_recto_text")
+        new_recto_url = st.text_input("Nouveau Lien image Recto", value=card_to_edit.get('recto_path', '') if card_to_edit.get('recto_path','').startswith('http') else '', key="edit_recto_url")
+        new_recto_upload = st.file_uploader("Nouvelle Image locale Recto", type=['png', 'jpg', 'jpeg'], key="edit_recto_img")
         
-        st.markdown("**Contenu Verso**")
+        st.markdown("**Contenu Verso Actuel**")
         display_card_face_content(st, "", card_to_edit.get('verso_path'), card_to_edit.get('verso_text'))
-        new_verso_text = st.text_area("Texte Verso", value=card_to_edit.get('verso_text', ''), key="edit_verso_text")
-        new_verso_url = st.text_input("Lien image Verso", value=card_to_edit.get('verso_path', '') if card_to_edit.get('verso_path','').startswith('http') else '', key="edit_verso_url")
-        new_verso_upload = st.file_uploader("Image locale Verso", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
+        new_verso_text = st.text_area("Nouveau Texte Verso", value=card_to_edit.get('verso_text', ''), key="edit_verso_text")
+        new_verso_url = st.text_input("Nouveau Lien image Verso", value=card_to_edit.get('verso_path', '') if card_to_edit.get('verso_path','').startswith('http') else '', key="edit_verso_url")
+        new_verso_upload = st.file_uploader("Nouvelle Image locale Verso", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
 
         if st.form_submit_button("Sauvegarder"):
             idx = next((i for i, c in enumerate(all_cards) if c['id'] == st.session_state.editing_card_id), -1)
