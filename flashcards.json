@@ -115,10 +115,10 @@
         "recto_text": null,
         "verso_path": "images/0cdcdb00-bdc2-44ab-9813-df11d9b76995.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "4e4b9933-82ae-424b-91d3-c79ab9cbfb3f",
@@ -126,10 +126,10 @@
         "recto_text": null,
         "verso_path": "images/4666ee52-de58-4cd9-b347-54e2f5614c21.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "6e2cccd7-e9ec-44e7-9717-0e8459695e5c",
@@ -137,10 +137,10 @@
         "recto_text": null,
         "verso_path": "images/cb43c07f-0fe4-41e1-bd27-d84db19c0891.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "437bd693-7c07-45a4-b93d-2ef7dbf4d284",
@@ -148,10 +148,10 @@
         "recto_text": null,
         "verso_path": "images/302e0488-6c12-4253-b592-b3bdc7819fa2.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "f5986b0a-2361-4f12-a8e2-4d9fe36bad74",
@@ -159,10 +159,10 @@
         "recto_text": null,
         "verso_path": "images/fa4f6cbd-fa3f-41fa-bc20-2b4696de8215.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "ad45487a-89bf-44a0-aad4-d8dc0f3909fe",
@@ -170,10 +170,10 @@
         "recto_text": null,
         "verso_path": "images/70282bfa-d624-45b3-a3e7-da3d8c89a4a3.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "35a65235-24a6-4725-9250-98f96e5ed7bf",
@@ -1358,10 +1358,10 @@
         "recto_text": "Éperlan",
         "verso_path": "https://www.academiedugout.fr/images/5461/1200-auto/eperlan-copy.jpg?poix=50&poiy=50",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "51e407c8-93f7-4458-add1-f3a9224313dc",
@@ -1369,10 +1369,10 @@
         "recto_text": "Carlos Goshn",
         "verso_path": null,
         "verso_text": "Ancien PDG de Nissan Renault",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "2b8d95b6-74b8-413e-9219-f2934320e65f",
@@ -1380,10 +1380,10 @@
         "recto_text": "Prix Nobel de Littérature en 1953",
         "verso_path": null,
         "verso_text": "Winston Churchill (prix Nobel ?)",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "ff60bd56-6750-46bf-a581-de8fd92001ba",
@@ -1391,10 +1391,10 @@
         "recto_text": "Premier Ministre de UK pendant Second Guerre Mondiale",
         "verso_path": null,
         "verso_text": "Winston Churchill (rôle État)",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "df69bbf2-6d2e-4d6e-9a23-8ee4880c2f0a",
@@ -1402,10 +1402,10 @@
         "recto_text": "Popularisé l'expression \"Rideau de feu\"",
         "verso_path": null,
         "verso_text": "Winston Churchill (expression)",
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "c82656d5-e880-4633-b65c-34d7ac83c8de",
@@ -1413,10 +1413,10 @@
         "recto_text": "Albert Moukheiber",
         "verso_path": "https://upload.wikimedia.org/wikipedia/commons/1/14/Albert-moukheiber.jpg",
         "verso_text": null,
-        "box": 1,
+        "box": 2,
         "creation_date": "2025-07-25",
-        "next_review_date": "2025-07-26",
-        "current_face": "recto"
+        "next_review_date": "2025-07-28",
+        "current_face": "verso"
     },
     {
         "id": "14c48a01-92ee-4f21-8cac-455e42fda856",
@@ -2802,6 +2802,17 @@
         "box": 19,
         "creation_date": "2025-07-26",
         "next_review_date": "2025-08-14",
+        "current_face": "recto"
+    },
+    {
+        "id": "a7050710-c8b7-4300-b867-56958e7b8a87",
+        "recto_path": null,
+        "recto_text": "To cope",
+        "verso_path": null,
+        "verso_text": "Pour faire face",
+        "box": 1,
+        "creation_date": "2025-07-26",
+        "next_review_date": "2025-07-27",
         "current_face": "recto"
     }
 ]
