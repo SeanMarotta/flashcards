@@ -10,7 +10,7 @@ def check_password():
 
     def password_entered():
         """Vérifie si le mot de passe entré par l'utilisateur est correct."""
-        if st.session_state["password"] == st.secrets["password"]:
+        if "password" in st.session_state and st.session_state["password"] == st.secrets["password"]:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Ne pas garder le mot de passe en mémoire
         else:
@@ -178,8 +178,9 @@ def display_review_session():
 
             is_recto_question = card.get('current_face', 'recto') == 'recto'
             
-            question_content = card.get('recto_path') if is_recto_question else card.get('verso_path') or card.get('verso_text')
-            answer_content = card.get('verso_path') or card.get('verso_text') if is_recto_question else card.get('recto_path') or card.get('recto_text')
+            # --- FIX: Check for path OR text for the question side ---
+            question_content = (card.get('recto_path') or card.get('recto_text')) if is_recto_question else (card.get('verso_path') or card.get('verso_text'))
+            answer_content = (card.get('verso_path') or card.get('verso_text')) if is_recto_question else (card.get('recto_path') or card.get('recto_text'))
             question_title = "Recto (Question)" if is_recto_question else "Verso (Question)"
             answer_title = "Verso (Réponse)" if is_recto_question else "Recto (Réponse)"
 
