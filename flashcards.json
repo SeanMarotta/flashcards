@@ -9254,5 +9254,29 @@
         "recto_text": null,
         "verso_path": "images/88_verso_245d1c9f.jpg",
         "verso_text": null
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-07-27",
+        "current_face": "recto",
+        "id": "879de366-72dc-4792-8121-301d3c27ef5a",
+        "last_reviewed_date": null,
+        "next_review_date": "2025-07-28",
+        "recto_path": null,
+        "recto_text": "Local Repository",
+        "verso_path": null,
+        "verso_text": "Base de données qui contient l'historique de modifications du projet"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-07-27",
+        "current_face": "recto",
+        "id": "56485027-68b0-436e-9001-208849226c2c",
+        "last_reviewed_date": null,
+        "next_review_date": "2025-07-28",
+        "recto_path": null,
+        "recto_text": "Staging Area",
+        "verso_path": null,
+        "verso_text": "Zone intermédiaire où l'on stocke les modifications avant de l'envoyer dans le Local Repository"
     }
 ]
