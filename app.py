@@ -3,6 +3,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta
+import time
 
 # --- Fonction de vérification du mot de passe ---
 def check_password():
@@ -218,12 +219,14 @@ def display_review_session():
                     st.toast(message, icon=icon)
                     st.session_state.current_card_index += 1
                     st.session_state.show_answer = False
+                    time.sleep(1)
                     st.rerun()
 
                 def handle_pass():
                     st.toast("Carte passée.", icon="⏭️")
                     st.session_state.current_card_index += 1
                     st.session_state.show_answer = False
+                    time.sleep(1)
                     st.rerun()
 
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
