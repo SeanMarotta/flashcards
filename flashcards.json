@@ -11045,5 +11045,41 @@
         "recto_text": "Statue de la Liberté (facts)",
         "verso_path": null,
         "verso_text": "Offert par la France en 1886 pour le centenaire de l'indépendance US."
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-07-28",
+        "current_face": "recto",
+        "id": "edee7d2e-eed0-4477-b95c-55ffe4dd21b4",
+        "last_reviewed_date": null,
+        "next_review_date": "2025-07-29",
+        "recto_path": null,
+        "recto_text": "Centre pénitentiaire de Marseille",
+        "verso_path": null,
+        "verso_text": "Les Baumettes"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-07-29",
+        "current_face": "recto",
+        "id": "8da08b43-ee26-497a-927f-9541e5d340b5",
+        "last_reviewed_date": null,
+        "next_review_date": "2025-07-30",
+        "recto_path": null,
+        "recto_text": "Signal TTL",
+        "verso_path": null,
+        "verso_text": "Type de signal électronique numérique. Niveau logique 0 (tension entre 0V et 0.8V). Niveau 1 (tension entre 2 V et 5V)"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-07-29",
+        "current_face": "recto",
+        "id": "50fb862e-d9f8-4f9e-b66f-0faeb236cef3",
+        "last_reviewed_date": null,
+        "next_review_date": "2025-07-30",
+        "recto_path": null,
+        "recto_text": "Port RS-232",
+        "verso_path": null,
+        "verso_text": "Niveau logique 1 : -3V;-25V. Niveau logique 0 : +3V;+25V"
     }
 ]

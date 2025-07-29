@@ -38,6 +38,13 @@
         "2025-07-28": {
             "sommeil": 9,
             "reveil": 7,
+            "motivation": 7,
+            "attention": 8,
+            "productivite": 6
+        },
+        "2025-07-29": {
+            "sommeil": 5,
+            "reveil": 6,
             "motivation": 5,
             "attention": 5,
             "productivite": 5
@@ -65,7 +72,8 @@
         "2025-07-24": true,
         "2025-07-25": true,
         "2025-07-26": true,
-        "2025-07-27": true
+        "2025-07-27": true,
+        "2025-07-28": false
     },
     "\ud83d\udcda Connaissance g\u00e9n\u00e9rales": {
         "2025-07-01": true,
@@ -90,7 +98,8 @@
         "2025-07-24": true,
         "2025-07-25": true,
         "2025-07-26": true,
-        "2025-07-27": true
+        "2025-07-27": true,
+        "2025-07-28": true
     },
     "\ud83c\udfa8 Cr\u00e9ativit\u00e9": {
         "2025-07-01": true,
@@ -115,7 +124,8 @@
         "2025-07-23": true,
         "2025-07-24": true,
         "2025-07-25": true,
-        "2025-07-26": false
+        "2025-07-26": false,
+        "2025-07-28": true
     },
     "\ud83c\udfc3 Activit\u00e9 sportive": {
         "2025-07-05": true,
