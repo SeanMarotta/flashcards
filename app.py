@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 import time
 from habit_tracker import display_habit_tracker
+from eisenhower_matrix import display_eisenhower_matrix
 
 # --- Fonction de vérification du mot de passe ---
 def check_password():
@@ -450,11 +451,10 @@ def display_create_card():
 
 # --- Point d'entrée principal ---
 st.set_page_config(layout="wide", page_title="Révision Espacée")
-st.title("🧠 Application de Révision à Répétition Espacée")
 
 if check_password():
     initialize_session_state()
-    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte", "Habit Tracker"))
+    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte", "Habit Tracker", "Matrice d'Eisenhower"))
     st.sidebar.markdown("---")
 
     if menu == "Séance de révision":
@@ -465,3 +465,5 @@ if check_password():
         display_create_card()
     elif menu == "Habit Tracker":
         display_habit_tracker()
+    elif menu == "Matrice d'Eisenhower":
+        display_eisenhower_matrix()

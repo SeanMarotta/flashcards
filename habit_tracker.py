@@ -33,7 +33,7 @@ def display_habit_tracker():
     Fonction principale qui affiche toute la page du Habit Tracker.
     Elle est appelée depuis app.py.
     """
-    st.title("📅 Mon Suivi d'Habitudes & Bilan Journalier")
+    st.header("📅 Mon Suivi d'Habitudes & Bilan Journalier")
     if 'habits_data' not in st.session_state:
         st.session_state.habits_data = load_habits_data()
 
