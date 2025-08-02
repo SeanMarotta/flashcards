@@ -331,13 +331,25 @@ def display_edit_form():
         st.markdown("**Contenu Recto Actuel**")
         display_card_face_content(st, "", card_to_edit.get('recto_path'), card_to_edit.get('recto_text'))
         new_recto_text = st.text_area("Nouveau Texte Recto", value=card_to_edit.get('recto_text', ''), key="edit_recto_text")
-        new_recto_url = st.text_input("Nouveau Lien image Recto", value=card_to_edit.get('recto_path', '') if card_to_edit.get('recto_path','').startswith('http') else '', key="edit_recto_url")
+        
+        # --- FIX STARTS HERE ---
+        recto_path_value = card_to_edit.get('recto_path')
+        recto_url_default = recto_path_value if isinstance(recto_path_value, str) and recto_path_value.startswith('http') else ''
+        new_recto_url = st.text_input("Nouveau Lien image Recto", value=recto_url_default, key="edit_recto_url")
+        # --- FIX ENDS HERE ---
+        
         new_recto_upload = st.file_uploader("Nouvelle Image locale Recto", type=['png', 'jpg', 'jpeg'], key="edit_recto_img")
         
         st.markdown("**Contenu Verso Actuel**")
         display_card_face_content(st, "", card_to_edit.get('verso_path'), card_to_edit.get('verso_text'))
         new_verso_text = st.text_area("Nouveau Texte Verso", value=card_to_edit.get('verso_text', ''), key="edit_verso_text")
-        new_verso_url = st.text_input("Nouveau Lien image Verso", value=card_to_edit.get('verso_path', '') if card_to_edit.get('verso_path','').startswith('http') else '', key="edit_verso_url")
+
+        # --- FIX STARTS HERE ---
+        verso_path_value = card_to_edit.get('verso_path')
+        verso_url_default = verso_path_value if isinstance(verso_path_value, str) and verso_path_value.startswith('http') else ''
+        new_verso_url = st.text_input("Nouveau Lien image Verso", value=verso_url_default, key="edit_verso_url")
+        # --- FIX ENDS HERE ---
+
         new_verso_upload = st.file_uploader("Nouvelle Image locale Verso", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
 
         if st.form_submit_button("Sauvegarder"):
