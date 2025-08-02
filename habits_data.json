@@ -69,6 +69,13 @@
             "motivation": 9,
             "attention": 8,
             "productivite": 7
+        },
+        "2025-08-02": {
+            "sommeil": 9,
+            "reveil": 9,
+            "motivation": 7,
+            "attention": 3,
+            "productivite": 3
         }
     },
     "\ud83d\udcbc Comp\u00e9tence professionnelle": {
@@ -128,7 +135,8 @@
         "2025-07-29": true,
         "2025-07-30": true,
         "2025-07-31": true,
-        "2025-08-01": true
+        "2025-08-01": true,
+        "2025-08-02": true
     },
     "\ud83c\udfa8 Cr\u00e9ativit\u00e9": {
         "2025-07-01": true,
@@ -179,6 +187,7 @@
         "2025-07-27": true,
         "2025-07-29": true,
         "2025-07-30": true,
-        "2025-08-01": true
+        "2025-08-01": true,
+        "2025-08-02": true
     }
 }
