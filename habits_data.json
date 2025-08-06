@@ -90,6 +90,20 @@
             "motivation": 10,
             "attention": 8,
             "productivite": 7
+        },
+        "2025-08-05": {
+            "sommeil": 8,
+            "reveil": 9,
+            "motivation": 8,
+            "attention": 9,
+            "productivite": 6
+        },
+        "2025-08-06": {
+            "sommeil": 7,
+            "reveil": 9,
+            "motivation": 5,
+            "attention": 5,
+            "productivite": 5
         }
     },
     "\ud83d\udcbc Comp\u00e9tence professionnelle": {
@@ -120,7 +134,10 @@
         "2025-07-30": true,
         "2025-07-31": true,
         "2025-08-01": true,
-        "2025-08-03": true
+        "2025-08-03": true,
+        "2025-08-04": true,
+        "2025-08-05": true,
+        "2025-08-06": true
     },
     "\ud83d\udcda Connaissance g\u00e9n\u00e9rales": {
         "2025-07-01": true,
@@ -153,7 +170,9 @@
         "2025-08-01": true,
         "2025-08-02": true,
         "2025-08-03": true,
-        "2025-08-04": true
+        "2025-08-04": true,
+        "2025-08-05": true,
+        "2025-08-06": true
     },
     "\ud83c\udfa8 Cr\u00e9ativit\u00e9": {
         "2025-07-01": true,
@@ -182,7 +201,10 @@
         "2025-07-28": true,
         "2025-07-30": true,
         "2025-08-03": true,
-        "2025-08-02": true
+        "2025-08-02": true,
+        "2025-08-04": false,
+        "2025-08-05": true,
+        "2025-08-06": true
     },
     "\ud83c\udfc3 Activit\u00e9 sportive": {
         "2025-07-05": true,
@@ -209,6 +231,8 @@
         "2025-08-01": true,
         "2025-08-02": true,
         "2025-08-03": true,
-        "2025-08-04": true
+        "2025-08-04": true,
+        "2025-08-05": true,
+        "2025-08-06": true
     }
 }
