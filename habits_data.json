@@ -104,6 +104,20 @@
             "motivation": 10,
             "attention": 10,
             "productivite": 4
+        },
+        "2025-08-07": {
+            "sommeil": 8,
+            "reveil": 9,
+            "motivation": 10,
+            "attention": 9,
+            "productivite": 3
+        },
+        "2025-08-08": {
+            "sommeil": 10,
+            "reveil": 10,
+            "motivation": 5,
+            "attention": 5,
+            "productivite": 5
         }
     },
     "\ud83d\udcbc Comp\u00e9tence professionnelle": {
@@ -137,7 +151,9 @@
         "2025-08-03": true,
         "2025-08-04": true,
         "2025-08-05": true,
-        "2025-08-06": true
+        "2025-08-06": true,
+        "2025-08-07": true,
+        "2025-08-08": true
     },
     "\ud83d\udcda Connaissance g\u00e9n\u00e9rales": {
         "2025-07-01": true,
@@ -172,7 +188,9 @@
         "2025-08-03": true,
         "2025-08-04": true,
         "2025-08-05": true,
-        "2025-08-06": true
+        "2025-08-06": true,
+        "2025-08-07": true,
+        "2025-08-08": true
     },
     "\ud83c\udfa8 Cr\u00e9ativit\u00e9": {
         "2025-07-01": true,
@@ -233,6 +251,7 @@
         "2025-08-03": true,
         "2025-08-04": true,
         "2025-08-05": true,
-        "2025-08-06": true
+        "2025-08-06": true,
+        "2025-08-07": true
     }
 }
