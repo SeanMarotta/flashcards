@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 import time
 from habit_tracker import display_habit_tracker
+import random
 
 
 # --- Fonction de vérification du mot de passe ---
@@ -88,10 +89,12 @@ def get_cards_for_box_review(box_number):
     return [card for card in all_cards if card.get('box') == box_number]
 
 def get_cards_for_daily_review():
-    """Retourne les cartes dont la date de révision est aujourd'hui ou passée."""
+    """Retourne les cartes dont la date de révision est aujourd'hui ou passée, mélangées aléatoirement."""
     all_cards = load_flashcards()
     today_str = datetime.now().strftime('%Y-%m-%d')
-    return [card for card in all_cards if card.get('next_review_date', '') <= today_str]
+    cards_to_review = [card for card in all_cards if card.get('next_review_date', '') <= today_str]
+    random.shuffle(cards_to_review) # On mélange les cartes
+    return cards_to_review
 
 def get_marked_cards():
     """Retourne toutes les cartes marquées."""
@@ -194,9 +197,8 @@ def display_review_session():
                 st.session_state.show_answer = False
                 st.rerun()
             else:
-                st.toast("Aucune carte marquée à réviser.", icon="�")
+                st.toast("Aucune carte marquée à réviser.", icon="📦")
 
-            
     with col2:
         if st.session_state.review_cards and st.session_state.current_card_index < len(st.session_state.review_cards):
             card = st.session_state.review_cards[st.session_state.current_card_index]
@@ -204,6 +206,9 @@ def display_review_session():
             total_cards = len(st.session_state.review_cards)
             progress = st.session_state.current_card_index + 1
             st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
+
+            # Affiche le numéro de la boîte de la carte
+            st.info(f"Boîte n°{card.get('box', 'N/A')}")
 
             # NOUVEAU : Bouton pour marquer/démarquer la carte
             def toggle_mark_status(card_id):
