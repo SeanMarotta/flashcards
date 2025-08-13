@@ -131,7 +131,7 @@ def display_card_face_content(container, title, path, text):
         
     if path:
         if path.startswith(('http://', 'https://')) or os.path.exists(path):
-            container.image(path, width=400, use_column_width=True)
+            container.image(path, width=400, use_container_width=True)
         else:
             container.error(f"Image locale introuvable : {os.path.basename(path)}")
     elif text:
