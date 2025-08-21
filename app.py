@@ -38,7 +38,6 @@ if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
 # --- Fonctions Utilitaires ---
-
 def load_flashcards():
     """Charge les flashcards depuis le fichier JSON."""
     if not os.path.exists(CARDS_FILE):
@@ -121,7 +120,7 @@ def display_content(content, title):
     if not content:
         st.warning("Contenu introuvable.")
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
-        st.image(content, width=400)
+        st.image(content, use_container_width=True)
     elif isinstance(content, str):
          st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #1C83E1;'>{content}</div>", unsafe_allow_html=True)
     else:
@@ -134,7 +133,7 @@ def display_card_face_content(container, title, path, text):
         
     if path:
         if path.startswith(('http://', 'https://')) or os.path.exists(path):
-            container.image(path, width=400, use_container_width=True)
+            container.image(path, use_container_width=True)
         else:
             container.error(f"Image locale introuvable : {os.path.basename(path)}")
     elif text:
