@@ -4563,19 +4563,6 @@
         "verso_text": null
     },
     {
-        "box": 7,
-        "creation_date": "2025-07-26",
-        "current_face": "verso",
-        "id": "f8d520ef-fa8b-4764-bd9e-802c753ee7eb",
-        "last_reviewed_date": "2025-08-22",
-        "marked": true,
-        "next_review_date": "2025-08-29",
-        "recto_path": "images/42_recto_8974873d.jpg",
-        "recto_text": null,
-        "verso_path": "images/42_verso_8974873d.jpg",
-        "verso_text": null
-    },
-    {
         "box": 10,
         "creation_date": "2025-07-26",
         "current_face": "recto",
@@ -9794,7 +9781,7 @@
         "current_face": "verso",
         "id": "a6ceaa2a-a985-4bba-bcad-92116fdf3b81",
         "last_reviewed_date": "2025-08-23",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2025-09-07",
         "recto_path": "images/21_recto_c0e92048.jpg",
         "recto_text": null,
@@ -10442,19 +10429,6 @@
         "box": 15,
         "creation_date": "2025-07-26",
         "current_face": "verso",
-        "id": "099703e0-f130-4869-bccf-85734c57bcef",
-        "last_reviewed_date": "2025-08-23",
-        "marked": true,
-        "next_review_date": "2025-09-07",
-        "recto_path": "images/71_recto_faf37b71.jpg",
-        "recto_text": null,
-        "verso_path": "images/71_verso_faf37b71.jpg",
-        "verso_text": null
-    },
-    {
-        "box": 15,
-        "creation_date": "2025-07-26",
-        "current_face": "verso",
         "id": "18a57bcc-143f-4cc2-9018-03a8e3da2b66",
         "last_reviewed_date": "2025-08-23",
         "marked": false,
@@ -10501,19 +10475,6 @@
         "recto_path": "images/75_recto_8cc4682a.jpg",
         "recto_text": null,
         "verso_path": "images/75_verso_8cc4682a.jpg",
-        "verso_text": null
-    },
-    {
-        "box": 15,
-        "creation_date": "2025-07-26",
-        "current_face": "verso",
-        "id": "401aa2eb-a692-4769-a931-f355e8e98a3f",
-        "last_reviewed_date": "2025-08-23",
-        "marked": true,
-        "next_review_date": "2025-09-07",
-        "recto_path": "images/76_recto_e23480b6.jpg",
-        "recto_text": null,
-        "verso_path": "images/76_verso_e23480b6.jpg",
         "verso_text": null
     },
     {
@@ -15925,19 +15886,6 @@
         "verso_text": "Astana"
     },
     {
-        "box": 2,
-        "creation_date": "2025-08-16",
-        "current_face": "verso",
-        "id": "49b83790-61f0-4fe7-8767-43b94736c245",
-        "last_reviewed_date": "2025-08-22",
-        "marked": false,
-        "next_review_date": "2025-08-24",
-        "recto_path": null,
-        "recto_text": "6 premiers coups du système de Londres",
-        "verso_path": null,
-        "verso_text": "d4 Cf3 Ff4 Cbd2 e3 c3"
-    },
-    {
         "box": 4,
         "creation_date": "2025-08-16",
         "current_face": "verso",
@@ -16066,19 +16014,6 @@
         "recto_text": "Défense Sicilienne (contre quelle pion ?)",
         "verso_path": null,
         "verso_text": "Défense contre pion e4."
-    },
-    {
-        "box": 1,
-        "creation_date": "2025-08-17",
-        "current_face": "recto",
-        "id": "23f80873-e354-4ca6-9448-04b985c24148",
-        "last_reviewed_date": "2025-08-23",
-        "marked": false,
-        "next_review_date": "2025-08-24",
-        "recto_path": null,
-        "recto_text": "Défense sicilienne (coups/idée)",
-        "verso_path": null,
-        "verso_text": "1. e4, c5 2. Fc4, e6 pour idée d5"
     },
     {
         "box": 2,
