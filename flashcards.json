@@ -7306,13 +7306,13 @@
         "verso_text": null
     },
     {
-        "box": 9,
+        "box": 8,
         "creation_date": "2025-07-26",
-        "current_face": "verso",
+        "current_face": "recto",
         "id": "9de379f4-41ef-4499-8fe5-9811ac3657fe",
-        "last_reviewed_date": "2025-08-24",
+        "last_reviewed_date": "2025-08-27",
         "marked": true,
-        "next_review_date": "2025-09-02",
+        "next_review_date": "2025-09-04",
         "recto_path": "images/63_recto_c97ee189.jpg",
         "recto_text": null,
         "verso_path": "images/63_verso_c97ee189.jpg",
