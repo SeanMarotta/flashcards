@@ -4,9 +4,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 import time
-from habit_tracker import display_habit_tracker
 import random
-
 
 # --- Fonction de vérification du mot de passe ---
 def check_password():
@@ -505,7 +503,7 @@ if check_password():
     
     initialize_session_state()
     # J'ai commenté les modules non fournis pour éviter les erreurs
-    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte", "Habit Tracker"))
+    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
     st.sidebar.markdown("---")
 
     if menu == "Séance de révision":
@@ -514,5 +512,3 @@ if check_password():
         display_card_management()
     elif menu == "Créer une nouvelle carte":
         display_create_card()
-    elif menu == "Habit Tracker":
-        display_habit_tracker()
