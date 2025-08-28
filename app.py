@@ -7,50 +7,27 @@ import time
 import random
 
 # --- Fonction de vérification du mot de passe ---
-import streamlit as st
-from streamlit_cookies_manager import EncryptedCookieManager
-from datetime import datetime, timedelta
-
-# --- Fonction de vérification du mot de passe (Version améliorée avec Cookies) ---
-import streamlit as st
-from streamlit_cookies_manager import EncryptedCookieManager
-from datetime import datetime, timedelta
-
-# --- Fonction de vérification du mot de passe (Version Corrigée) ---
 def check_password():
-    """Retourne True si l'utilisateur est authentifié via un cookie ou un mot de passe valide."""
+    """Retourne True si l'utilisateur a entré le bon mot de passe."""
 
-    cookies = EncryptedCookieManager(
-        password=st.secrets.get("cookie_encrypt_password", "DEFAULT_ENCRYPT_PASSWORD"),
-    )
-
-    # La vérification "is_ready()" a été supprimée car elle est obsolète.
-
-    # 1. Vérifie si un cookie d'authentification valide existe déjà
-    auth_cookie = cookies.get('auth_cookie')
-    if auth_cookie == st.secrets.get("auth_secret_value", "VALID_SECRET_VALUE"):
-        return True
-
-    # 2. Si aucun cookie valide n'est trouvé, affiche le champ de saisie du mot de passe
     def password_entered():
-        """Vérifie le mot de passe et définit le cookie si correct."""
-        if st.session_state["password"] == st.secrets.get("password", "VOTRE_MOT_DE_PASSE_PAR_DEFAUT"):
-            cookies.set(
-                'auth_cookie', 
-                st.secrets.get("auth_secret_value", "VALID_SECRET_VALUE"), 
-                expires_at=datetime.now() + timedelta(days=30)
-            )
-            del st.session_state["password"]
+        """Vérifie si le mot de passe entré par l'utilisateur est correct."""
+        # Assurez-vous d'avoir configuré vos secrets dans Streamlit
+        if "password" in st.session_state and st.session_state["password"] == st.secrets.get("password", "VOTRE_MOT_DE_PASSE_PAR_DEFAUT"):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Ne pas garder le mot de passe en mémoire
         else:
-            if cookies.get('auth_cookie'):
-                cookies.delete('auth_cookie')
+            st.session_state["password_correct"] = False
 
-    st.text_input("Mot de passe", type="password", on_change=password_entered, key="password")
-
-    if "password" in st.session_state and st.session_state.get("password"):
-         st.error("😕 Mot de passe incorrect.")
-
-    return False
+    if "password_correct" not in st.session_state:
+        st.text_input("Mot de passe", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.text_input("Mot de passe", type="password", on_change=password_entered, key="password")
+        st.error("😕 Mot de passe incorrect.")
+        return False
+    else:
+        return True
 
 # --- Configuration et Initialisation ---
 CARDS_FILE = "flashcards.json"
