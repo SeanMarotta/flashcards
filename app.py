@@ -12,10 +12,9 @@ def check_password():
 
     def password_entered():
         """Vérifie si le mot de passe entré par l'utilisateur est correct."""
-        # Assurez-vous d'avoir configuré vos secrets dans Streamlit
         if "password" in st.session_state and st.session_state["password"] == st.secrets.get("password", "VOTRE_MOT_DE_PASSE_PAR_DEFAUT"):
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Ne pas garder le mot de passe en mémoire
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
@@ -90,7 +89,7 @@ def get_cards_for_daily_review():
     all_cards = load_flashcards()
     today_str = datetime.now().strftime('%Y-%m-%d')
     cards_to_review = [card for card in all_cards if card.get('next_review_date', '') <= today_str]
-    random.shuffle(cards_to_review) # On mélange les cartes
+    random.shuffle(cards_to_review)
     return cards_to_review
 
 def get_marked_cards():
@@ -118,7 +117,8 @@ def display_content(content, title):
     if not content:
         st.warning("Contenu introuvable.")
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
-        st.image(content, width=300)
+        # La limitation de hauteur est gérée par le CSS global
+        st.image(content, use_container_width=True)
     elif isinstance(content, str):
          st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #1C83E1;'>{content}</div>", unsafe_allow_html=True)
     else:
@@ -131,7 +131,8 @@ def display_card_face_content(container, title, path, text):
         
     if path:
         if path.startswith(('http://', 'https://')) or os.path.exists(path):
-            container.image(path, width=300)
+            # La limitation de hauteur est gérée par le CSS global
+            container.image(path, use_container_width=True)
         else:
             container.error(f"Image locale introuvable : {os.path.basename(path)}")
     elif text:
@@ -148,7 +149,6 @@ def display_review_session():
     with col1:
         st.subheader("Choisissez un mode de révision")
 
-        # Mode 1: Révision du jour
         st.markdown("**Révision du Jour**")
         cards_due_today = get_cards_for_daily_review()
         if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, type="primary"):
@@ -162,7 +162,6 @@ def display_review_session():
 
         st.markdown("---")
 
-        # Mode 2: Révision par boîte
         st.markdown("**Révision par Boîte**")
         all_cards = load_flashcards()
         if all_cards:
@@ -183,7 +182,6 @@ def display_review_session():
         else:
             st.info("Aucune carte n'existe. Créez-en une pour commencer.")
 
-        # NOUVEAU : Mode 3: Révision des cartes marquées
         st.markdown("---")
         st.markdown("**Révision des Cartes Marquées**")
         marked_cards = get_marked_cards()
@@ -203,29 +201,47 @@ def display_review_session():
             total_cards = len(st.session_state.review_cards)
             progress = st.session_state.current_card_index + 1
             st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
-
-            # Affiche le numéro de la boîte de la carte
             st.info(f"Boîte n°{card.get('box', 'N/A')}")
 
-            # NOUVEAU : Bouton pour marquer/démarquer la carte
-            def toggle_mark_status(card_id):
-                all_cards = load_flashcards()
-                for i, c in enumerate(all_cards):
-                    if c['id'] == card_id:
-                        all_cards[i]['marked'] = not c.get('marked', False)
-                        save_flashcards(all_cards)
-                        marked_status = "marquée" if all_cards[i]['marked'] else "non marquée"
-                        st.toast(f"Carte {marked_status}.", icon="🔖")
-                        break
+            # --- Actions sur la carte (Marquer et Supprimer) ---
+            action_col1, action_col2 = st.columns(2)
+            with action_col1:
+                is_marked = card.get('marked', False)
+                button_label = "🔖 Démarquer la carte" if is_marked else "🔖 Marquer la carte"
+                if st.button(button_label, key=f"mark_review_{card['id']}", use_container_width=True):
+                    all_cards_db = load_flashcards()
+                    for i, c in enumerate(all_cards_db):
+                        if c['id'] == card['id']:
+                            all_cards_db[i]['marked'] = not c.get('marked', False)
+                            save_flashcards(all_cards_db)
+                            marked_status = "marquée" if all_cards_db[i]['marked'] else "non marquée"
+                            st.toast(f"Carte {marked_status}.", icon="🔖")
+                            # Mettre à jour l'état dans la session de révision aussi
+                            st.session_state.review_cards[st.session_state.current_card_index]['marked'] = not is_marked
+                            st.rerun()
+                            break
             
-            is_marked = card.get('marked', False)
-            button_label = "🔖 Démarquer la carte" if is_marked else "🔖 Marquer la carte"
-            if st.button(button_label, key=f"mark_review_{card['id']}"):
-                toggle_mark_status(card['id'])
-                st.session_state.review_cards[st.session_state.current_card_index]['marked'] = not is_marked
-                st.rerun()
+            # NOUVEAU : Bouton pour supprimer la carte pendant la révision
+            with action_col2:
+                if st.button("🗑️ Supprimer", key=f"delete_review_{card['id']}", use_container_width=True, type="secondary"):
+                    all_cards_db = load_flashcards()
+                    # Supprimer les images associées
+                    delete_image_file(card.get('recto_path'))
+                    delete_image_file(card.get('verso_path'))
+                    # Filtrer la carte de la base de données
+                    new_cards_db = [c for c in all_cards_db if c['id'] != card['id']]
+                    save_flashcards(new_cards_db)
+                    
+                    # Retirer la carte de la session de révision actuelle
+                    st.session_state.review_cards.pop(st.session_state.current_card_index)
+                    
+                    st.toast("Carte supprimée !", icon="🗑️")
+                    
+                    # Pas besoin d'incrémenter l'index, car la carte suivante prend la place de l'actuelle
+                    # Si c'était la dernière carte, la session se terminera naturellement
+                    st.rerun()
 
-
+            # --- Affichage de la carte (Recto/Verso) ---
             is_recto_question = card.get('current_face', 'recto') == 'recto'
             
             question_content = (card.get('recto_path') or card.get('recto_text')) if is_recto_question else (card.get('verso_path') or card.get('verso_text'))
@@ -284,9 +300,11 @@ def display_review_session():
                     st.session_state.show_answer = True
                     st.rerun()
         
-        elif st.session_state.review_cards:
+        elif st.session_state.review_cards is not None and len(st.session_state.review_cards) == 0:
             st.success("🎉 Session de révision terminée ! Bravo !")
-            st.session_state.review_cards = []
+            # Réinitialiser pour éviter que ce message ne reste
+            st.session_state.review_cards = None
+
 
 # --- Section 2: Gérer les cartes ---
 def display_card_management():
@@ -300,7 +318,6 @@ def display_card_management():
         display_edit_form()
         return
 
-    # 1. Sélection de la boîte
     existing_boxes = sorted(list(set(c['box'] for c in all_cards)))
     box_options = ["-- Choisir une boîte --"] + existing_boxes
     selected_box = st.selectbox("Choisissez une boîte à inspecter:", options=box_options)
@@ -308,7 +325,6 @@ def display_card_management():
     if selected_box != "-- Choisir une boîte --":
         cards_in_box = [c for c in all_cards if c['box'] == int(selected_box)]
         
-        # 2. Sélection de la carte dans la boîte
         card_labels = ["-- Choisir une carte --"]
         for i, card in enumerate(cards_in_box):
             recto_content = card.get('recto_text') or os.path.basename(card.get('recto_path', ''))
@@ -358,7 +374,6 @@ def display_card_management():
                         st.toast("Carte supprimée !", icon="🗑️")
                         st.rerun()
                     
-                    # NOUVEAU : Bouton pour marquer/démarquer
                     is_marked = card_to_display.get('marked', False)
                     button_label = "Démarquer" if is_marked else "Marquer"
                     if st.button(f"🔖 {button_label}", key=f"mark_manage_{card_to_display['id']}", use_container_width=True):
@@ -408,10 +423,7 @@ def display_edit_form():
             if idx != -1:
                 all_cards[idx]['box'] = new_box
                 base_date_str = all_cards[idx].get('last_reviewed_date') or all_cards[idx].get('creation_date')
-                if base_date_str:
-                    base_date = datetime.strptime(base_date_str, '%Y-%m-%d')
-                else:
-                    base_date = datetime.now()
+                base_date = datetime.strptime(base_date_str, '%Y-%m-%d') if base_date_str else datetime.now()
                 all_cards[idx]['next_review_date'] = (base_date + timedelta(days=new_box)).strftime('%Y-%m-%d')
 
                 # Mise à jour Recto
@@ -486,7 +498,7 @@ def display_create_card():
                     "recto_text": recto_text_val,
                     "verso_path": verso_path, 
                     "verso_text": verso_text_val,
-                    "marked": False  # NOUVEAU : Ajout du champ marqué
+                    "marked": False
                 }
                 all_cards.append(new_card)
                 save_flashcards(all_cards)
@@ -498,11 +510,19 @@ def display_create_card():
 st.set_page_config(layout="wide", page_title="Révision Espacée")
 
 if check_password():
-    # S'assure que toutes les cartes ont le champ "marked"
-    update_flashcards_with_marked_field()
+    # NOUVEAU : Ajout de CSS pour limiter la hauteur des images
+    st.markdown("""
+        <style>
+        img {
+            max-height: 200px;
+            object-fit: contain; /* Garde les proportions de l'image */
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
+    update_flashcards_with_marked_field()
     initialize_session_state()
-    # J'ai commenté les modules non fournis pour éviter les erreurs
+
     menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
     st.sidebar.markdown("---")
 
