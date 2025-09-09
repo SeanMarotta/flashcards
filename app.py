@@ -109,6 +109,10 @@ def initialize_session_state():
         st.session_state.show_answer = False
     if 'editing_card_id' not in st.session_state:
         st.session_state.editing_card_id = None
+    # NOUVEAU : Flag pour savoir si on vient de la session de révision
+    if 'editing_from_review' not in st.session_state:
+        st.session_state.editing_from_review = False
+
 
 # --- Fonctions d'affichage ---
 def display_content(content, title):
@@ -117,7 +121,6 @@ def display_content(content, title):
     if not content:
         st.warning("Contenu introuvable.")
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
-        # La limitation de hauteur est gérée par le CSS global
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
          st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #1C83E1;'>{content}</div>", unsafe_allow_html=True)
@@ -131,7 +134,6 @@ def display_card_face_content(container, title, path, text):
         
     if path:
         if path.startswith(('http://', 'https://')) or os.path.exists(path):
-            # La limitation de hauteur est gérée par le CSS global
             container.image(path, use_container_width=True)
         else:
             container.error(f"Image locale introuvable : {os.path.basename(path)}")
@@ -203,11 +205,11 @@ def display_review_session():
             st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
             st.info(f"Boîte n°{card.get('box', 'N/A')}")
 
-            # --- Actions sur la carte (Marquer et Supprimer) ---
-            action_col1, action_col2 = st.columns(2)
+            # --- Actions sur la carte (Marquer, Supprimer, Modifier) ---
+            action_col1, action_col2, action_col3 = st.columns(3)
             with action_col1:
                 is_marked = card.get('marked', False)
-                button_label = "🔖 Démarquer la carte" if is_marked else "🔖 Marquer la carte"
+                button_label = "🔖 Démarquer" if is_marked else "🔖 Marquer"
                 if st.button(button_label, key=f"mark_review_{card['id']}", use_container_width=True):
                     all_cards_db = load_flashcards()
                     for i, c in enumerate(all_cards_db):
@@ -216,29 +218,27 @@ def display_review_session():
                             save_flashcards(all_cards_db)
                             marked_status = "marquée" if all_cards_db[i]['marked'] else "non marquée"
                             st.toast(f"Carte {marked_status}.", icon="🔖")
-                            # Mettre à jour l'état dans la session de révision aussi
                             st.session_state.review_cards[st.session_state.current_card_index]['marked'] = not is_marked
                             st.rerun()
                             break
             
-            # NOUVEAU : Bouton pour supprimer la carte pendant la révision
             with action_col2:
+                # NOUVEAU : Bouton pour modifier la carte
+                if st.button("✏️ Modifier", key=f"edit_review_{card['id']}", use_container_width=True):
+                    st.session_state.editing_card_id = card['id']
+                    st.session_state.editing_from_review = True
+                    st.rerun()
+
+            with action_col3:
                 if st.button("🗑️ Supprimer", key=f"delete_review_{card['id']}", use_container_width=True, type="secondary"):
                     all_cards_db = load_flashcards()
-                    # Supprimer les images associées
                     delete_image_file(card.get('recto_path'))
                     delete_image_file(card.get('verso_path'))
-                    # Filtrer la carte de la base de données
                     new_cards_db = [c for c in all_cards_db if c['id'] != card['id']]
                     save_flashcards(new_cards_db)
                     
-                    # Retirer la carte de la session de révision actuelle
                     st.session_state.review_cards.pop(st.session_state.current_card_index)
-                    
                     st.toast("Carte supprimée !", icon="🗑️")
-                    
-                    # Pas besoin d'incrémenter l'index, car la carte suivante prend la place de l'actuelle
-                    # Si c'était la dernière carte, la session se terminera naturellement
                     st.rerun()
 
             # --- Affichage de la carte (Recto/Verso) ---
@@ -302,7 +302,6 @@ def display_review_session():
         
         elif st.session_state.review_cards is not None and len(st.session_state.review_cards) == 0:
             st.success("🎉 Session de révision terminée ! Bravo !")
-            # Réinitialiser pour éviter que ce message ne reste
             st.session_state.review_cards = None
 
 
@@ -314,6 +313,7 @@ def display_card_management():
         st.info("Aucune carte créée. Allez dans 'Créer une nouvelle carte'.")
         return
 
+    # Si on est en mode édition, on affiche le formulaire directement
     if st.session_state.editing_card_id:
         display_edit_form()
         return
@@ -418,7 +418,7 @@ def display_edit_form():
         new_verso_url = st.text_input("Nouveau Lien image Verso", value=verso_url_default, key="edit_verso_url")
         new_verso_upload = st.file_uploader("Nouvelle Image locale Verso", type=['png', 'jpg', 'jpeg'], key="edit_verso_img")
 
-        if st.form_submit_button("Sauvegarder"):
+        if st.form_submit_button("Sauvegarder les modifications"):
             idx = next((i for i, c in enumerate(all_cards) if c['id'] == st.session_state.editing_card_id), -1)
             if idx != -1:
                 all_cards[idx]['box'] = new_box
@@ -456,11 +456,21 @@ def display_edit_form():
 
                 save_flashcards(all_cards)
                 st.toast("Carte modifiée !", icon="✅")
+                
+                # NOUVEAU : Si on vient de la révision, mettre à jour la carte dans la session
+                if st.session_state.get('editing_from_review'):
+                    # Trouver l'index de la carte dans la session de révision
+                    review_idx = next((i for i, c in enumerate(st.session_state.review_cards) if c['id'] == st.session_state.editing_card_id), -1)
+                    if review_idx != -1:
+                        st.session_state.review_cards[review_idx] = all_cards[idx]
+
                 st.session_state.editing_card_id = None
+                st.session_state.editing_from_review = False
                 st.rerun()
 
     if st.button("Annuler"):
         st.session_state.editing_card_id = None
+        st.session_state.editing_from_review = False
         st.rerun()
 
 # --- Section 4: Créer une carte ---
@@ -510,12 +520,11 @@ def display_create_card():
 st.set_page_config(layout="wide", page_title="Révision Espacée")
 
 if check_password():
-    # NOUVEAU : Ajout de CSS pour limiter la hauteur des images
     st.markdown("""
         <style>
         img {
             max-height: 200px;
-            object-fit: contain; /* Garde les proportions de l'image */
+            object-fit: contain;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -526,7 +535,12 @@ if check_password():
     menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
     st.sidebar.markdown("---")
 
-    if menu == "Séance de révision":
+    # NOUVEAU : Logique d'affichage principale
+    # Si une carte est en cours de modification, on affiche le formulaire d'édition en priorité
+    if st.session_state.get('editing_card_id'):
+        display_edit_form()
+    # Sinon, on affiche la page sélectionnée dans le menu
+    elif menu == "Séance de révision":
         display_review_session()
     elif menu == "Gérer les cartes":
         display_card_management()
