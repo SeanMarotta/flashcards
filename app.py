@@ -145,13 +145,9 @@ def display_card_face_content(container, title, path, text):
 
 # --- Section 1: Séance de révision ---
 def display_review_session():
-    st.header("🎯 Séance de révision")
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.subheader("Choisissez un mode de révision")
-
-        st.markdown("**Révision du Jour**")
         cards_due_today = get_cards_for_daily_review()
         if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, type="primary"):
             if cards_due_today:
@@ -163,29 +159,6 @@ def display_review_session():
                 st.toast("Aucune carte à réviser pour aujourd'hui. Reposez-vous !", icon="🌴")
 
         st.markdown("---")
-
-        st.markdown("**Révision par Boîte**")
-        all_cards = load_flashcards()
-        if all_cards:
-            existing_boxes = sorted(list(set(c['box'] for c in all_cards)))
-            box_options = ["-- Choisir une boîte --"] + existing_boxes
-            box_to_review = st.selectbox("Boîtes disponibles:", options=box_options)
-
-            if st.button("Démarrer la révision de la boîte", use_container_width=True):
-                if box_to_review != "-- Choisir une boîte --":
-                    st.session_state.review_cards = get_cards_for_box_review(box_number=int(box_to_review))
-                    st.session_state.current_card_index = 0
-                    st.session_state.show_answer = False
-                    if not st.session_state.review_cards:
-                        st.toast(f"La boîte {box_to_review} est vide.", icon="📦")
-                    st.rerun()
-                else:
-                    st.warning("Veuillez sélectionner une boîte avant de commencer.")
-        else:
-            st.info("Aucune carte n'existe. Créez-en une pour commencer.")
-
-        st.markdown("---")
-        st.markdown("**Révision des Cartes Marquées**")
         marked_cards = get_marked_cards()
         if st.button(f"Réviser les cartes marquées ({len(marked_cards)} cartes)", use_container_width=True):
             if marked_cards:
