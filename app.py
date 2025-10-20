@@ -160,7 +160,7 @@ def display_review_session():
     
     with col2:
         cards_due_today = get_cards_for_daily_review()
-        if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, type="primary"):
+        if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, icon="😃"):
             if cards_due_today:
                 st.session_state.review_cards = cards_due_today
                 st.session_state.current_card_index = 0
@@ -169,9 +169,8 @@ def display_review_session():
             else:
                 st.toast("Aucune carte à réviser pour aujourd'hui. Reposez-vous !", icon="🌴")
 
-        st.markdown("---")
         marked_cards = get_marked_cards()
-        if st.button(f"Réviser les cartes marquées ({len(marked_cards)} cartes)", use_container_width=True):
+        if st.button(f"Réviser les cartes marquées ({len(marked_cards)} cartes)", use_container_width=True, icon="📦"):
             if marked_cards:
                 st.session_state.review_cards = marked_cards
                 st.session_state.current_card_index = 0
@@ -237,7 +236,7 @@ def display_review_session():
                 with btn_col3:
                     if st.button("⏭️ Pass", use_container_width=True, type="secondary"): handle_pass()
             else:
-                if st.button("Afficher la réponse", use_container_width=True):
+                if st.button("Afficher la réponse", use_container_width=True, type="primary"):
                     st.session_state.show_answer = True
                     st.rerun()
 
