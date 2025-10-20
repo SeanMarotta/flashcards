@@ -190,11 +190,11 @@ def display_review_session():
             answer_content = (card.get('verso_path') or card.get('verso_text')) if is_recto_question else (card.get('recto_path') or card.get('recto_text'))
 
             display_content_no_title(question_content)
-            st.markdown("---")
+            st.markdown("")
 
             if st.session_state.show_answer:
                 display_content_no_title(answer_content)
-                st.markdown("---")
+                st.markdown("")
 
                 def handle_response(correct):
                     all_cards = load_flashcards()
