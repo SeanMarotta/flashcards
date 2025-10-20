@@ -240,6 +240,10 @@ def display_review_session():
                     st.session_state.show_answer = True
                     st.rerun()
 
+            st.markdown("---")
+            st.markdown("")
+            st.markdown("")
+            st.markdown("")
             total_cards = len(st.session_state.review_cards)
             progress = st.session_state.current_card_index + 1
             st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
