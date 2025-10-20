@@ -147,7 +147,7 @@ def display_card_face_content(container, title, path, text):
 def display_review_session():
     col1, col2 = st.columns([1, 2])
     
-    with col1:
+    with col2:
         cards_due_today = get_cards_for_daily_review()
         if st.button(f"Démarrer la révision du jour ({len(cards_due_today)} cartes)", use_container_width=True, type="primary"):
             if cards_due_today:
@@ -169,7 +169,7 @@ def display_review_session():
             else:
                 st.toast("Aucune carte marquée à réviser.", icon="📦")
 
-    with col2:
+    with col1:
         if st.session_state.review_cards and st.session_state.current_card_index < len(st.session_state.review_cards):
             card = st.session_state.review_cards[st.session_state.current_card_index]
             
