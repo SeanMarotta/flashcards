@@ -127,6 +127,17 @@ def display_content(content, title):
     else:
         st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
+def display_content_no_title(content):
+    """Affiche le contenu (texte ou image)."""
+    if not content:
+        st.warning("Contenu introuvable.")
+    elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
+        st.image(content, use_container_width=True)
+    elif isinstance(content, str):
+         st.markdown(f"<div style='font-size: 1.25rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem; background-color: #1C83E1;'>{content}</div>", unsafe_allow_html=True)
+    else:
+        st.warning(f"Contenu inattendu ou chemin invalide : {content}")
+
 def display_card_face_content(container, title, path, text):
     """Affiche le contenu d'une face de carte dans un conteneur donné (st, col, etc.)."""
     if title:
@@ -172,22 +183,18 @@ def display_review_session():
     with col1:
         if st.session_state.review_cards and st.session_state.current_card_index < len(st.session_state.review_cards):
             card = st.session_state.review_cards[st.session_state.current_card_index]
-            
-            
 
             # --- Affichage de la carte (Recto/Verso) ---
             is_recto_question = card.get('current_face', 'recto') == 'recto'
             
             question_content = (card.get('recto_path') or card.get('recto_text')) if is_recto_question else (card.get('verso_path') or card.get('verso_text'))
             answer_content = (card.get('verso_path') or card.get('verso_text')) if is_recto_question else (card.get('recto_path') or card.get('recto_text'))
-            question_title = "Recto (Question)" if is_recto_question else "Verso (Question)"
-            answer_title = "Verso (Réponse)" if is_recto_question else "Recto (Réponse)"
 
-            display_content(question_content, question_title)
+            display_content_no_title(question_content)
             st.markdown("---")
 
             if st.session_state.show_answer:
-                display_content(answer_content, answer_title)
+                display_content_no_title(answer_content)
                 st.markdown("---")
 
                 def handle_response(correct):
