@@ -173,46 +173,7 @@ def display_review_session():
         if st.session_state.review_cards and st.session_state.current_card_index < len(st.session_state.review_cards):
             card = st.session_state.review_cards[st.session_state.current_card_index]
             
-            total_cards = len(st.session_state.review_cards)
-            progress = st.session_state.current_card_index + 1
-            st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
-            st.info(f"Boîte n°{card.get('box', 'N/A')}")
-
-            # --- Actions sur la carte (Marquer, Supprimer, Modifier) ---
-            action_col1, action_col2, action_col3 = st.columns(3)
-            with action_col1:
-                is_marked = card.get('marked', False)
-                button_label = "🔖 Démarquer" if is_marked else "🔖 Marquer"
-                if st.button(button_label, key=f"mark_review_{card['id']}", use_container_width=True):
-                    all_cards_db = load_flashcards()
-                    for i, c in enumerate(all_cards_db):
-                        if c['id'] == card['id']:
-                            all_cards_db[i]['marked'] = not c.get('marked', False)
-                            save_flashcards(all_cards_db)
-                            marked_status = "marquée" if all_cards_db[i]['marked'] else "non marquée"
-                            st.toast(f"Carte {marked_status}.", icon="🔖")
-                            st.session_state.review_cards[st.session_state.current_card_index]['marked'] = not is_marked
-                            st.rerun()
-                            break
             
-            with action_col2:
-                # NOUVEAU : Bouton pour modifier la carte
-                if st.button("✏️ Modifier", key=f"edit_review_{card['id']}", use_container_width=True):
-                    st.session_state.editing_card_id = card['id']
-                    st.session_state.editing_from_review = True
-                    st.rerun()
-
-            with action_col3:
-                if st.button("🗑️ Supprimer", key=f"delete_review_{card['id']}", use_container_width=True, type="secondary"):
-                    all_cards_db = load_flashcards()
-                    delete_image_file(card.get('recto_path'))
-                    delete_image_file(card.get('verso_path'))
-                    new_cards_db = [c for c in all_cards_db if c['id'] != card['id']]
-                    save_flashcards(new_cards_db)
-                    
-                    st.session_state.review_cards.pop(st.session_state.current_card_index)
-                    st.toast("Carte supprimée !", icon="🗑️")
-                    st.rerun()
 
             # --- Affichage de la carte (Recto/Verso) ---
             is_recto_question = card.get('current_face', 'recto') == 'recto'
@@ -271,6 +232,47 @@ def display_review_session():
             else:
                 if st.button("Afficher la réponse", use_container_width=True):
                     st.session_state.show_answer = True
+                    st.rerun()
+
+            total_cards = len(st.session_state.review_cards)
+            progress = st.session_state.current_card_index + 1
+            st.progress(progress / total_cards, text=f"Carte {progress}/{total_cards}")
+            st.info(f"Boîte n°{card.get('box', 'N/A')}")
+
+            # --- Actions sur la carte (Marquer, Supprimer, Modifier) ---
+            action_col1, action_col2, action_col3 = st.columns(3)
+            with action_col1:
+                is_marked = card.get('marked', False)
+                button_label = "🔖 Démarquer" if is_marked else "🔖 Marquer"
+                if st.button(button_label, key=f"mark_review_{card['id']}", use_container_width=True):
+                    all_cards_db = load_flashcards()
+                    for i, c in enumerate(all_cards_db):
+                        if c['id'] == card['id']:
+                            all_cards_db[i]['marked'] = not c.get('marked', False)
+                            save_flashcards(all_cards_db)
+                            marked_status = "marquée" if all_cards_db[i]['marked'] else "non marquée"
+                            st.toast(f"Carte {marked_status}.", icon="🔖")
+                            st.session_state.review_cards[st.session_state.current_card_index]['marked'] = not is_marked
+                            st.rerun()
+                            break
+            
+            with action_col2:
+                # NOUVEAU : Bouton pour modifier la carte
+                if st.button("✏️ Modifier", key=f"edit_review_{card['id']}", use_container_width=True):
+                    st.session_state.editing_card_id = card['id']
+                    st.session_state.editing_from_review = True
+                    st.rerun()
+
+            with action_col3:
+                if st.button("🗑️ Supprimer", key=f"delete_review_{card['id']}", use_container_width=True, type="secondary"):
+                    all_cards_db = load_flashcards()
+                    delete_image_file(card.get('recto_path'))
+                    delete_image_file(card.get('verso_path'))
+                    new_cards_db = [c for c in all_cards_db if c['id'] != card['id']]
+                    save_flashcards(new_cards_db)
+                    
+                    st.session_state.review_cards.pop(st.session_state.current_card_index)
+                    st.toast("Carte supprimée !", icon="🗑️")
                     st.rerun()
         
         elif st.session_state.review_cards is not None and len(st.session_state.review_cards) == 0:
