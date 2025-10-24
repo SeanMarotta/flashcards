@@ -189,12 +189,10 @@ def display_review_session():
             question_content = (card.get('recto_path') or card.get('recto_text')) if is_recto_question else (card.get('verso_path') or card.get('verso_text'))
             answer_content = (card.get('verso_path') or card.get('verso_text')) if is_recto_question else (card.get('recto_path') or card.get('recto_text'))
 
-            display_content_no_title(question_content)
             st.markdown("")
 
             if st.session_state.show_answer:
-                display_content_no_title(answer_content)
-                st.markdown("")
+                
 
                 def handle_response(correct):
                     all_cards = load_flashcards()
@@ -227,7 +225,6 @@ def display_review_session():
                     st.session_state.show_answer = False
                     time.sleep(1)
                     st.rerun()
-
                 btn_col1, btn_col2, btn_col3 = st.columns(3)
                 with btn_col1:
                     if st.button("✅ Correct", use_container_width=True, type="primary"): handle_response(correct=True)
@@ -235,10 +232,14 @@ def display_review_session():
                     if st.button("❌ Incorrect", use_container_width=True): handle_response(correct=False)
                 with btn_col3:
                     if st.button("⏭️ Pass", use_container_width=True, type="secondary"): handle_pass()
+                display_content_no_title(answer_content)
+                st.markdown("")
+                
             else:
                 if st.button("Afficher la réponse", use_container_width=True, type="primary"):
                     st.session_state.show_answer = True
                     st.rerun()
+            display_content_no_title(question_content)
 
             st.markdown("---")
             st.markdown("")
