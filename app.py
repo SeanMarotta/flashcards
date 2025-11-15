@@ -202,10 +202,10 @@ def display_review_session():
                         if c['id'] == card['id']:
                             if correct:
                                 new_box = min(60, c['box'] + 1)
-                                icon, message = "🎉", f"Bravo ! Carte déplacée vers la boîte n°{new_box}."
+                                icon, message = "🎉", f"Bravo ! boîte n°{new_box}."
                             else:
                                 new_box = max(1, c['box'] - 1)
-                                icon, message = "📚", f"Pas de souci. Carte déplacée vers la boîte n°{new_box}."
+                                icon, message = "📚", f"Nul. boîte n°{new_box}."
                             
                             all_cards[i]['box'] = new_box
                             all_cards[i]['last_reviewed_date'] = review_date.strftime('%Y-%m-%d')
@@ -509,7 +509,7 @@ if check_password():
     st.markdown("""
         <style>
         img {
-            max-height: 200px;
+            max-height: 400px;
             object-fit: contain;
         }
         </style>
