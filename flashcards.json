@@ -36281,5 +36281,44 @@
         "recto_text": "EXT4 (Fourth Extended Filesystem)",
         "verso_path": null,
         "verso_text": "Idéal pour les disques internes sous Linux."
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-13",
+        "current_face": "recto",
+        "id": "a536200d-9833-4279-a44e-12707cf94115",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-14",
+        "recto_path": null,
+        "recto_text": "Pyramide de Djoser de Saqqarah",
+        "verso_path": null,
+        "verso_text": "Première pyramide d'Égypte"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-13",
+        "current_face": "recto",
+        "id": "ef87fd5b-2978-449f-9c44-3812562aad3b",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-14",
+        "recto_path": null,
+        "recto_text": "Imhotep ",
+        "verso_path": null,
+        "verso_text": "Architecte de Djoser"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-13",
+        "current_face": "recto",
+        "id": "71c7b595-9190-452e-bac4-e50a32f2c1dc",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-14",
+        "recto_path": null,
+        "recto_text": "Outil Python qui permet de convertir un script Python",
+        "verso_path": null,
+        "verso_text": "PyInstaller"
     }
 ]
