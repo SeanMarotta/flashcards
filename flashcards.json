@@ -36320,5 +36320,31 @@
         "recto_text": "Outil Python qui permet de convertir un script Python",
         "verso_path": null,
         "verso_text": "PyInstaller"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-13",
+        "current_face": "recto",
+        "id": "8e630484-ffbd-48d5-8001-c25eee59044e",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-14",
+        "recto_path": null,
+        "recto_text": "Groupe de Gaëtan Roussel, Nicolas Musset",
+        "verso_path": null,
+        "verso_text": "Membres de Louis Attaque"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-13",
+        "current_face": "recto",
+        "id": "13540c34-45c8-4d4a-8412-80487de682a6",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-14",
+        "recto_path": null,
+        "recto_text": "Composé de Jean-Louis Aubert (guitare et chant), Louis Bertignac (guitare et chant), Corine Marienneau (basse, chant et guitare) et Richard Kolinka",
+        "verso_path": null,
+        "verso_text": "Membres de Téléphone "
     }
 ]
