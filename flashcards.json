@@ -36502,5 +36502,44 @@
         "recto_text": "sudo cp Sizer3D.cpython-310-x86_64-linux-gnu.so /usr/local/lib/python3.10/dist-packages/",
         "verso_path": null,
         "verso_text": "Installer une librairie perso globalement"
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-15",
+        "current_face": "recto",
+        "id": "0142ff64-f14c-4a15-a72a-653de0b0e21f",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-16",
+        "recto_path": null,
+        "recto_text": "● Une copie complète de l’objet Logger est créée à l’appel de la fonction ● Toute modification faite à logger ne concerne que la copie (pas l’original).",
+        "verso_path": "images/60ee2f5b-1cb0-4ee9-a1ae-625a04f06c63.jpg",
+        "verso_text": null
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-15",
+        "current_face": "recto",
+        "id": "7a1c6bf9-d7e4-4fb6-b7af-8830619673cb",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-16",
+        "recto_path": "images/3fc9e823-8b84-4d5d-8554-eb3e39e36a5c.jpg",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "● Aucune copie : la fonction travaille directement sur l’objet original. ● Toutes les modifications faites à logger affectent l’objet d’origine."
+    },
+    {
+        "box": 1,
+        "creation_date": "2025-12-15",
+        "current_face": "recto",
+        "id": "62c76ffd-0666-40b1-aecb-f009dbdd1759",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2025-12-16",
+        "recto_path": null,
+        "recto_text": "● La fonction reçoit l’adresse de l’objet. ● Tu peux tester si le pointeur est nul. ● Tu utilises -> pour accéder à ses membres.",
+        "verso_path": "images/2d9c5af1-2a6f-4555-8286-0a7d12beb1c6.jpg",
+        "verso_text": null
     }
 ]
