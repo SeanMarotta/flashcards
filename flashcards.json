@@ -11726,13 +11726,13 @@
         "verso_text": "Chanterelle en tube"
     },
     {
-        "box": 16,
+        "box": 17,
         "creation_date": "2025-08-11",
-        "current_face": "recto",
+        "current_face": "verso",
         "id": "9bee846e-bf3b-46ad-b7c8-db9e6772ccff",
-        "last_reviewed_date": "2025-12-10",
+        "last_reviewed_date": "2025-12-26",
         "marked": false,
-        "next_review_date": "2025-12-26",
+        "next_review_date": "2026-01-12",
         "recto_path": "https://upload.wikimedia.org/wikipedia/commons/8/8c/Boletus_satanas.JPG",
         "recto_text": null,
         "verso_path": null,
