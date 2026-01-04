@@ -15535,13 +15535,13 @@
         "verso_text": "1805 en Bavière"
     },
     {
-        "box": 10,
+        "box": 11,
         "creation_date": "2025-09-01",
-        "current_face": "verso",
+        "current_face": "recto",
         "id": "5442d309-5afd-41dc-9e5d-8ff7b8d5b1b0",
-        "last_reviewed_date": "2025-12-25",
+        "last_reviewed_date": "2026-01-04",
         "marked": false,
-        "next_review_date": "2026-01-04",
+        "next_review_date": "2026-01-15",
         "recto_path": null,
         "recto_text": "Roald Dahl (Oeuvres)",
         "verso_path": null,
