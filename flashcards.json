@@ -40805,5 +40805,57 @@
         "recto_text": "0201 SMD (Surface-Mount Device)",
         "verso_path": null,
         "verso_text": "Format mécanique très petit (montage en surface)"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-07",
+        "current_face": "recto",
+        "id": "2c25a746-07e5-40fb-9eaa-433ce761ffb8",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-08",
+        "recto_path": null,
+        "recto_text": "Date de la relativité restreinte",
+        "verso_path": null,
+        "verso_text": "1905 par Einstein"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-07",
+        "current_face": "recto",
+        "id": "1120cf6c-4d47-40dd-aa11-390dd8c2cde6",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-08",
+        "recto_path": null,
+        "recto_text": "Lois de la physique sont les mêmes pour tous les observateurs en mouvement rectiligne uniforme, et la vitesse de la lumière est constante",
+        "verso_path": null,
+        "verso_text": "Idée centrale de La relativité restreinte (1905)"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-07",
+        "current_face": "recto",
+        "id": "4b8f9467-538a-4fd5-b271-3918dec769b8",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-08",
+        "recto_path": null,
+        "recto_text": "Date de la relativité générale",
+        "verso_path": null,
+        "verso_text": "1915 par Einstein"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-07",
+        "current_face": "recto",
+        "id": "dbcf1335-5111-4ada-80f0-384562052137",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-08",
+        "recto_path": null,
+        "recto_text": "La gravitation n’est plus une force classique, mais une courbure de l’espace-temps provoquée par la masse et l’énergie.",
+        "verso_path": null,
+        "verso_text": "Idée centrale de la relativité générale (1915)"
     }
 ]
