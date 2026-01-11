@@ -39499,12 +39499,12 @@
         "current_face": "recto",
         "id": "7f40010e-19bb-40ab-b88e-2634e73dab1c",
         "last_reviewed_date": "2026-01-11",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-01-14",
         "recto_path": null,
-        "recto_text": "7 unités fondamentales",
+        "recto_text": "Quand de là où je mettrai des kilos de sels en cas de molle",
         "verso_path": null,
-        "verso_text": "Mètre, Kilogramme, Seconde, Ampère, Kelvin, Candela et Mole ()"
+        "verso_text": "7 unités fondamentales - Mètre, Kilogramme, Seconde, Ampère, Kelvin, Candela et Mole"
     },
     {
         "box": 4,
@@ -39850,12 +39850,12 @@
         "current_face": "recto",
         "id": "0f1630f6-2950-488a-976b-55ac343e754c",
         "last_reviewed_date": "2026-01-11",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-01-12",
         "recto_path": null,
-        "recto_text": "Sécurité sociale, retraite, allocations familiales, assurance chômage, accidents du travail et maladies professionnelles",
+        "recto_text": "Les SS sont à la retraite sans allocations ni assurance chômage en cas d'accidents ou maladies",
         "verso_path": null,
-        "verso_text": "Protections sociales assurées par les charges patronales"
+        "verso_text": "Protections sociales assurées par les charges patronales - Sécurité sociale, retraite, allocations familiales, assurance chômage, accidents du travail et maladies professionnelles"
     },
     {
         "box": 4,
@@ -41020,7 +41020,7 @@
         "current_face": "recto",
         "id": "fd869385-4e55-4948-ae34-c38394bf42a2",
         "last_reviewed_date": "2026-01-11",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-01-14",
         "recto_path": "images/8cc4b8a9-d7f6-4ede-9cef-be45a80762f1.png",
         "recto_text": null,
@@ -41845,5 +41845,70 @@
         "recto_text": "Hôtel de ville Paris",
         "verso_path": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/H%C3%B4tel_ville_fa%C3%A7ade_principale_Paris_11.jpg/330px-H%C3%B4tel_ville_fa%C3%A7ade_principale_Paris_11.jpg",
         "verso_text": null
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-11",
+        "current_face": "recto",
+        "id": "75eb0af0-95ef-4a6d-8dd0-f0e9b2753a7a",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-12",
+        "recto_path": null,
+        "recto_text": "Puy-de-Dôme - Clermont-Ferrand",
+        "verso_path": null,
+        "verso_text": "C'est clair que le puit de Dom est en fer"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-11",
+        "current_face": "recto",
+        "id": "11697284-c3a9-4c79-b0f0-2b48696e1724",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-12",
+        "recto_path": null,
+        "recto_text": "Pyrénées-Atlantiques - Pau",
+        "verso_path": null,
+        "verso_text": "P.A mais avec un U"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-11",
+        "current_face": "recto",
+        "id": "846416dd-bc21-40f7-94ac-917400c0b6c9",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-12",
+        "recto_path": null,
+        "recto_text": "Tarbes - Hautes-Pyrénées",
+        "verso_path": null,
+        "verso_text": "Tas d'arbres dans la haute, c'est le pire"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-11",
+        "current_face": "recto",
+        "id": "3aeb7c5f-bf2d-40e2-ba9e-dfe902dd1c04",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-12",
+        "recto_path": null,
+        "recto_text": "Schéma de la gamme majeur",
+        "verso_path": null,
+        "verso_text": "Ton – Ton – Demi-ton – Ton – Ton – Ton – Demi-ton"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-11",
+        "current_face": "recto",
+        "id": "51100561-5cec-43a9-a454-78c205546e59",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-12",
+        "recto_path": "images/dd3600ef-4864-4413-b7b4-d5a31ab34c97.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Pentatonique mineur DO "
     }
 ]
