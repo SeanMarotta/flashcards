@@ -43574,5 +43574,18 @@
         "recto_text": "Grade - Militaire du rang → Sous-officier → Officier → Officier supérieur → Général",
         "verso_path": null,
         "verso_text": "Militaire rangé sous l'office et au dessus du Général"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-15",
+        "current_face": "recto",
+        "id": "6f35f60a-19b3-4ab8-9437-f8dbbaf89fdb",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-16",
+        "recto_path": null,
+        "recto_text": "Interface en C++",
+        "verso_path": null,
+        "verso_text": "Un classe abstraites avec un destructeur virtuel et méthode virtuelle pure = 0"
     }
 ]
