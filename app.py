@@ -465,13 +465,12 @@ def display_create_card():
         recto_text = st.text_input("Texte", key="recto_txt")
         recto_url = st.text_input("Lien image web", key="recto_url")
         recto_upload = st.file_uploader("Image locale", type=['png', 'jpg', 'jpeg'], key="recto_up")
-        
-        st.markdown("---")
+
         verso_text = st.text_input("Texte", key="verso_txt")
         verso_url = st.text_input("Lien image web", key="verso_url")
         verso_upload = st.file_uploader("Image locale", type=['png', 'jpg', 'jpeg'], key="verso_up")
         
-        initial_box = st.number_input("Boîte de départ", min_value=1, max_value=60, value=1)
+        initial_box = 1
         
         submitted = st.form_submit_button("Ajouter la carte")
         if submitted:
