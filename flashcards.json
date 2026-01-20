@@ -44484,5 +44484,18 @@
         "recto_text": "Règne de Philippe II Auguste",
         "verso_path": null,
         "verso_text": "Roi de 1180-1223"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-20",
+        "current_face": "recto",
+        "id": "73cbc4de-b5c0-4825-adbf-70bf4ad703f0",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-21",
+        "recto_path": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cleopatra_VII%2C_dalla_via_appia_tra_ariccia_e_genzano%2C_40-30_ac_ca._02.JPG",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Sculture Cléopatre VII"
     }
 ]
