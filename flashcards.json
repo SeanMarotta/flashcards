@@ -44874,5 +44874,18 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "Effet de Bougé"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-22",
+        "current_face": "recto",
+        "id": "1424c9ed-ea56-41db-a3eb-3362d77e8959",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-23",
+        "recto_path": null,
+        "recto_text": "Qui effectue Correction de Color Shading",
+        "verso_path": null,
+        "verso_text": "FPGA l'effectue car nécessite l'image RAW"
     }
 ]
