@@ -967,12 +967,12 @@
         "current_face": "recto",
         "id": "2e4a74ed-f108-4968-9a6c-74ecfcc427a9",
         "last_reviewed_date": "2026-01-25",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-02-14",
-        "recto_path": "images/26_recto_2ce914f9.jpg",
-        "recto_text": null,
-        "verso_path": "images/26_verso_2ce914f9.jpg",
-        "verso_text": null
+        "recto_path": null,
+        "recto_text": "Renommée de Auguste Escoffier",
+        "verso_path": null,
+        "verso_text": "Surnommé \"Roi des cuisiniers et cuisiner des Rois\" (1845 - 1935)"
     },
     {
         "box": 16,
@@ -5473,13 +5473,13 @@
         "verso_text": null
     },
     {
-        "box": 18,
+        "box": 17,
         "creation_date": "2025-07-26",
-        "current_face": "verso",
+        "current_face": "recto",
         "id": "07053db9-cb58-4278-be06-399251342e41",
-        "last_reviewed_date": "2026-01-07",
+        "last_reviewed_date": "2026-01-25",
         "marked": false,
-        "next_review_date": "2026-01-25",
+        "next_review_date": "2026-02-11",
         "recto_path": null,
         "recto_text": "Emblème de Metz",
         "verso_path": null,
@@ -9183,12 +9183,12 @@
         "current_face": "recto",
         "id": "c71bfa54-f567-409d-8a68-8fc8d29bf071",
         "last_reviewed_date": "2026-01-23",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-02-15",
-        "recto_path": "images/eaee0d3a-6844-442c-b9af-0c4403908acc.png",
+        "recto_path": "images/81714728-43c6-43cc-b722-b31c63c3d3bc.png",
         "recto_text": null,
         "verso_path": null,
-        "verso_text": "Film de James Cameron"
+        "verso_text": "Film de James Cameron - Avatar, Titanic, Alien, Terminator"
     },
     {
         "box": 24,
@@ -22269,13 +22269,13 @@
         "verso_text": "Prince Noir, fils de Édouard III"
     },
     {
-        "box": 13,
+        "box": 14,
         "creation_date": "2025-09-25",
-        "current_face": "verso",
+        "current_face": "recto",
         "id": "2a1c340a-18eb-4699-9595-f6e51d02b182",
-        "last_reviewed_date": "2026-01-12",
+        "last_reviewed_date": "2026-01-25",
         "marked": false,
-        "next_review_date": "2026-01-25",
+        "next_review_date": "2026-02-08",
         "recto_path": null,
         "recto_text": "Pablo Picasso",
         "verso_path": "https://cdn.prod.website-files.com/634560e30ccbc4e083a944ff/6378fb4a5c586671c630de91_Picasso-Galerie-ab.jpg",
@@ -33956,19 +33956,6 @@
         "verso_text": "Université à Cambridge, ville de l'agglomération de Boston, dans le Massachusetts"
     },
     {
-        "box": 4,
-        "creation_date": "2025-12-06",
-        "current_face": "recto",
-        "id": "e651088e-e5b2-4016-aa08-fb823af775a1",
-        "last_reviewed_date": "2026-01-24",
-        "marked": true,
-        "next_review_date": "2026-01-28",
-        "recto_path": null,
-        "recto_text": "Lieu de Yale University",
-        "verso_path": null,
-        "verso_text": "Université au New Haven, Connecticut"
-    },
-    {
         "box": 9,
         "creation_date": "2025-12-06",
         "current_face": "recto",
@@ -45316,5 +45303,18 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": "Picture of Christina Koch "
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-25",
+        "current_face": "recto",
+        "id": "60bde65d-f805-443a-b65a-96652bf74c88",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-26",
+        "recto_path": "images/b2e49645-42cb-4544-8bea-46064887265f.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Portrait d'Auguste Escoffier"
     }
 ]
