@@ -45849,5 +45849,18 @@
         "recto_text": "Obélisque de Louxor",
         "verso_path": "images/ebe1f4e8-21eb-4d70-ad2f-6a540bba27f5.png",
         "verso_text": null
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-28",
+        "current_face": "recto",
+        "id": "ddb7295a-9b61-49fe-878c-c9d8ceb8b135",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-01-29",
+        "recto_path": null,
+        "recto_text": "Qui donne une vue générale.",
+        "verso_path": null,
+        "verso_text": "Qqc de synoptique"
     }
 ]
