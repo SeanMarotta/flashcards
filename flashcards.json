@@ -46772,5 +46772,44 @@
         "recto_text": null,
         "verso_path": null,
         "verso_text": " Hayao Miyazaki"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-31",
+        "current_face": "recto",
+        "id": "e848c3fb-4728-459b-b20b-1e2451ed5225",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-01",
+        "recto_path": null,
+        "recto_text": "Ponce",
+        "verso_path": "images/3c9aec73-175c-4634-a431-cdc57b92d65f.png",
+        "verso_text": null
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-31",
+        "current_face": "recto",
+        "id": "f54bfc2f-8783-456f-b7ab-27c6ef3ee18e",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-01",
+        "recto_path": "images/d33fe83f-8298-45f9-b202-d4923fa90ee3.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Tobey Maguire"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-01-31",
+        "current_face": "recto",
+        "id": "74404c82-c7c2-4429-9310-f320dee696ca",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-01",
+        "recto_path": "images/baa71d7b-2e3d-4c74-91ed-c8aabb5ec054.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "The Artist"
     }
 ]
