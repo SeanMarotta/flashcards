@@ -47708,5 +47708,31 @@
         "recto_text": "\"Instead, the best way to tame a fear of failure is to hone courage.\"",
         "verso_path": null,
         "verso_text": "\"Au contraire, la meilleure façon de dompter la peur de l'échec est de cultiver le courage.\""
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-07",
+        "current_face": "recto",
+        "id": "8c2d0029-4837-4e34-953d-12141e694be9",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-08",
+        "recto_path": null,
+        "recto_text": "Flamboyance groupe d'animaux",
+        "verso_path": null,
+        "verso_text": "Groupe de flamants roses"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-07",
+        "current_face": "recto",
+        "id": "54bcce5e-17c7-4605-97c9-474cfa84ed12",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-08",
+        "recto_path": null,
+        "recto_text": "Groupe de hiboux",
+        "verso_path": null,
+        "verso_text": "Parlement groupe d'animaux"
     }
 ]
