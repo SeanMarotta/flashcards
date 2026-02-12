@@ -123,7 +123,7 @@ def display_content(content, title):
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
-         st.markdown(f"<div style='border: 1px solid rgba(255,255,255,0.12);background: rgba(255,255,255,0.06);padding: 1.3rem;border-radius: 16px;font-size: 1.8rem;line-height: 1.5;font-weight: 500;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='border: 1px solid rgba(255,255,255,0.12);background: rgba(255,255,255,0.06);padding: 1.3rem;border-radius: 16px;font-size: 1.3rem;line-height: 1.5;font-weight: 500;'>{content}</div>", unsafe_allow_html=True)
     else:
         st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
@@ -134,7 +134,7 @@ def display_content_no_title(content):
     elif isinstance(content, str) and (content.startswith(('http://', 'https://')) or os.path.exists(content)):
         st.image(content, use_container_width=True)
     elif isinstance(content, str):
-         st.markdown(f"<div style='border: 1px solid rgba(255,255,255,0.12);background: rgba(255,255,255,0.06);padding: 1.3rem;border-radius: 16px;font-size: 1.8rem;line-height: 1.5;font-weight: 500;'>{content}</div>", unsafe_allow_html=True)
+         st.markdown(f"<div style='border: 1px solid rgba(255,255,255,0.12);background: rgba(255,255,255,0.06);padding: 1.3rem;border-radius: 16px;font-size: 1.3rem;line-height: 1.5;font-weight: 500;'>{content}</div>", unsafe_allow_html=True)
     else:
         st.warning(f"Contenu inattendu ou chemin invalide : {content}")
 
