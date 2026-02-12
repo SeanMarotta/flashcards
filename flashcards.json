@@ -48852,5 +48852,18 @@
         "recto_text": "Vol Malaysia Airlines 370 ",
         "verso_path": null,
         "verso_text": "8 mars 2014, tragédie aérienne"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-12",
+        "current_face": "verso",
+        "id": "dc1a4806-78f6-4ae7-a202-6903166a162b",
+        "last_reviewed_date": "2026-02-12",
+        "marked": false,
+        "next_review_date": "2026-02-13",
+        "recto_path": null,
+        "recto_text": "Date du premier fossile humain",
+        "verso_path": null,
+        "verso_text": "Découverte datant de 3,2 millions d'années"
     }
 ]
