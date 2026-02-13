@@ -20,6 +20,7 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.text_input("Mot de passe", type="password", on_change=password_entered, key="password")
+        display_dashboard()  # Affiche le dashboard même avant la connexion pour teaser les fonctionnalités
         return False
     elif not st.session_state["password_correct"]:
         st.text_input("Mot de passe", type="password", on_change=password_entered, key="password")
@@ -27,7 +28,7 @@ def check_password():
         return False
     else:
         return True
-
+    
 # --- Configuration et Initialisation ---
 CARDS_FILE = "flashcards.json"
 IMAGE_DIR = "images"
@@ -499,6 +500,49 @@ def display_create_card():
             else:
                 st.error("Le recto et le verso doivent avoir un contenu.")
 
+def display_dashboard():
+    st.header("**Tableau de bord cognitif**")
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
+    cards = load_flashcards()
+    df = pd.DataFrame(cards)
+
+    mastery_score = (df['box'].sum() / (len(df) * 60)) * 100
+    st.metric("Maîtrise globale", f"{mastery_score:.1f}%")
+    long_term = len(df[df['box'] >= 20])
+    ratio = long_term / len(df) * 100
+    st.metric("Connaissances à long terme", f"{ratio:.1f}%")
+    total_cards = len(df)
+    st.metric("Nombre total de cartes", total_cards)
+
+    box_counts = df['box'].value_counts().sort_index()
+
+    plt.figure(figsize=(10,5))
+    plt.bar(box_counts.index, box_counts.values)
+    plt.xlabel("Niveau de maîtrise (boîte)")
+    plt.ylabel("Nombre de cartes")
+    plt.title("Nombre de cartes par boîte")
+    st.pyplot(plt)
+
+    df['creation_date'] = pd.to_datetime(df['creation_date'])
+    timeline = df.groupby('creation_date').size().cumsum()
+
+    plt.figure(figsize=(10,5))
+    timeline.plot()
+    plt.title("Croissance de ton savoir")
+    plt.xlabel("Temps")
+    plt.ylabel("Total connaissances acquises")
+    st.pyplot(plt)
+
+    df['next_review_date'] = pd.to_datetime(df['next_review_date'])
+    next_reviews = df.groupby('next_review_date').size()
+
+    plt.figure(figsize=(10,5))
+    next_reviews.plot()
+    plt.title("Charge cognitive future")
+    st.pyplot(plt)
+
 # --- Point d'entrée principal ---
 st.set_page_config(layout="wide", page_title="Révision Espacée")
 
@@ -515,7 +559,7 @@ if check_password():
     update_flashcards_with_marked_field()
     initialize_session_state()
 
-    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte"))
+    menu = st.sidebar.radio("Navigation", ("Séance de révision", "Gérer les cartes", "Créer une nouvelle carte", "Dashboard cognitif"))
     st.sidebar.markdown("---")
 
     # NOUVEAU : Logique d'affichage principale
@@ -529,3 +573,5 @@ if check_password():
         display_card_management()
     elif menu == "Créer une nouvelle carte":
         display_create_card()
+    elif menu == "Dashboard cognitif":
+        display_dashboard()
