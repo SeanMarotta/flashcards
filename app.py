@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime, timedelta
 import time
 import random
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # --- Fonction de vérification du mot de passe ---
 def check_password():
@@ -502,8 +504,6 @@ def display_create_card():
 
 def display_dashboard():
     st.header("**Tableau de bord cognitif**")
-    import pandas as pd
-    import matplotlib.pyplot as plt
 
     cards = load_flashcards()
     df = pd.DataFrame(cards)
