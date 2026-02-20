@@ -20,7 +20,7 @@ from werkzeug.utils import secure_filename
 # ─── Configuration ───────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "VOTRE_MOT_DE_PASSE_PAR_DEFAUT")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "Kiwy")
 
 CARDS_FILE = "flashcards.json"
 IMAGE_DIR = "images"
@@ -954,6 +954,7 @@ def base_template(title, active, content, body_class=""):
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0c0c0f">
 <title>{title}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style>{BASE_CSS}</style>
 </head>
 <body class="{body_class}">
