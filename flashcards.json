@@ -390,19 +390,6 @@
         "verso_text": "Utilitaire qui permet d'automatiser des tâches à un moment prédéfinis"
     },
     {
-        "box": 21,
-        "creation_date": "2025-07-25",
-        "current_face": "verso",
-        "id": "60b217bc-ce28-4f72-96f8-c9901a4036bc",
-        "last_reviewed_date": "2026-02-18",
-        "marked": true,
-        "next_review_date": "2026-03-11",
-        "recto_path": "images/bc13a489-8274-4281-bcec-d229f68471dd.jpg",
-        "recto_text": null,
-        "verso_path": "images/43fa3f58-9067-419e-b00f-93764d561b63.jpg",
-        "verso_text": null
-    },
-    {
         "box": 20,
         "creation_date": "2025-07-25",
         "current_face": "verso",
@@ -3177,7 +3164,7 @@
         "current_face": "recto",
         "id": "98d3cb16-2eed-4a1d-bb13-42b97389a32e",
         "last_reviewed_date": "2026-02-18",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-03-08",
         "recto_path": "images/12_recto_1d1adae6.jpg",
         "recto_text": null,
@@ -47624,12 +47611,12 @@
         "current_face": "recto",
         "id": "aa07cab2-bdea-48fa-a493-40dc74a5c28a",
         "last_reviewed_date": "2026-02-17",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-02-21",
-        "recto_path": "images/63a564c8-2ef0-45f8-85a5-63cc668ea6d4.png",
+        "recto_path": "images/1a57df9e-fb12-48bb-be21-ab2a0edae670.png",
         "recto_text": null,
         "verso_path": null,
-        "verso_text": "Famille violon - Orchestre symphonique"
+        "verso_text": "1er, 2ème violon, Alto, Violoncelle, Contrebasses  - Orchestre symphonique"
     },
     {
         "box": 4,
@@ -49080,7 +49067,7 @@
         "current_face": "verso",
         "id": "1b8fc733-d182-4635-b6ae-07e3c582a3ee",
         "last_reviewed_date": "2026-02-19",
-        "marked": true,
+        "marked": false,
         "next_review_date": "2026-02-20",
         "recto_path": null,
         "recto_text": "Boeing B-29 Superfortress",
