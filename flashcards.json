@@ -50451,5 +50451,57 @@
         "recto_text": "Prétérition",
         "verso_path": null,
         "verso_text": "Figure de style où on dit ne pas vouloir parler d'un sujet tout en en parlant"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-24",
+        "current_face": "recto",
+        "id": "83dcd580-088c-40ef-9fe2-65f3900da741",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-25",
+        "recto_path": null,
+        "recto_text": "Bombyx du mûrier",
+        "verso_path": null,
+        "verso_text": "Originaire du Nord de la Chine, élevé pour produire la soie"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-24",
+        "current_face": "recto",
+        "id": "6e8f389b-1291-461b-a4d7-5f8faa983303",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-25",
+        "recto_path": null,
+        "recto_text": "Invention de Fabre d'Eglantine",
+        "verso_path": null,
+        "verso_text": "Auteur de la chanson fameuse \"Il pleut, il pleut bergère\" et l'inventeur des noms des mois du calendrier républicain"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-24",
+        "current_face": "recto",
+        "id": "27e35fa0-4614-4ce1-adea-511ee436bb5b",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-25",
+        "recto_path": null,
+        "recto_text": "\"I appended a document to the file.\"",
+        "verso_path": null,
+        "verso_text": "\"J'ai joint un document au fichier.\""
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-02-24",
+        "current_face": "recto",
+        "id": "3ce96a35-6d3e-407f-9c3f-eff585d3cbf3",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-02-25",
+        "recto_path": null,
+        "recto_text": "local.conf",
+        "verso_path": null,
+        "verso_text": "Fichier qui dit à BitBake comment tu veux construire et pour quoi"
     }
 ]
