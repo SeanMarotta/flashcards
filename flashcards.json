@@ -52154,5 +52154,44 @@
         "recto_text": "Monter/Descendre octave FL Studio",
         "verso_path": null,
         "verso_text": "FL Studio Ctrl + Up/Down arrow"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-02",
+        "current_face": "recto",
+        "id": "583b2b07-6447-49bd-886b-4f2a271b4ba3",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-03",
+        "recto_path": null,
+        "recto_text": "🇬🇧 Overall, the project went well despite a few technical issues.",
+        "verso_path": null,
+        "verso_text": "🇫🇷 Globalement, le projet s’est bien passé malgré quelques problèmes techniques."
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-02",
+        "current_face": "recto",
+        "id": "88468a26-9c56-4484-9897-fd3c917d279c",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-03",
+        "recto_path": "images/81ed2684-1ec8-42d0-94e5-c7ddb19b19a2.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Logo Typing Keyboard to play Piano"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-02",
+        "current_face": "recto",
+        "id": "e942e09d-8f6b-47c6-a40c-81579554d043",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-03",
+        "recto_path": null,
+        "recto_text": "\"Best be off\"",
+        "verso_path": null,
+        "verso_text": "\"Il vaut mieux partir.\""
     }
 ]
