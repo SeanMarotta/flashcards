@@ -52830,5 +52830,70 @@
         "recto_text": "Maud Ankaoua",
         "verso_path": null,
         "verso_text": "Kilomètre Zéro de"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-05",
+        "current_face": "recto",
+        "id": "2e19b533-3c09-491a-95bd-d0e39d0da0d8",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-06",
+        "recto_path": null,
+        "recto_text": "\"we've cramped everything\"",
+        "verso_path": null,
+        "verso_text": "\"nous avons tout entassé\""
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-05",
+        "current_face": "recto",
+        "id": "f85d2e13-d326-4f8b-9423-955757ece702",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-06",
+        "recto_path": null,
+        "recto_text": "Le Condor",
+        "verso_path": null,
+        "verso_text": "Grand rapace des Andes"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-05",
+        "current_face": "recto",
+        "id": "3c6ca4ee-aeee-4d63-959c-7a869649d5ef",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-06",
+        "recto_path": null,
+        "recto_text": "Fleuve Limpopo",
+        "verso_path": null,
+        "verso_text": "Fleuve approvisionnement en eau en Afrique australe"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-05",
+        "current_face": "recto",
+        "id": "2cd2c5e0-94c8-41ac-bb67-5ecd121f42b4",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-06",
+        "recto_path": null,
+        "recto_text": "To stick it out",
+        "verso_path": null,
+        "verso_text": "Tenir bon en EN"
+    },
+    {
+        "box": 1,
+        "creation_date": "2026-03-05",
+        "current_face": "recto",
+        "id": "971fae44-3399-4fc0-835b-a077cfdb1fe6",
+        "last_reviewed_date": null,
+        "marked": false,
+        "next_review_date": "2026-03-06",
+        "recto_path": "images/e9605a81-69f2-4f76-b010-830be5d08613.png",
+        "recto_text": null,
+        "verso_path": null,
+        "verso_text": "Doberman"
     }
 ]
