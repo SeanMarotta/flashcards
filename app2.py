@@ -24,10 +24,13 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "Kiwy")
 
 CARDS_FILE = "flashcards.json"
 IMAGE_DIR = "images"
+AUDIO_DIR = "audios"
 REVIEW_DIR = "review_sessions"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(REVIEW_DIR, exist_ok=True)
 
 # ─── Server-side review session storage (avoids cookie size limits) ──────────
@@ -39,8 +42,24 @@ def _review_path():
         session["_review_sid"] = sid
     return os.path.join(REVIEW_DIR, f"{sid}.json")
 
-def save_review_state(cards, index, show_answer):
-    data = {"cards": cards, "index": index, "show_answer": show_answer}
+def save_review_state(cards, index, show_answer, **extra):
+    p = _review_path()
+    existing = {}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    data = {
+        "cards": cards,
+        "index": index,
+        "show_answer": show_answer,
+        "correct": extra.get("correct", existing.get("correct", 0)),
+        "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
+        "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
+        "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+    }
     with open(_review_path(), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
 
@@ -48,8 +67,15 @@ def load_review_state():
     p = _review_path()
     if os.path.exists(p):
         with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"cards": [], "index": 0, "show_answer": False}
+            data = json.load(f)
+        data.setdefault("correct", 0)
+        data.setdefault("incorrect", 0)
+        data.setdefault("pass_count", 0)
+        data.setdefault("start_time", datetime.now().isoformat())
+        return data
+    return {"cards": [], "index": 0, "show_answer": False,
+            "correct": 0, "incorrect": 0, "pass_count": 0,
+            "start_time": datetime.now().isoformat()}
 
 def clear_review_state():
     p = _review_path()
@@ -86,6 +112,18 @@ def save_uploaded_image(file_storage):
 def delete_image_file(path):
     if path and not path.startswith("http") and os.path.exists(path):
         os.remove(path)
+
+def allowed_audio_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_AUDIO
+
+def save_uploaded_audio(file_storage):
+    if file_storage and allowed_audio_file(file_storage.filename):
+        ext = file_storage.filename.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid.uuid4()}.{ext}"
+        path = os.path.join(AUDIO_DIR, unique_name)
+        file_storage.save(path)
+        return unique_name  # store only filename, served via /audios/
+    return None
 
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -125,6 +163,11 @@ def logout():
 def serve_image(filename):
     return send_from_directory(IMAGE_DIR, filename)
 
+@app.route("/audios/<path:filename>")
+@login_required
+def serve_audio(filename):
+    return send_from_directory(AUDIO_DIR, filename)
+
 # ─── Pages ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -149,7 +192,9 @@ def review_start(mode):
     if not cards:
         flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
         return redirect(url_for("index"))
-    save_review_state(cards, 0, False)
+    save_review_state(cards, 0, False,
+                      correct=0, incorrect=0, pass_count=0,
+                      start_time=datetime.now().isoformat())
     return redirect(url_for("review_card"))
 
 @app.route("/review")
@@ -159,8 +204,23 @@ def review_card():
     cards = state["cards"]
     idx = state["index"]
     if not cards or idx >= len(cards):
+        # Compute duration
+        try:
+            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
+            elapsed = int((datetime.now() - start_dt).total_seconds())
+        except Exception:
+            elapsed = 0
+        minutes, seconds = divmod(elapsed, 60)
+        duration = f"{minutes}m {seconds:02d}s"
+        summary = {
+            "correct": state.get("correct", 0),
+            "incorrect": state.get("incorrect", 0),
+            "pass_count": state.get("pass_count", 0),
+            "total": len(cards),
+            "duration": duration,
+        }
         clear_review_state()
-        return render_template_string(REVIEW_DONE_HTML)
+        return render_template_string(REVIEW_DONE_HTML, **summary)
     card = cards[idx]
     show_answer = state["show_answer"]
     is_recto = card.get("current_face", "recto") == "recto"
@@ -177,7 +237,7 @@ def review_card():
 def review_show():
     state = load_review_state()
     save_review_state(state["cards"], state["index"], True)
-    return redirect(url_for("review_card"))
+    return ("", 204)  # Called via fetch from JS fade animation
 
 @app.route("/review/answer/<result>")
 @login_required
@@ -185,6 +245,15 @@ def review_answer(result):
     state = load_review_state()
     cards = state["cards"]
     idx = state["index"]
+    correct = state.get("correct", 0)
+    incorrect = state.get("incorrect", 0)
+    pass_count = state.get("pass_count", 0)
+    if result == "correct":
+        correct += 1
+    elif result == "incorrect":
+        incorrect += 1
+    else:
+        pass_count += 1
     if idx < len(cards):
         card = cards[idx]
         all_cards = load_flashcards()
@@ -202,7 +271,7 @@ def review_answer(result):
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
                 break
         save_flashcards(all_cards)
-    save_review_state(cards, idx + 1, False)
+    save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
     return redirect(url_for("review_card"))
 
 # ── Toggle mark from review ─────────────────────────────────────────────────
@@ -318,6 +387,7 @@ def card_edit(card_id):
         recto_upload = request.files.get("recto_upload")
         recto_url = request.form.get("recto_url", "").strip()
         recto_text = request.form.get("recto_text", "").strip()
+        recto_audio_upload = request.files.get("recto_audio_upload")
         if recto_upload and recto_upload.filename:
             delete_image_file(all_cards[idx].get("recto_path"))
             all_cards[idx]["recto_path"] = save_uploaded_image(recto_upload)
@@ -330,11 +400,14 @@ def card_edit(card_id):
             delete_image_file(all_cards[idx].get("recto_path"))
             all_cards[idx]["recto_path"] = None
             all_cards[idx]["recto_text"] = recto_text or None
+        if recto_audio_upload and recto_audio_upload.filename:
+            all_cards[idx]["recto_audio"] = save_uploaded_audio(recto_audio_upload)
 
         # Verso
         verso_upload = request.files.get("verso_upload")
         verso_url = request.form.get("verso_url", "").strip()
         verso_text = request.form.get("verso_text", "").strip()
+        verso_audio_upload = request.files.get("verso_audio_upload")
         if verso_upload and verso_upload.filename:
             delete_image_file(all_cards[idx].get("verso_path"))
             all_cards[idx]["verso_path"] = save_uploaded_image(verso_upload)
@@ -347,6 +420,8 @@ def card_edit(card_id):
             delete_image_file(all_cards[idx].get("verso_path"))
             all_cards[idx]["verso_path"] = None
             all_cards[idx]["verso_text"] = verso_text or None
+        if verso_audio_upload and verso_audio_upload.filename:
+            all_cards[idx]["verso_audio"] = save_uploaded_audio(verso_audio_upload)
 
         save_flashcards(all_cards)
         flash("Carte modifiée !", "success")
@@ -379,8 +454,11 @@ def create():
         verso_upload = request.files.get("verso_upload")
         verso_url = request.form.get("verso_url", "").strip()
         verso_text = request.form.get("verso_text", "").strip()
+        recto_audio_upload = request.files.get("recto_audio_upload")
+        verso_audio_upload = request.files.get("verso_audio_upload")
 
         recto_path = recto_text_val = verso_path = verso_text_val = None
+        recto_audio = verso_audio = None
 
         if recto_upload and recto_upload.filename:
             recto_path = save_uploaded_image(recto_upload)
@@ -396,7 +474,12 @@ def create():
         else:
             verso_text_val = verso_text
 
-        if (recto_path or recto_text_val) and (verso_path or verso_text_val):
+        if recto_audio_upload and recto_audio_upload.filename:
+            recto_audio = save_uploaded_audio(recto_audio_upload)
+        if verso_audio_upload and verso_audio_upload.filename:
+            verso_audio = save_uploaded_audio(verso_audio_upload)
+
+        if (recto_path or recto_text_val or recto_audio) and (verso_path or verso_text_val or verso_audio):
             all_cards = load_flashcards()
             now = datetime.now()
             new_card = {
@@ -409,8 +492,10 @@ def create():
                 "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
                 "recto_path": recto_path,
                 "recto_text": recto_text_val,
+                "recto_audio": recto_audio,
                 "verso_path": verso_path,
                 "verso_text": verso_text_val,
+                "verso_audio": verso_audio,
             }
             all_cards.append(new_card)
             save_flashcards(all_cards)
@@ -1004,9 +1089,9 @@ def base_template(title, active, content, body_class=""):
 </body>
 </html>"""
 
-# Jinja helper for rendering card content (text or image)
+# Jinja helper for rendering card content (text or image + optional audio)
 CONTENT_MACRO = """
-{% macro render_content(path, text) %}
+{% macro render_content(path, text, audio=None) %}
 {% if path and path.startswith('http') %}
     <img src="{{ path }}" alt="card image" loading="lazy">
 {% elif path %}
@@ -1015,6 +1100,11 @@ CONTENT_MACRO = """
     <div>{{ text }}</div>
 {% else %}
     <span style="color:var(--text2)">—</span>
+{% endif %}
+{% if audio %}
+    <audio controls style="width:100%;margin-top:12px;border-radius:8px;">
+        <source src="/audios/{{ audio }}">
+    </audio>
 {% endif %}
 {% endmacro %}
 """
@@ -1083,16 +1173,22 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 
 <div class="card">
     <div class="card-content">
-        {{{{ render_content(card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path, card.recto_text if (card.current_face|default('recto'))=='recto' else card.verso_text) }}}}
+        {{{{ render_content(
+            card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path,
+            card.recto_text if (card.current_face|default('recto'))=='recto' else card.verso_text,
+            card.recto_audio if (card.current_face|default('recto'))=='recto' else card.verso_audio
+        ) }}}}
     </div>
 
-    {{% if show_answer %}}
-    <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:12px;">
+    <div id="answer-section" style="border-top:1px solid var(--border);padding-top:20px;margin-top:12px;opacity:{{% if show_answer %}}1{{% else %}}0{{% endif %}};transition:opacity 0.5s ease;{{% if not show_answer %}}pointer-events:none;{{% endif %}}">
         <div class="card-content" style="padding-top:8px;">
-            {{{{ render_content(card.verso_path if (card.current_face|default('recto'))=='recto' else card.recto_path, card.verso_text if (card.current_face|default('recto'))=='recto' else card.recto_text) }}}}
+            {{{{ render_content(
+                card.verso_path if (card.current_face|default('recto'))=='recto' else card.recto_path,
+                card.verso_text if (card.current_face|default('recto'))=='recto' else card.recto_text,
+                card.verso_audio if (card.current_face|default('recto'))=='recto' else card.recto_audio
+            ) }}}}
         </div>
     </div>
-    {{% endif %}}
 </div>
 
 <div class="meta-row" style="justify-content:center;">
@@ -1109,15 +1205,16 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 </div>
 
 <!-- Fixed bottom action bar -->
-<div class="review-action-bar">
+<div id="bar-show" class="review-action-bar" style="{{% if show_answer %}}display:none;{{% endif %}}">
     <div class="action-buttons">
-        {{% if show_answer %}}
+        <button onclick="revealAnswer()" class="btn btn-primary" style="grid-column:1/-1;">Voir la réponse</button>
+    </div>
+</div>
+<div id="bar-answer" class="review-action-bar" style="{{% if not show_answer %}}display:none;{{% endif %}}">
+    <div class="action-buttons">
         <a href="/review/answer/correct" class="btn btn-success">✅ Correct</a>
         <a href="/review/answer/incorrect" class="btn btn-danger">❌ Faux</a>
         <a href="/review/answer/pass" class="btn btn-ghost">⏭️ Pass</a>
-        {{% else %}}
-        <a href="/review/show" class="btn btn-primary" style="grid-column:1/-1;">Voir la réponse</a>
-        {{% endif %}}
     </div>
 </div>
 
@@ -1134,6 +1231,14 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 <script>
 function showConfirm() {{ document.getElementById('confirmDelete').classList.add('show'); }}
 function hideConfirm() {{ document.getElementById('confirmDelete').classList.remove('show'); }}
+async function revealAnswer() {{
+    fetch('/review/show');  // update server state in background
+    const ans = document.getElementById('answer-section');
+    ans.style.pointerEvents = 'auto';
+    requestAnimationFrame(() => {{ ans.style.opacity = '1'; }});
+    document.getElementById('bar-show').style.display = 'none';
+    document.getElementById('bar-answer').style.display = '';
+}}
 </script>
 """, body_class="review-mode")
 
@@ -1143,7 +1248,25 @@ REVIEW_DONE_HTML = base_template("Terminé !", "review", """
 <div class="done-wrap">
     <div class="emoji">🎉</div>
     <h2>Session terminée !</h2>
-    <p>Bravo, toutes les cartes ont été révisées.</p>
+    <p>{{ total }} carte{{ 's' if total > 1 else '' }} révisée{{ 's' if total > 1 else '' }}</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:24px 0;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:#2cb67d;">{{ correct }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">✅ Correct</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:#e53170;">{{ incorrect }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">❌ Faux</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:var(--text2);">{{ pass_count }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">⏭️ Pass</div>
+        </div>
+    </div>
+
+    <div style="font-size:0.9rem;color:var(--text2);margin-bottom:24px;">⏱️ Durée : {{ duration }}</div>
+
     <a href="/" class="btn btn-primary" style="max-width:280px;margin:0 auto;">Retour</a>
 </div>
 """)
@@ -1210,12 +1333,12 @@ CARD_DETAIL_HTML = base_template("Détails", "manage", f"""
 
     <div class="detail-face">
         <h4>Recto</h4>
-        {{{{ render_content(card.recto_path, card.recto_text) }}}}
+        {{{{ render_content(card.recto_path, card.recto_text, card.recto_audio) }}}}
     </div>
     <div class="detail-face">
         <h4>Verso</h4>
         {{{{ render_content(card.verso_path, card.verso_text) }}}}
-    </div>
+        {{{{ render_content(card.verso_path, card.verso_text, card.verso_audio) }}}}
 
     <div class="btn-row">
         <a href="/card/{{{{ card.id }}}}/edit" class="btn btn-ghost btn-sm">✏️ Modifier</a>
@@ -1250,11 +1373,11 @@ EDIT_HTML = base_template("Modifier", "manage", f"""
 
 <div class="detail-face">
     <h4>Recto actuel</h4>
-    {{{{ render_content(card.recto_path, card.recto_text) }}}}
+    {{{{ render_content(card.recto_path, card.recto_text, card.recto_audio) }}}}
 </div>
 <div class="detail-face">
     <h4>Verso actuel</h4>
-    {{{{ render_content(card.verso_path, card.verso_text) }}}}
+    {{{{ render_content(card.verso_path, card.verso_text, card.verso_audio) }}}}
 </div>
 
 <form method="POST" enctype="multipart/form-data">
@@ -1278,6 +1401,10 @@ EDIT_HTML = base_template("Modifier", "manage", f"""
         <label>Upload image</label>
         <input type="file" name="recto_upload" accept="image/*">
     </div>
+    <div class="form-group">
+        <label>🎵 Audio — {{% if card.recto_audio %}}fichier actuel : {{{{ card.recto_audio }}}}{{% else %}}aucun{{% endif %}}</label>
+        <input type="file" name="recto_audio_upload" accept="audio/*">
+    </div>
 
     <p class="section-title">Verso</p>
     <div class="form-group">
@@ -1291,6 +1418,10 @@ EDIT_HTML = base_template("Modifier", "manage", f"""
     <div class="form-group">
         <label>Upload image</label>
         <input type="file" name="verso_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio — {{% if card.verso_audio %}}fichier actuel : {{{{ card.verso_audio }}}}{{% else %}}aucun{{% endif %}}</label>
+        <input type="file" name="verso_audio_upload" accept="audio/*">
     </div>
 
     <button type="submit" class="btn btn-primary" style="margin-bottom:12px;">Sauvegarder</button>
@@ -1317,6 +1448,10 @@ CREATE_HTML = base_template("Créer", "create", """
         <label>Upload image</label>
         <input type="file" name="recto_upload" accept="image/*">
     </div>
+    <div class="form-group">
+        <label>🎵 Audio (mp3, wav, ogg…)</label>
+        <input type="file" name="recto_audio_upload" accept="audio/*">
+    </div>
 
     <p class="section-title">Verso</p>
     <div class="form-group">
@@ -1330,6 +1465,10 @@ CREATE_HTML = base_template("Créer", "create", """
     <div class="form-group">
         <label>Upload image</label>
         <input type="file" name="verso_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio (mp3, wav, ogg…)</label>
+        <input type="file" name="verso_audio_upload" accept="audio/*">
     </div>
 
     <button type="submit" class="btn btn-primary">Ajouter la carte</button>
