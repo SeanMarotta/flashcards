@@ -244,6 +244,14 @@ def review_delete(card_id):
     save_review_state(new_cards, state["index"], state["show_answer"])
     return redirect(url_for("review_card"))
 
+# ── Quit review session ──────────────────────────────────────────────────────
+
+@app.route("/review/quit")
+@login_required
+def review_quit():
+    clear_review_state()
+    return redirect(url_for("index"))
+
 # ── Manage cards ─────────────────────────────────────────────────────────────
 
 @app.route("/manage")
@@ -946,6 +954,7 @@ NAV_ICONS = {
 }
 
 def base_template(title, active, content, body_class=""):
+    quit_btn = '<a href="/review/quit" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.75rem;">🏠 Menu</a>' if body_class == "review-mode" else ""
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -961,6 +970,7 @@ def base_template(title, active, content, body_class=""):
 <div class="topbar">
     <h1>⚡ Flashcards</h1>
     <div class="topbar-actions">
+        {quit_btn}
         <a href="/logout" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.75rem;">Déconnexion</a>
     </div>
 </div>
