@@ -560,6 +560,13 @@ def api_cards():
         cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
     return jsonify(cards[:100])  # Limit for perf
 
+# ── Mindfulness / Zen ───────────────────────────────────────────────────────
+
+@app.route("/zen")
+@login_required
+def zen():
+    return render_template_string(MINDFULNESS_HTML)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TEMPLATES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1036,6 +1043,7 @@ NAV_ICONS = {
     "manage": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>',
     "create": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
     "dashboard": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    "zen": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12s1-2 4-2 4 2 4 2"/><path d="M9 9h.01M15 9h.01"/></svg>',
 }
 
 def base_template(title, active, content, body_class=""):
@@ -1084,6 +1092,9 @@ def base_template(title, active, content, body_class=""):
     </a>
     <a href="/dashboard" class="{{% if active == 'dashboard' %}}active{{% endif %}}">
         {NAV_ICONS["dashboard"]}<span>Stats</span>
+    </a>
+    <a href="/zen" class="{{% if active == 'zen' %}}active{{% endif %}}">
+        {NAV_ICONS["zen"]}<span>Zen</span>
     </a>
 </nav>
 </body>
@@ -1549,6 +1560,485 @@ new Chart(document.getElementById('workloadChart'), {
 {% endif %}
 """)
 
+
+# ── Mindfulness template ─────────────────────────────────────────────────────
+
+MINDFULNESS_HTML = base_template("Zen", "zen", """
+<style>
+/* ── Zen-specific overrides ── */
+.zen-hero {
+    text-align: center;
+    padding: 32px 0 24px;
+}
+.zen-hero .eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+.zen-hero h2 {
+    font-size: 2rem;
+    font-weight: 300;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+}
+.zen-hero p {
+    font-size: 0.9rem;
+    color: var(--text2);
+    line-height: 1.6;
+}
+
+/* Breath widget */
+.breath-widget {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+.breath-widget::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(44,182,125,0.08) 0%, transparent 65%);
+    pointer-events: none;
+}
+.breath-widget-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 24px;
+    font-weight: 500;
+}
+.breath-ring-wrap {
+    position: relative; width: 140px; height: 140px;
+    margin: 0 auto 20px;
+}
+.b-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(44,182,125,0.25);
+    animation: bpulse 4s ease-in-out infinite;
+}
+.b-ring:nth-child(2) { inset: -14px; animation-delay:.5s; opacity:.5; }
+.b-ring:nth-child(3) { inset: -28px; animation-delay:1s; opacity:.2; }
+.b-circle {
+    position: absolute; inset: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 38%, #2cb67d, #1a7a52);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 32px rgba(44,182,125,0.3);
+    transition: transform 0.2s;
+}
+.b-circle:hover { transform: scale(1.04); }
+.b-circle-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #e8ece4;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    user-select: none;
+}
+.b-phase {
+    font-size: 1.2rem;
+    font-weight: 300;
+    color: var(--text);
+    margin-bottom: 4px;
+    min-height: 28px;
+}
+.b-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text2);
+    min-height: 20px;
+}
+@keyframes bpulse {
+    0%,100% { transform:scale(1); opacity:.4; }
+    50% { transform:scale(1.07); opacity:1; }
+}
+@keyframes bIn  { from{transform:scale(1)} to{transform:scale(1.3)} }
+@keyframes bOut { from{transform:scale(1.3)} to{transform:scale(1)} }
+
+/* Practice cards */
+.zen-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+}
+.zen-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    background: var(--zc-accent, var(--accent2));
+    transform: scaleX(0);
+    transition: transform .3s;
+    transform-origin: left;
+}
+.zen-card:hover { border-color: var(--zc-accent, var(--accent2)); }
+.zen-card:hover::after, .zen-card.open::after { transform: scaleX(1); }
+.zen-card.open { border-color: var(--zc-accent, var(--accent2)); background: var(--surface2); }
+
+.zen-card-head {
+    display: flex; align-items: center; gap: 14px;
+}
+.zen-card-icon { font-size: 1.5rem; flex-shrink: 0; }
+.zen-card-title { font-size: 1rem; font-weight: 600; color: var(--text); }
+.zen-card-desc { font-size: 0.82rem; color: var(--text2); margin-top: 2px; line-height: 1.5; }
+.zen-card-meta {
+    margin-left: auto;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;
+}
+.zen-card-dur {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--zc-accent, var(--accent2));
+}
+.zen-chevron {
+    font-size: 0.75rem; color: var(--text2);
+    transition: transform .3s;
+}
+.zen-card.open .zen-chevron { transform: rotate(180deg); }
+
+/* Steps panel */
+.zen-steps {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .5s ease;
+}
+.zen-steps.open { max-height: 600px; }
+.zen-steps-inner {
+    padding-top: 20px;
+}
+.zen-step {
+    display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start;
+}
+.zen-step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: rgba(44,182,125,0.12);
+    color: var(--zc-accent, var(--accent2));
+    font-size: 0.7rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+}
+.zen-step-text {
+    font-size: 0.88rem; color: var(--text2);
+    line-height: 1.65;
+}
+.zen-tip {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: rgba(44,182,125,0.06);
+    border-left: 2px solid var(--zc-accent, var(--accent2));
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82rem; color: var(--text2);
+    line-height: 1.6; font-style: italic;
+}
+
+/* Checklist */
+.zen-checklist {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+}
+.zen-checklist-title {
+    font-size: 0.8rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text2); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+}
+.ck-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background .2s;
+    user-select: none;
+}
+.ck-item:hover { background: var(--surface2); }
+.ck-item.checked { opacity: 0.5; }
+.ck-box {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all .2s;
+    font-size: 0.7rem; color: #fff;
+}
+.ck-item.checked .ck-box { background: var(--accent2); border-color: var(--accent2); }
+.ck-label { font-size: 0.88rem; color: var(--text); }
+.ck-item.checked .ck-label { text-decoration: line-through; color: var(--text2); }
+
+/* Quote block */
+.zen-quote {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    text-align: center;
+    margin-bottom: 80px;
+}
+.zen-quote-mark { font-size: 3rem; line-height: 1; color: var(--accent); opacity: 0.3; margin-bottom: 8px; }
+.zen-quote-text {
+    font-size: 1.05rem; font-weight: 300;
+    font-style: italic; color: var(--text);
+    line-height: 1.6; margin-bottom: 12px;
+}
+.zen-quote-author {
+    font-size: 0.72rem; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--accent2);
+    font-weight: 600;
+}
+</style>
+
+<div class="zen-hero">
+    <p class="eyebrow">Espace de calme</p>
+    <h2>Pleine Conscience</h2>
+    <p>Ancrez-vous dans le moment présent,<br>une respiration à la fois.</p>
+</div>
+
+<!-- ── BREATHING ── -->
+<div class="breath-widget">
+    <p class="breath-widget-label">Respiration 4 – 7 – 8</p>
+    <div class="breath-ring-wrap">
+        <div class="b-ring"></div>
+        <div class="b-ring"></div>
+        <div class="b-ring"></div>
+        <div class="b-circle" id="bCircle" onclick="toggleBreath()">
+            <span class="b-circle-text" id="bStart">Démarrer</span>
+        </div>
+    </div>
+    <div class="b-phase" id="bPhase"></div>
+    <div class="b-count" id="bCount"></div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:16px;width:auto;padding:10px 28px;" onclick="toggleBreath()" id="bBtn">▶ &nbsp;Commencer</button>
+</div>
+
+<!-- ── PRACTICES ── -->
+<p class="section-title">Pratiques guidées</p>
+<div id="zenCards"></div>
+
+<!-- ── DAILY CHECKLIST ── -->
+<div class="zen-checklist">
+    <div class="zen-checklist-title">
+        <span>✦</span> Routine du jour
+    </div>
+    <div id="ckGrid"></div>
+    <div class="progress-wrap" style="margin-top:16px;">
+        <div class="progress-bar" id="ckBar" style="width:0%"></div>
+    </div>
+    <p class="progress-label" id="ckLabel">0 / 10</p>
+</div>
+
+<!-- ── QUOTE ── -->
+<div class="zen-quote">
+    <div class="zen-quote-mark">"</div>
+    <p class="zen-quote-text" id="qText">Le passé est révolu, l'avenir n'est pas encore là. Il n'y a qu'un seul moment où l'on peut vivre : le moment présent.</p>
+    <p class="zen-quote-author" id="qAuthor">— Thich Nhat Hanh</p>
+    <button class="btn btn-ghost btn-sm" style="margin-top:20px;width:auto;padding:10px 24px;" onclick="nextQuote()">Nouvelle citation</button>
+</div>
+
+<script>
+// ─── Data ──────────────────────────────────────────────────────────────────
+const ZEN_PRACTICES = [
+    { icon:"🍃", title:"Scan corporel", desc:"Relâchez les tensions en parcourant votre corps avec attention.", dur:"5–20 min", accent:"#2cb67d",
+      steps:["Allongez-vous ou asseyez-vous confortablement. Fermez les yeux.",
+             "Portez attention aux orteils — chaleur, picotements, pression.",
+             "Remontez lentement : pieds, chevilles, mollets, genoux, cuisses.",
+             "Continuez vers le ventre, la poitrine, les bras, les mains, les doigts.",
+             "Terminez par le cou, le visage, le sommet du crâne.",
+             "Respirez profondément, sentez votre corps entier."],
+      tip:"Si l'esprit vagabonde, revenez sans jugement à l'endroit où vous étiez — c'est l'essence même de la pratique." },
+    { icon:"🌬️", title:"Respiration consciente", desc:"L'ancrage le plus immédiat : observez simplement votre souffle.", dur:"2–10 min", accent:"#7f5af0",
+      steps:["Asseyez-vous avec le dos droit, mains sur les cuisses.",
+             "Fermez les yeux ou fixez un point devant vous.",
+             "Observez l'air entrer par les narines — fraîcheur, texture.",
+             "Suivez le souffle jusqu'au ventre. Notez la pause entre chaque cycle.",
+             "À chaque distraction, nommez-la doucement puis revenez au souffle.",
+             "Prenez 3 grandes respirations avant de rouvrir les yeux."],
+      tip:"Vous ne faites pas de 'mauvaise' méditation. Chaque retour au souffle est une victoire de conscience." },
+    { icon:"🚶", title:"Marche méditative", desc:"Transformez un trajet ordinaire en présence totale.", dur:"10–30 min", accent:"#fbbf24",
+      steps:["Choisissez un espace calme : jardin, couloir, ou chambre.",
+             "Marchez 2× plus lentement que d'habitude.",
+             "Portez attention à chaque pied se levant, avançant, se posant.",
+             "Synchronisez le souffle avec les pas (ex. 2 pas = inspiration).",
+             "Engagez les sens : sons, textures, lumières.",
+             "À la fin, immobilisez-vous. Ressentez le contraste."],
+      tip:"La destination n'a aucune importance. Chaque pas est la destination." },
+    { icon:"🫀", title:"Bienveillance aimante", desc:"Cultivez la compassion envers vous-même et les autres.", dur:"10–15 min", accent:"#e53170",
+      steps:["Fermez les yeux. Posez les mains sur votre cœur.",
+             "Visualisez quelqu'un que vous aimez facilement.",
+             "Répétez mentalement : 'Que tu sois heureux·se. Que tu sois en paix.'",
+             "Élargissez à vous-même : 'Que je sois heureux·se. Que je sois en paix.'",
+             "Puis à des connaissances, des inconnus, et tous les êtres.",
+             "Terminez en ressentant la chaleur dans la poitrine."],
+      tip:"Il est souvent plus difficile d'envoyer de la bienveillance à soi-même — c'est là que la pratique est la plus précieuse." },
+    { icon:"✍️", title:"Journaling libre", desc:"Observez vos pensées par écrit, sans filtre ni jugement.", dur:"5–15 min", accent:"#2cb67d",
+      steps:["Prenez un carnet et un stylo. Pas d'écran.",
+             "Écrivez la date et une sensation physique du moment.",
+             "Pendant 5 minutes, écrivez sans arrêter — tout ce qui traverse l'esprit.",
+             "Pas de correction, pas de relecture. Le stylo ne s'arrête pas.",
+             "Relisez avec curiosité, non avec jugement.",
+             "Cerclz un mot qui résonne. Méditez dessus 2 minutes."],
+      tip:"Ce n'est pas un journal classique — c'est un filet pour attraper les pensées fugaces et les observer à distance." },
+    { icon:"🌿", title:"Technique 5-4-3-2-1", desc:"Revenez instantanément au présent via vos cinq sens.", dur:"2–5 min", accent:"#7f5af0",
+      steps:["Regardez et nommez mentalement 5 choses que vous voyez.",
+             "Posez la main sur 4 surfaces différentes. Percevez les textures.",
+             "Écoutez et identifiez 3 sons distincts autour de vous.",
+             "Sentez 2 odeurs — proches ou lointaines.",
+             "Notez 1 goût dans votre bouche en ce moment.",
+             "Prenez 3 respirations lentes. Observez le calme."],
+      tip:"Particulièrement efficace lors d'anxiété intense — elle interrompt la spirale mentale en ramenant aux sensations réelles." },
+];
+
+const ZEN_CHECKLIST = [
+    "Méditation matinale (5 min)",
+    "3 respirations avant chaque repas",
+    "Marche sans téléphone (10 min)",
+    "Pause sensorielle 5-4-3-2-1",
+    "Écrire 3 gratitudes",
+    "Respiration 4-7-8 le soir",
+    "Manger en pleine conscience",
+    "Scan corporel au coucher",
+    "Bienveillance aimante (5 min)",
+    "Journaling libre (5 min)",
+];
+
+const ZEN_QUOTES = [
+    { text:"Le passé est révolu, l'avenir n'est pas encore là. Il n'y a qu'un seul moment où l'on peut vivre : le moment présent.", author:"Thich Nhat Hanh" },
+    { text:"La pleine conscience n'est pas difficile. Ce qui est difficile, c'est de se souvenir d'être attentif.", author:"Sharon Salzberg" },
+    { text:"Respirer, c'est la seule chose dont vous avez besoin pour commencer à méditer.", author:"Jon Kabat-Zinn" },
+    { text:"Entre le stimulus et la réponse, il y a un espace. Dans cet espace résident notre liberté et notre pouvoir de choisir.", author:"Viktor Frankl" },
+    { text:"Là où tu es, sois entièrement là.", author:"Eckhart Tolle" },
+];
+
+// ─── Render practices ──────────────────────────────────────────────────────
+let openCard = -1;
+function renderPractices() {
+    const el = document.getElementById('zenCards');
+    el.innerHTML = ZEN_PRACTICES.map((p, i) => `
+        <div class="zen-card" id="zc${i}" style="--zc-accent:${p.accent}" onclick="toggleCard(${i})">
+            <div class="zen-card-head">
+                <span class="zen-card-icon">${p.icon}</span>
+                <div>
+                    <div class="zen-card-title">${p.title}</div>
+                    <div class="zen-card-desc">${p.desc}</div>
+                </div>
+                <div class="zen-card-meta">
+                    <span class="zen-card-dur">${p.dur}</span>
+                    <span class="zen-chevron">▾</span>
+                </div>
+            </div>
+            <div class="zen-steps" id="zs${i}">
+                <div class="zen-steps-inner">
+                    <ol style="list-style:none;">
+                        ${p.steps.map((s,j) => `<li class="zen-step"><div class="zen-step-num" style="background:${p.accent}18;color:${p.accent}">${j+1}</div><div class="zen-step-text">${s}</div></li>`).join('')}
+                    </ol>
+                    <div class="zen-tip">💡 ${p.tip}</div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+function toggleCard(i) {
+    if (openCard === i) {
+        document.getElementById(`zc${i}`).classList.remove('open');
+        document.getElementById(`zs${i}`).classList.remove('open');
+        openCard = -1;
+    } else {
+        if (openCard >= 0) {
+            document.getElementById(`zc${openCard}`).classList.remove('open');
+            document.getElementById(`zs${openCard}`).classList.remove('open');
+        }
+        document.getElementById(`zc${i}`).classList.add('open');
+        document.getElementById(`zs${i}`).classList.add('open');
+        openCard = i;
+    }
+}
+
+// ─── Checklist ─────────────────────────────────────────────────────────────
+let ckState = new Array(ZEN_CHECKLIST.length).fill(false);
+function renderChecklist() {
+    const el = document.getElementById('ckGrid');
+    el.innerHTML = ZEN_CHECKLIST.map((item, i) => `
+        <div class="ck-item ${ckState[i]?'checked':''}" onclick="toggleCk(${i})">
+            <div class="ck-box">${ckState[i]?'✓':''}</div>
+            <div class="ck-label">${item}</div>
+        </div>
+    `).join('');
+    const done = ckState.filter(Boolean).length;
+    document.getElementById('ckBar').style.width = (done/ZEN_CHECKLIST.length*100)+'%';
+    document.getElementById('ckLabel').textContent = `${done} / ${ZEN_CHECKLIST.length} complétées`;
+}
+function toggleCk(i) { ckState[i]=!ckState[i]; renderChecklist(); }
+
+// ─── Quotes ────────────────────────────────────────────────────────────────
+let qi = 0;
+function nextQuote() {
+    qi = (qi+1) % ZEN_QUOTES.length;
+    const qt = document.getElementById('qText');
+    const qa = document.getElementById('qAuthor');
+    qt.style.opacity='0'; qa.style.opacity='0';
+    setTimeout(()=>{
+        qt.textContent = ZEN_QUOTES[qi].text;
+        qa.textContent = '— '+ZEN_QUOTES[qi].author;
+        qt.style.transition='opacity .4s'; qa.style.transition='opacity .4s';
+        qt.style.opacity='1'; qa.style.opacity='1';
+    }, 280);
+}
+
+// ─── Breathing ─────────────────────────────────────────────────────────────
+let bRunning=false, bTimer=null;
+function toggleBreath() { bRunning ? stopBreath() : startBreath(); }
+function startBreath() {
+    bRunning=true;
+    document.getElementById('bBtn').textContent='■  Arrêter';
+    document.getElementById('bStart').style.display='none';
+    runPhase('Inspirez',4,()=>runPhase('Retenez',7,()=>runPhase('Expirez',8,()=>{ if(bRunning) startBreath(); })));
+}
+function runPhase(name, secs, cb) {
+    if(!bRunning) return;
+    document.getElementById('bPhase').textContent=name;
+    const c=document.getElementById('bCircle');
+    if(name==='Inspirez') c.style.animation=`bIn ${secs}s ease forwards`;
+    else if(name==='Expirez') c.style.animation=`bOut ${secs}s ease forwards`;
+    else c.style.animation='none';
+    let r=secs;
+    document.getElementById('bCount').textContent=r+'s';
+    bTimer=setInterval(()=>{
+        r--;
+        document.getElementById('bCount').textContent=r>0?r+'s':'';
+        if(r<=0){ clearInterval(bTimer); if(bRunning) cb(); }
+    },1000);
+}
+function stopBreath() {
+    bRunning=false; clearInterval(bTimer);
+    document.getElementById('bPhase').textContent='';
+    document.getElementById('bCount').textContent='';
+    document.getElementById('bBtn').textContent='▶  Commencer';
+    document.getElementById('bStart').style.display='block';
+    document.getElementById('bCircle').style.animation='';
+}
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+renderPractices();
+renderChecklist();
+</script>
+""")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
