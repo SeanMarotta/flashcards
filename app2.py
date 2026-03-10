@@ -26,12 +26,15 @@ CARDS_FILE = "flashcards.json"
 IMAGE_DIR = "images"
 AUDIO_DIR = "audios"
 REVIEW_DIR = "review_sessions"
+BACKUP_DIR = "backups"
+MAX_BACKUPS = 10
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(REVIEW_DIR, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # ─── Server-side review session storage (avoids cookie size limits) ──────────
 
@@ -84,6 +87,51 @@ def clear_review_state():
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+def create_backup():
+    """Snapshot the current flashcards.json into backups/ before any write."""
+    if not os.path.exists(CARDS_FILE):
+        return
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = os.path.join(BACKUP_DIR, f"flashcards_{ts}.json")
+    try:
+        import shutil
+        shutil.copy2(CARDS_FILE, dest)
+        # Keep only the MAX_BACKUPS most recent files
+        backups = sorted(
+            [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")],
+            reverse=True
+        )
+        for old in backups[MAX_BACKUPS:]:
+            os.remove(os.path.join(BACKUP_DIR, old))
+    except Exception:
+        pass
+
+def list_backups():
+    """Return backup metadata sorted newest first."""
+    files = sorted(
+        [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")],
+        reverse=True
+    )
+    result = []
+    for fname in files:
+        path = os.path.join(BACKUP_DIR, fname)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            count = len(data) if isinstance(data, list) else 0
+        except Exception:
+            count = "?"
+        size_kb = round(os.path.getsize(path) / 1024, 1)
+        # Parse timestamp from filename: flashcards_YYYYMMDD_HHMMSS.json
+        try:
+            ts_str = fname.replace("flashcards_", "").replace(".json", "")
+            dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+            label = dt.strftime("%d/%m/%Y à %H:%M:%S")
+        except Exception:
+            label = fname
+        result.append({"filename": fname, "label": label, "count": count, "size_kb": size_kb})
+    return result
+
 def load_flashcards():
     if not os.path.exists(CARDS_FILE):
         return []
@@ -94,6 +142,7 @@ def load_flashcards():
         return []
 
 def save_flashcards(cards):
+    create_backup()
     with open(CARDS_FILE, "w", encoding="utf-8") as f:
         json.dump(cards, f, indent=4, ensure_ascii=False, sort_keys=True)
 
@@ -613,6 +662,49 @@ def api_cards():
         cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
     return jsonify(cards[:100])  # Limit for perf
 
+# ── Backups ──────────────────────────────────────────────────────────────────
+
+@app.route("/backups")
+@login_required
+def backups():
+    return render_template_string(BACKUPS_HTML, backups=list_backups(), max_backups=MAX_BACKUPS)
+
+@app.route("/backups/restore/<filename>")
+@login_required
+def backup_restore(filename):
+    # Security: only allow filenames that match our pattern
+    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+        flash("Fichier invalide.", "error")
+        return redirect(url_for("backups"))
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        flash("Sauvegarde introuvable.", "error")
+        return redirect(url_for("backups"))
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cards = json.load(f)
+        save_flashcards(cards)  # this will itself create a backup of the current state first
+        flash(f"✅ Restauration réussie — {len(cards)} cartes rechargées.", "success")
+    except Exception as e:
+        flash(f"Erreur lors de la restauration : {e}", "error")
+    return redirect(url_for("backups"))
+
+@app.route("/backups/preview/<filename>")
+@login_required
+def backup_preview(filename):
+    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+        return jsonify({"error": "Fichier invalide"}), 400
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        return jsonify({"error": "Introuvable"}), 404
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cards = json.load(f)
+        sample = [{"recto": c.get("recto_text", "🖼️ Image"), "verso": c.get("verso_text", "🖼️ Image"), "box": c.get("box")} for c in cards[:5]]
+        return jsonify({"count": len(cards), "sample": sample})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ── Mindfulness / Zen ───────────────────────────────────────────────────────
 
 @app.route("/zen")
@@ -1098,6 +1190,7 @@ NAV_ICONS = {
     "create": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
     "dashboard": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
     "zen": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12s1-2 4-2 4 2 4 2"/><path d="M9 9h.01M15 9h.01"/></svg>',
+    "backups": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12a10 10 0 0 1-10 10"/><polyline points="16 16 22 16 22 22"/></svg>',
 }
 
 def base_template(title, active, content, body_class=""):
@@ -1149,6 +1242,9 @@ def base_template(title, active, content, body_class=""):
     </a>
     <a href="/zen" class="{{% if active == 'zen' %}}active{{% endif %}}">
         {NAV_ICONS["zen"]}<span>Zen</span>
+    </a>
+    <a href="/backups" class="{{% if active == 'backups' %}}active{{% endif %}}">
+        {NAV_ICONS["backups"]}<span>Sauvegardes</span>
     </a>
 </nav>
 </body>
@@ -1932,6 +2028,118 @@ document.getElementById('healthChart').addEventListener('click', function(e) {
 {% endif %}
 """)
 
+
+BACKUPS_HTML = base_template("Sauvegardes", "backups", """
+<h2 style="font-size:1.2rem;margin-bottom:4px;">🕐 Sauvegardes automatiques</h2>
+<p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px;">
+    Une sauvegarde est créée automatiquement avant chaque modification. Les {{ max_backups }} plus récentes sont conservées.
+</p>
+
+{% if not backups %}
+<div class="empty-state">
+    <div class="icon">📭</div>
+    <p>Aucune sauvegarde pour l'instant.<br>Elle sera créée lors de ta prochaine modification.</p>
+</div>
+{% else %}
+
+{% for b in backups %}
+<div class="backup-item" id="bi-{{ loop.index }}">
+    <div class="backup-info">
+        <div class="backup-label">{{ b.label }}</div>
+        <div class="backup-meta">{{ b.count }} cartes · {{ b.size_kb }} Ko</div>
+    </div>
+    <div class="backup-actions">
+        <button class="btn btn-ghost btn-sm" onclick="togglePreview('{{ b.filename }}', {{ loop.index }})">👁 Aperçu</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--warning)"
+                onclick="confirmRestore('{{ b.filename }}', '{{ b.label }}')">↩️ Restaurer</button>
+    </div>
+    <div class="backup-preview" id="preview-{{ loop.index }}" style="display:none;"></div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+<!-- Restore confirm overlay -->
+<div class="confirm-overlay" id="confirmRestoreOverlay">
+    <div class="confirm-box">
+        <p style="margin-bottom:8px;">Restaurer cette version ?</p>
+        <p id="restoreLabel" style="font-size:0.82rem;color:var(--text2);margin-bottom:16px;"></p>
+        <p style="font-size:0.8rem;color:var(--warning);margin-bottom:16px;">
+            ⚠️ L'état actuel sera sauvegardé automatiquement avant la restauration.
+        </p>
+        <div class="btn-row-2">
+            <a id="restoreLink" href="#" class="btn btn-danger btn-sm">Restaurer</a>
+            <button class="btn btn-ghost btn-sm" onclick="hideRestoreConfirm()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.backup-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.backup-info { margin-bottom: 10px; }
+.backup-label { font-size: 0.95rem; font-weight: 500; }
+.backup-meta { font-size: 0.78rem; color: var(--text2); margin-top: 3px; }
+.backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.backup-preview {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    font-size: 0.82rem;
+    color: var(--text2);
+}
+.preview-row {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.preview-row:last-child { border-bottom: none; }
+.preview-recto { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-verso { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-box { font-size: 0.72rem; background: rgba(127,90,240,.15); color: var(--accent); border-radius: 4px; padding: 1px 6px; flex-shrink: 0; }
+</style>
+
+<script>
+function confirmRestore(filename, label) {
+    document.getElementById('restoreLabel').textContent = label;
+    document.getElementById('restoreLink').href = '/backups/restore/' + filename;
+    document.getElementById('confirmRestoreOverlay').classList.add('show');
+}
+function hideRestoreConfirm() {
+    document.getElementById('confirmRestoreOverlay').classList.remove('show');
+}
+
+const previewCache = {};
+async function togglePreview(filename, idx) {
+    const el = document.getElementById('preview-' + idx);
+    if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+    if (previewCache[filename]) { el.innerHTML = previewCache[filename]; el.style.display = 'block'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<span style="color:var(--text2)">Chargement…</span>';
+    try {
+        const r = await fetch('/backups/preview/' + filename);
+        const data = await r.json();
+        if (data.error) { el.innerHTML = '<span style="color:var(--danger)">Erreur : ' + data.error + '</span>'; return; }
+        let html = `<div style="margin-bottom:8px;font-weight:500;">${data.count} cartes — aperçu des 5 premières :</div>`;
+        html += data.sample.map(c =>
+            `<div class="preview-row">
+                <span class="preview-recto">${c.recto}</span>
+                <span class="preview-verso">${c.verso}</span>
+                <span class="preview-box">Boîte ${c.box}</span>
+            </div>`
+        ).join('');
+        previewCache[filename] = html;
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = "<span style='color:var(--danger)'>Impossible de charger l'aperçu.</span>";
+    }
+}
+</script>
+""")
 
 # ── Mindfulness template ─────────────────────────────────────────────────────
 
