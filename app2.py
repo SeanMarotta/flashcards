@@ -1332,7 +1332,13 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 </div>
 <div class="progress-label">{{{{ idx+1 }}}}/{{{{ total }}}}</div>
 
-<div class="card">
+<div class="card" id="swipeCard">
+    <!-- Swipe indicator overlays -->
+    <div class="swipe-indicator swipe-correct" id="swipeCorrect">✅</div>
+    <div class="swipe-indicator swipe-incorrect" id="swipeIncorrect">❌</div>
+    <div class="swipe-indicator swipe-pass" id="swipePass">⏭️</div>
+    <div class="swipe-indicator swipe-reveal" id="swipeReveal">👁️</div>
+
     <div class="card-content">
         {{{{ render_content(
             card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path,
@@ -1392,6 +1398,73 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 }}
 .card.glow-correct   {{ animation: glowCorrect  0.55s ease-out forwards; }}
 .card.glow-incorrect {{ animation: glowIncorrect 0.55s ease-out forwards; }}
+
+/* ── Swipe gestures ─────────── */
+#swipeCard {{
+    position: relative;
+    touch-action: pan-x pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    will-change: transform;
+    overflow: hidden;
+}}
+#swipeCard.swiping {{
+    transition: none !important;
+}}
+#swipeCard.snap-back {{
+    transition: transform 0.35s cubic-bezier(.22,.68,0,.98) !important;
+}}
+#swipeCard.fly-out {{
+    transition: transform 0.35s cubic-bezier(.55,.06,.68,.19), opacity 0.3s ease !important;
+}}
+
+.swipe-indicator {{
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.4rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    z-index: 10;
+    filter: drop-shadow(0 0 12px rgba(0,0,0,0.5));
+}}
+.swipe-correct   {{ right: 20px; }}
+.swipe-incorrect {{ left: 20px; }}
+.swipe-pass      {{ left: 50%; transform: translate(-50%, -50%); }}
+.swipe-reveal    {{ left: 50%; transform: translate(-50%, -50%); }}
+
+/* Border glow during swipe drag */
+#swipeCard.drag-correct   {{ border-color: rgba(44,182,125,0.6);  box-shadow: 0 0 20px rgba(44,182,125,0.2); }}
+#swipeCard.drag-incorrect {{ border-color: rgba(229,49,112,0.6);  box-shadow: 0 0 20px rgba(229,49,112,0.2); }}
+#swipeCard.drag-pass      {{ border-color: rgba(148,146,157,0.6); box-shadow: 0 0 20px rgba(148,146,157,0.15); }}
+#swipeCard.drag-reveal    {{ border-color: rgba(127,90,240,0.6);  box-shadow: 0 0 20px rgba(127,90,240,0.2); }}
+
+/* Swipe hint badge */
+.swipe-hint {{
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    font-size: 0.72rem;
+    padding: 8px 16px;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 1s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}}
+.swipe-hint span {{
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}}
 </style>
 
 <div class="confirm-overlay" id="confirmDelete">
@@ -1407,6 +1480,7 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 <script>
 function showConfirm() {{ document.getElementById('confirmDelete').classList.add('show'); }}
 function hideConfirm() {{ document.getElementById('confirmDelete').classList.remove('show'); }}
+let navigating = false;
 async function revealAnswer() {{
     fetch('/review/show');
     const ans = document.getElementById('answer-section');
@@ -1417,7 +1491,9 @@ async function revealAnswer() {{
 }}
 
 function answerAndGo(result) {{
-    const card = document.querySelector('.card');
+    if (navigating) return;
+    navigating = true;
+    const card = document.getElementById('swipeCard');
     if (result === 'correct')   card.classList.add('glow-correct');
     if (result === 'incorrect') card.classList.add('glow-incorrect');
     setTimeout(() => {{ window.location.href = '/review/answer/' + result; }}, 420);
@@ -1448,32 +1524,157 @@ document.addEventListener('keydown', function(e) {{
     }}
 }});
 
-// ── Hint tooltip (disparaît après 4s) ──────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SWIPE GESTURES
+// ═══════════════════════════════════════════════════════════════════════════════
+(function() {{
+    const card = document.getElementById('swipeCard');
+    if (!card) return;
+
+    const THRESHOLD  = 70;   // px to trigger action
+    const SHOW_RATIO = 0.25; // opacity ramp speed
+    let startX = 0, startY = 0, dx = 0, dy = 0, swiping = false;
+    let direction = null; // 'horizontal' or 'vertical'
+
+    const indicators = {{
+        correct:   document.getElementById('swipeCorrect'),
+        incorrect: document.getElementById('swipeIncorrect'),
+        pass:      document.getElementById('swipePass'),
+        reveal:    document.getElementById('swipeReveal'),
+    }};
+
+    function clearDragClasses() {{
+        card.classList.remove('drag-correct','drag-incorrect','drag-pass','drag-reveal');
+        Object.values(indicators).forEach(el => el.style.opacity = '0');
+    }}
+
+    function getSwipeAction() {{
+        const absDx = Math.abs(dx), absDy = Math.abs(dy);
+        if (direction === 'horizontal') {{
+            if (absDx < THRESHOLD) return null;
+            if (!answerVisible()) return null; // no horizontal swipe before reveal
+            return dx > 0 ? 'correct' : 'incorrect';
+        }}
+        if (direction === 'vertical') {{
+            if (absDy < THRESHOLD) return null;
+            if (dy < 0 && answerVisible()) return 'pass';       // swipe up = pass
+            if (dy > 0 && !answerVisible()) return 'reveal';    // swipe down = reveal
+        }}
+        return null;
+    }}
+
+    card.addEventListener('touchstart', function(e) {{
+        if (navigating) return;
+        if (document.getElementById('confirmDelete').classList.contains('show')) return;
+        // Don't intercept if touch is on a button/link inside card
+        if (e.target.closest('a, button, audio')) return;
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        dx = 0; dy = 0;
+        swiping = true;
+        direction = null;
+        card.classList.add('swiping');
+        card.classList.remove('snap-back','fly-out');
+    }}, {{ passive: true }});
+
+    card.addEventListener('touchmove', function(e) {{
+        if (!swiping || navigating) return;
+        const t = e.touches[0];
+        dx = t.clientX - startX;
+        dy = t.clientY - startY;
+
+        // Lock direction after 10px of movement
+        if (!direction) {{
+            const absDx = Math.abs(dx), absDy = Math.abs(dy);
+            if (absDx > 10 || absDy > 10) {{
+                direction = absDx > absDy ? 'horizontal' : 'vertical';
+            }} else {{
+                return;
+            }}
+        }}
+
+        // Apply visual transform
+        if (direction === 'horizontal' && answerVisible()) {{
+            const rotate = dx * 0.04; // subtle tilt
+            card.style.transform = `translateX(${{dx}}px) rotate(${{rotate}}deg)`;
+
+            clearDragClasses();
+            if (dx > THRESHOLD * 0.5) {{
+                card.classList.add('drag-correct');
+                indicators.correct.style.opacity = Math.min(1, (dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+            }} else if (dx < -THRESHOLD * 0.5) {{
+                card.classList.add('drag-incorrect');
+                indicators.incorrect.style.opacity = Math.min(1, (-dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+            }}
+        }} else if (direction === 'vertical') {{
+            const clampDy = Math.max(-120, Math.min(120, dy));
+            card.style.transform = `translateY(${{clampDy}}px)`;
+
+            clearDragClasses();
+            if (dy < -THRESHOLD * 0.5 && answerVisible()) {{
+                card.classList.add('drag-pass');
+                indicators.pass.style.opacity = Math.min(1, (-dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+            }} else if (dy > THRESHOLD * 0.5 && !answerVisible()) {{
+                card.classList.add('drag-reveal');
+                indicators.reveal.style.opacity = Math.min(1, (dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+            }}
+        }}
+    }}, {{ passive: true }});
+
+    function endSwipe() {{
+        if (!swiping) return;
+        swiping = false;
+        card.classList.remove('swiping');
+        clearDragClasses();
+
+        const action = getSwipeAction();
+
+        if (action === 'reveal') {{
+            card.classList.add('snap-back');
+            card.style.transform = '';
+            revealAnswer();
+        }} else if (action === 'correct') {{
+            card.classList.add('fly-out');
+            card.style.transform = `translateX(${{window.innerWidth}}px) rotate(20deg)`;
+            card.style.opacity = '0';
+            setTimeout(() => answerAndGo('correct'), 200);
+        }} else if (action === 'incorrect') {{
+            card.classList.add('fly-out');
+            card.style.transform = `translateX(${{-window.innerWidth}}px) rotate(-20deg)`;
+            card.style.opacity = '0';
+            setTimeout(() => answerAndGo('incorrect'), 200);
+        }} else if (action === 'pass') {{
+            card.classList.add('fly-out');
+            card.style.transform = `translateY(${{-window.innerHeight}}px)`;
+            card.style.opacity = '0';
+            setTimeout(() => answerAndGo('pass'), 200);
+        }} else {{
+            // Snap back
+            card.classList.add('snap-back');
+            card.style.transform = '';
+        }}
+    }}
+
+    card.addEventListener('touchend', endSwipe, {{ passive: true }});
+    card.addEventListener('touchcancel', endSwipe, {{ passive: true }});
+}})();
+
+// ── Swipe hint tooltip ───────────────────────────────────────────────────────
 (function() {{
     const hint = document.createElement('div');
-    hint.innerHTML = answerVisible()
-        ? '<kbd>1</kbd> Correct &nbsp; <kbd>2</kbd> Faux &nbsp; <kbd>3</kbd> Pass'
-        : '<kbd>↓</kbd> Voir la réponse';
-    hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#16161a;border:1px solid #2a2a32;color:#94929d;font-size:11px;padding:6px 14px;border-radius:20px;pointer-events:none;z-index:50;transition:opacity 1s;white-space:nowrap;';
-    hint.querySelectorAll && (hint.innerHTML = hint.innerHTML); // noop
+    hint.className = 'swipe-hint';
+    if (answerVisible()) {{
+        hint.innerHTML = '<span>👉 Correct</span><span>👈 Faux</span><span>👆 Pass</span>';
+    }} else {{
+        hint.innerHTML = '<span>👇 Voir la réponse</span>';
+    }}
     document.body.appendChild(hint);
-    setTimeout(() => hint.style.opacity = '0', 3000);
-    setTimeout(() => hint.remove(), 4200);
+    setTimeout(() => hint.style.opacity = '0', 4000);
+    setTimeout(() => hint.remove(), 5200);
 }})();
 </script>
 
-<style>
-kbd {{
-    display:inline-block;
-    background:#2a2a32;
-    color:#e8e6e3;
-    border:1px solid #3a3a44;
-    border-radius:5px;
-    padding:1px 6px;
-    font-size:10px;
-    font-family:'Space Mono', monospace;
-}}
-</style>
 """, body_class="review-mode")
 
 # ── Review done ──────────────────────────────────────────────────────────────
