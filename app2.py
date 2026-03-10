@@ -27,7 +27,7 @@ IMAGE_DIR = "images"
 AUDIO_DIR = "audios"
 REVIEW_DIR = "review_sessions"
 BACKUP_DIR = "backups"
-MAX_BACKUPS = 10
+MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
 
@@ -1373,11 +1373,26 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 </div>
 <div id="bar-answer" class="review-action-bar" style="{{% if not show_answer %}}display:none;{{% endif %}}">
     <div class="action-buttons">
-        <a href="/review/answer/correct" class="btn btn-success">✅ Correct</a>
-        <a href="/review/answer/incorrect" class="btn btn-danger">❌ Faux</a>
-        <a href="/review/answer/pass" class="btn btn-ghost">⏭️ Pass</a>
+        <button onclick="answerAndGo('correct')" class="btn btn-success">✅ Correct</button>
+        <button onclick="answerAndGo('incorrect')" class="btn btn-danger">❌ Faux</button>
+        <button onclick="answerAndGo('pass')" class="btn btn-ghost">⏭️ Pass</button>
     </div>
 </div>
+
+<style>
+@keyframes glowCorrect {{
+    0%   {{ box-shadow: 0 0 0px 0px rgba(44,182,125,0); }}
+    40%  {{ box-shadow: 0 0 40px 18px rgba(44,182,125,0.55); }}
+    100% {{ box-shadow: 0 0 0px 0px rgba(44,182,125,0); }}
+}}
+@keyframes glowIncorrect {{
+    0%   {{ box-shadow: 0 0 0px 0px rgba(229,49,112,0); }}
+    40%  {{ box-shadow: 0 0 40px 18px rgba(229,49,112,0.55); }}
+    100% {{ box-shadow: 0 0 0px 0px rgba(229,49,112,0); }}
+}}
+.card.glow-correct   {{ animation: glowCorrect  0.55s ease-out forwards; }}
+.card.glow-incorrect {{ animation: glowIncorrect 0.55s ease-out forwards; }}
+</style>
 
 <div class="confirm-overlay" id="confirmDelete">
     <div class="confirm-box">
@@ -1393,12 +1408,19 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 function showConfirm() {{ document.getElementById('confirmDelete').classList.add('show'); }}
 function hideConfirm() {{ document.getElementById('confirmDelete').classList.remove('show'); }}
 async function revealAnswer() {{
-    fetch('/review/show');  // update server state in background
+    fetch('/review/show');
     const ans = document.getElementById('answer-section');
     ans.style.pointerEvents = 'auto';
     requestAnimationFrame(() => {{ ans.style.opacity = '1'; }});
     document.getElementById('bar-show').style.display = 'none';
     document.getElementById('bar-answer').style.display = '';
+}}
+
+function answerAndGo(result) {{
+    const card = document.querySelector('.card');
+    if (result === 'correct')   card.classList.add('glow-correct');
+    if (result === 'incorrect') card.classList.add('glow-incorrect');
+    setTimeout(() => {{ window.location.href = '/review/answer/' + result; }}, 420);
 }}
 
 // ── Keyboard shortcuts ──────────────────────────────────────────────────────
@@ -1414,14 +1436,14 @@ document.addEventListener('keydown', function(e) {{
             break;
         case '1':
         case 'ArrowRight':
-            if (answerVisible()) window.location.href = '/review/answer/correct';
+            if (answerVisible()) answerAndGo('correct');
             break;
         case '2':
         case 'ArrowLeft':
-            if (answerVisible()) window.location.href = '/review/answer/incorrect';
+            if (answerVisible()) answerAndGo('incorrect');
             break;
         case '3':
-            if (answerVisible()) window.location.href = '/review/answer/pass';
+            if (answerVisible()) answerAndGo('pass');
             break;
     }}
 }});
