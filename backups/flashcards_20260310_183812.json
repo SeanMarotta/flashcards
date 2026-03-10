@@ -6011,7 +6011,7 @@
         "current_face": "verso",
         "id": "7b098dd6-7b43-4e8d-a47c-b46e4f1a4d12",
         "last_reviewed_date": "2026-03-07",
-        "marked": false,
+        "marked": true,
         "next_review_date": "2026-03-25",
         "recto_path": null,
         "recto_text": "PDG de OpenAI",
@@ -34135,6 +34135,19 @@
         "recto_path": "images/28422f56-49f5-4d99-9f45-731a7e2cb7f8.png",
         "recto_text": null,
         "verso_path": "images/a75b3452-e97d-40c0-ae9d-18f34486e09a.png",
+        "verso_text": null
+    },
+    {
+        "box": 10,
+        "creation_date": "2025-12-10",
+        "current_face": "verso",
+        "id": "6fd866dc-b0b8-4762-b419-aaf948f4a4be",
+        "last_reviewed_date": "2026-03-08",
+        "marked": true,
+        "next_review_date": "2026-03-18",
+        "recto_path": "images/949a4063-e6da-4c4d-adbc-280d1b00a85c.png",
+        "recto_text": null,
+        "verso_path": "images/be42b5d2-634d-4ceb-a8af-0a27afa757aa.png",
         "verso_text": null
     },
     {

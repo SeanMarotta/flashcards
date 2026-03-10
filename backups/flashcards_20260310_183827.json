@@ -6011,7 +6011,7 @@
         "current_face": "verso",
         "id": "7b098dd6-7b43-4e8d-a47c-b46e4f1a4d12",
         "last_reviewed_date": "2026-03-07",
-        "marked": false,
+        "marked": true,
         "next_review_date": "2026-03-25",
         "recto_path": null,
         "recto_text": "PDG de OpenAI",
