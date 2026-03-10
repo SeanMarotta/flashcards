@@ -514,7 +514,10 @@ def dashboard():
     cards = load_flashcards()
     total = len(cards)
     if total == 0:
-        return render_template_string(DASHBOARD_HTML, total=0, mastery=0, long_term_ratio=0, box_data=[], timeline_data=[], workload_data=[])
+        return render_template_string(DASHBOARD_HTML, total=0, mastery=0, long_term_ratio=0,
+                                      box_data=[], timeline_data=[], workload_data=[],
+                                      activity_data=[], stage_data=[], health_data={},
+                                      creation_heatmap=[])
 
     box_sum = sum(c["box"] for c in cards)
     mastery = (box_sum / (total * 60)) * 100
@@ -540,10 +543,50 @@ def dashboard():
     review_counts = Counter(review_dates)
     workload = [{"date": d, "count": n} for d, n in sorted(review_counts.items()) if d is not None][:30]
 
+    today = datetime.now().date()
+
+    # ── NEW: Creation heatmap (full year) ─────────────────────────────────────
+    creation_counts = Counter(c["creation_date"] for c in cards if c.get("creation_date"))
+    # Build a full 52-week grid ending today
+    heatmap_end = today
+    heatmap_start = heatmap_end - timedelta(days=364)
+    heatmap_data = {}
+    d = heatmap_start
+    while d <= heatmap_end:
+        ds = d.strftime("%Y-%m-%d")
+        heatmap_data[ds] = creation_counts.get(ds, 0)
+        d += timedelta(days=1)
+    creation_heatmap = [{"date": ds, "count": v} for ds, v in sorted(heatmap_data.items())]
+
+    # ── NEW: Daily review activity (last 30 days) ──────────────────────────────
+    last_30 = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
+    reviewed_dates = [c["last_reviewed_date"] for c in cards if c.get("last_reviewed_date")]
+    reviewed_counts = Counter(reviewed_dates)
+    activity_data = [{"date": d, "count": reviewed_counts.get(d, 0)} for d in last_30]
+
+    # ── NEW: Stage distribution (Donut) ───────────────────────────────────────
+    stage_data = {
+        "Débutant (1–5)":       sum(1 for c in cards if 1 <= c["box"] <= 5),
+        "Intermédiaire (6–19)": sum(1 for c in cards if 6 <= c["box"] <= 19),
+        "Avancé (20–59)":       sum(1 for c in cards if 20 <= c["box"] <= 59),
+        "Maîtrisé (60)":        sum(1 for c in cards if c["box"] >= 60),
+    }
+
+    # ── NEW: Card health (overdue / due today / upcoming / never reviewed) ─────
+    today_str = today.strftime("%Y-%m-%d")
+    health_data = {
+        "En retard":         sum(1 for c in cards if c.get("next_review_date","") < today_str and c.get("last_reviewed_date")),
+        "À réviser":         sum(1 for c in cards if c.get("next_review_date","") == today_str),
+        "À venir":           sum(1 for c in cards if c.get("next_review_date","") > today_str),
+        "Jamais révisées":   sum(1 for c in cards if not c.get("last_reviewed_date")),
+    }
+
     return render_template_string(
         DASHBOARD_HTML,
         total=total, mastery=mastery, long_term_ratio=long_term_ratio,
-        box_data=box_data, timeline_data=cumulative, workload_data=workload
+        box_data=box_data, timeline_data=cumulative, workload_data=workload,
+        activity_data=activity_data, stage_data=stage_data, health_data=health_data,
+        creation_heatmap=creation_heatmap
     )
 
 # ── API for search / filter (AJAX) ──────────────────────────────────────────
@@ -1524,13 +1567,36 @@ DASHBOARD_HTML = base_template("Dashboard", "dashboard", """
 </div>
 
 <div class="chart-card">
+    <h3>Calendrier de création — 12 derniers mois</h3>
+    <div id="heatmapWrap" style="overflow-x:auto;padding-bottom:4px;">
+        <canvas id="heatmapChart"></canvas>
+    </div>
+</div>
+
+<div class="chart-card">
     <h3>Charge cognitive future</h3>
     <canvas id="workloadChart" height="200"></canvas>
 </div>
 
+<div class="chart-card">
+    <h3>Activité de révision — 30 derniers jours</h3>
+    <canvas id="activityChart" height="200"></canvas>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="chart-card" style="margin-bottom:0">
+        <h3>Stades d'apprentissage</h3>
+        <canvas id="stageChart" height="220"></canvas>
+    </div>
+    <div class="chart-card" style="margin-bottom:0">
+        <h3>Santé des cartes</h3>
+        <canvas id="healthChart" height="220"></canvas>
+    </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const colors = { accent: '#7f5af0', accent2: '#2cb67d', border: '#2a2a32', text2: '#94929d', surface2: '#1e1e24' };
+const colors = { accent: '#7f5af0', accent2: '#2cb67d', border: '#2a2a32', text2: '#94929d', surface2: '#1e1e24', danger: '#e53170', warning: '#fbbf24' };
 const defaults = { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: colors.text2, maxTicksLimit: 8 }, grid: { color: colors.border } }, y: { ticks: { color: colors.text2 }, grid: { color: colors.border } } } };
 
 // Box chart
@@ -1549,12 +1615,222 @@ new Chart(document.getElementById('timelineChart'), {
     options: defaults
 });
 
+// ── NEW: Creation heatmap ───────────────────────────────────────────────────
+(function() {
+    const hmRaw = {{ creation_heatmap | tojson }};
+    if (!hmRaw.length) return;
+
+    const COLS = 53, ROWS = 7, CELL = 13, GAP = 3;
+    const PAD_LEFT = 28, PAD_TOP = 22, PAD_BOTTOM = 20;
+    const W = PAD_LEFT + COLS * (CELL + GAP);
+    const H = PAD_TOP + ROWS * (CELL + GAP) + PAD_BOTTOM;
+
+    const canvas = document.getElementById('heatmapChart');
+    canvas.width  = W;
+    canvas.height = H;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+
+    const maxCount = Math.max(...hmRaw.map(d => d.count), 1);
+    const logMax = Math.log1p(maxCount); // log(1 + max) to handle 0 safely
+    const dataMap = {};
+    hmRaw.forEach(d => dataMap[d.date] = d.count);
+
+    // Build weeks: first cell = hmRaw[0].date (a Monday-aligned start)
+    const startDate = new Date(hmRaw[0].date + 'T00:00:00');
+    // Align to Monday
+    const dow = startDate.getDay(); // 0=Sun
+    const offset = (dow === 0 ? 6 : dow - 1);
+    startDate.setDate(startDate.getDate() - offset);
+
+    const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const DAY_NAMES   = ['L','M','M','J','V','S','D'];
+
+    // Draw day labels
+    ctx.fillStyle = '#94929d';
+    ctx.font = '10px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    for (let r = 0; r < ROWS; r++) {
+        if (r % 2 === 0) {
+            const y = PAD_TOP + r * (CELL + GAP) + CELL - 2;
+            ctx.fillText(DAY_NAMES[r], PAD_LEFT - 4, y);
+        }
+    }
+
+    // Draw cells
+    let prevMonth = -1;
+    for (let col = 0; col < COLS; col++) {
+        for (let row = 0; row < ROWS; row++) {
+            const d = new Date(startDate);
+            d.setDate(startDate.getDate() + col * 7 + row);
+            const ds = d.toISOString().slice(0, 10);
+            const count = dataMap[ds] || 0;
+            const x = PAD_LEFT + col * (CELL + GAP);
+            const y = PAD_TOP  + row * (CELL + GAP);
+
+            // Month label at top of first row of each new month
+            if (row === 0) {
+                const m = d.getMonth();
+                if (m !== prevMonth) {
+                    ctx.fillStyle = '#94929d';
+                    ctx.font = '10px DM Sans, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(MONTH_NAMES[m], x, PAD_TOP - 6);
+                    prevMonth = m;
+                }
+            }
+
+            // Cell color (log scale to avoid outlier domination)
+            const ratio = count === 0 ? 0 : Math.log1p(count) / logMax;
+            let fill;
+            if (count === 0) {
+                fill = '#1e1e24';
+            } else if (ratio < 0.25) {
+                fill = '#2cb67d33';
+            } else if (ratio < 0.5) {
+                fill = '#2cb67d77';
+            } else if (ratio < 0.75) {
+                fill = '#2cb67dbb';
+            } else {
+                fill = '#2cb67d';
+            }
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            ctx.roundRect(x, y, CELL, CELL, 3);
+            ctx.fill();
+
+            // Tooltip stored as dataset on canvas (handled via mousemove)
+        }
+    }
+
+    // Tooltip on hover
+    const tooltip = document.createElement('div');
+    tooltip.style.cssText = 'position:fixed;background:#16161a;border:1px solid #2a2a32;color:#e8e6e3;font-size:11px;padding:5px 9px;border-radius:7px;pointer-events:none;display:none;z-index:999;font-family:DM Sans,sans-serif;';
+    document.body.appendChild(tooltip);
+
+    canvas.addEventListener('mousemove', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const col = Math.floor((mx - PAD_LEFT) / (CELL + GAP));
+        const row = Math.floor((my - PAD_TOP)  / (CELL + GAP));
+        if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+            const d = new Date(startDate);
+            d.setDate(startDate.getDate() + col * 7 + row);
+            const ds = d.toISOString().slice(0, 10);
+            const count = dataMap[ds] || 0;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.clientX + 12) + 'px';
+            tooltip.style.top  = (e.clientY - 28) + 'px';
+            tooltip.innerHTML = `<strong>${count} carte${count !== 1 ? 's' : ''}</strong> — ${ds}`;
+        } else {
+            tooltip.style.display = 'none';
+        }
+    });
+    canvas.addEventListener('mouseleave', () => tooltip.style.display = 'none');
+
+    // Legend
+    ctx.fillStyle = '#94929d';
+    ctx.font = '10px DM Sans, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Moins', PAD_LEFT, H - 4);
+    const legendX = PAD_LEFT + 36;
+    ['#1e1e24','#2cb67d33','#2cb67d77','#2cb67dbb','#2cb67d'].forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.roundRect(legendX + i * (CELL + 3), H - PAD_BOTTOM + 4, CELL, CELL, 3);
+        ctx.fill();
+    });
+    ctx.fillStyle = '#94929d';
+    ctx.fillText('Plus', legendX + 5 * (CELL + 3) + 2, H - 4);
+})();
+
 // Workload chart
 const wlData = {{ workload_data | tojson }};
 new Chart(document.getElementById('workloadChart'), {
     type: 'bar',
     data: { labels: wlData.map(d => d.date), datasets: [{ data: wlData.map(d => d.count), backgroundColor: colors.accent + '66', borderColor: colors.accent, borderWidth: 1, borderRadius: 4 }] },
     options: defaults
+});
+
+// ── NEW: Activity chart (last 30 days) ─────────────────────────────────────
+const actData = {{ activity_data | tojson }};
+const actMax = Math.max(...actData.map(d => d.count), 1);
+new Chart(document.getElementById('activityChart'), {
+    type: 'bar',
+    data: {
+        labels: actData.map(d => d.date.slice(5)),  // MM-DD
+        datasets: [{
+            data: actData.map(d => d.count),
+            backgroundColor: actData.map(d => {
+                const ratio = d.count / actMax;
+                return `rgba(44,182,125,${0.15 + ratio * 0.75})`;
+            }),
+            borderColor: colors.accent2,
+            borderWidth: d => d.raw > 0 ? 1 : 0,
+            borderRadius: 3,
+        }]
+    },
+    options: {
+        ...defaults,
+        scales: {
+            x: { ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
+            y: { ticks: { color: colors.text2, stepSize: 1 }, grid: { color: colors.border }, beginAtZero: true }
+        }
+    }
+});
+
+// ── NEW: Stage donut chart ──────────────────────────────────────────────────
+const stageRaw = {{ stage_data | tojson }};
+new Chart(document.getElementById('stageChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(stageRaw),
+        datasets: [{
+            data: Object.values(stageRaw),
+            backgroundColor: ['#e53170cc', '#fbbf24cc', colors.accent + 'cc', colors.accent2 + 'cc'],
+            borderColor:     ['#e53170',   '#fbbf24',   colors.accent,         colors.accent2],
+            borderWidth: 2,
+            hoverOffset: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout: '65%',
+        plugins: {
+            legend: {
+                display: true,
+                position: 'bottom',
+                labels: { color: colors.text2, font: { size: 11 }, boxWidth: 12, padding: 10 }
+            }
+        }
+    }
+});
+
+// ── NEW: Health horizontal bar chart ───────────────────────────────────────
+const healthRaw = {{ health_data | tojson }};
+new Chart(document.getElementById('healthChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(healthRaw),
+        datasets: [{
+            data: Object.values(healthRaw),
+            backgroundColor: [colors.danger + 'aa', colors.warning + 'aa', colors.accent2 + 'aa', colors.text2 + '66'],
+            borderColor:     [colors.danger,         colors.warning,         colors.accent2,         colors.text2],
+            borderWidth: 1,
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { ticks: { color: colors.text2 }, grid: { color: colors.border }, beginAtZero: true },
+            y: { ticks: { color: colors.text2 }, grid: { display: false } }
+        }
+    }
 });
 </script>
 {% endif %}
