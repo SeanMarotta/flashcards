@@ -1373,8 +1373,8 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 </div>
 <div id="bar-answer" class="review-action-bar" style="{{% if not show_answer %}}display:none;{{% endif %}}">
     <div class="action-buttons">
-        <button onclick="answerAndGo('correct')" class="btn btn-success">✅ Correct</button>
         <button onclick="answerAndGo('incorrect')" class="btn btn-danger">❌ Faux</button>
+        <button onclick="answerAndGo('correct')" class="btn btn-success">✅ Correct</button>
         <button onclick="answerAndGo('pass')" class="btn btn-ghost">⏭️ Pass</button>
     </div>
 </div>
