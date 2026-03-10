@@ -1429,7 +1429,7 @@ document.addEventListener('keydown', function(e) {{
     if (document.getElementById('confirmDelete').classList.contains('show')) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     switch(e.key) {{
-        case ' ':
+        case 'ArrowDown':
         case 'Enter':
             e.preventDefault();
             if (!answerVisible()) revealAnswer();
@@ -1453,7 +1453,7 @@ document.addEventListener('keydown', function(e) {{
     const hint = document.createElement('div');
     hint.innerHTML = answerVisible()
         ? '<kbd>1</kbd> Correct &nbsp; <kbd>2</kbd> Faux &nbsp; <kbd>3</kbd> Pass'
-        : '<kbd>Espace</kbd> Voir la réponse';
+        : '<kbd>↓</kbd> Voir la réponse';
     hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#16161a;border:1px solid #2a2a32;color:#94929d;font-size:11px;padding:6px 14px;border-radius:20px;pointer-events:none;z-index:50;transition:opacity 1s;white-space:nowrap;';
     hint.querySelectorAll && (hint.innerHTML = hint.innerHTML); // noop
     document.body.appendChild(hint);
