@@ -329,8 +329,18 @@ def manage():
     all_cards = load_flashcards()
     boxes = sorted(set(c["box"] for c in all_cards))
     selected_box = request.args.get("box", type=int)
-    cards_in_box = [c for c in all_cards if c["box"] == selected_box] if selected_box is not None else []
-    return render_template_string(MANAGE_HTML, boxes=boxes, selected_box=selected_box, cards=cards_in_box)
+    filter_mode = request.args.get("filter", "")
+
+    if filter_mode == "never_reviewed":
+        cards_in_box = [c for c in all_cards if not c.get("last_reviewed_date")]
+    elif selected_box is not None:
+        cards_in_box = [c for c in all_cards if c["box"] == selected_box]
+    else:
+        cards_in_box = []
+
+    never_count = sum(1 for c in all_cards if not c.get("last_reviewed_date"))
+    return render_template_string(MANAGE_HTML, boxes=boxes, selected_box=selected_box,
+                                  cards=cards_in_box, filter_mode=filter_mode, never_count=never_count)
 
 @app.route("/card/<card_id>")
 @login_required
@@ -834,6 +844,7 @@ body.review-mode .container { padding-bottom: 120px; }
 .badge-accent { background: rgba(127,90,240,.15); color: var(--accent); }
 .badge-green { background: rgba(44,182,125,.15); color: var(--accent2); }
 .badge-warning { background: rgba(251,191,36,.15); color: var(--warning); }
+.badge-danger { background: rgba(229,49,112,.15); color: var(--danger); }
 
 /* ── Stats grid ──────────────── */
 .stats-grid {
@@ -1293,7 +1304,58 @@ async function revealAnswer() {{
     document.getElementById('bar-show').style.display = 'none';
     document.getElementById('bar-answer').style.display = '';
 }}
+
+// ── Keyboard shortcuts ──────────────────────────────────────────────────────
+const answerVisible = () => document.getElementById('bar-answer').style.display !== 'none';
+document.addEventListener('keydown', function(e) {{
+    if (document.getElementById('confirmDelete').classList.contains('show')) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    switch(e.key) {{
+        case ' ':
+        case 'Enter':
+            e.preventDefault();
+            if (!answerVisible()) revealAnswer();
+            break;
+        case '1':
+        case 'ArrowRight':
+            if (answerVisible()) window.location.href = '/review/answer/correct';
+            break;
+        case '2':
+        case 'ArrowLeft':
+            if (answerVisible()) window.location.href = '/review/answer/incorrect';
+            break;
+        case '3':
+            if (answerVisible()) window.location.href = '/review/answer/pass';
+            break;
+    }}
+}});
+
+// ── Hint tooltip (disparaît après 4s) ──────────────────────────────────────
+(function() {{
+    const hint = document.createElement('div');
+    hint.innerHTML = answerVisible()
+        ? '<kbd>1</kbd> Correct &nbsp; <kbd>2</kbd> Faux &nbsp; <kbd>3</kbd> Pass'
+        : '<kbd>Espace</kbd> Voir la réponse';
+    hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#16161a;border:1px solid #2a2a32;color:#94929d;font-size:11px;padding:6px 14px;border-radius:20px;pointer-events:none;z-index:50;transition:opacity 1s;white-space:nowrap;';
+    hint.querySelectorAll && (hint.innerHTML = hint.innerHTML); // noop
+    document.body.appendChild(hint);
+    setTimeout(() => hint.style.opacity = '0', 3000);
+    setTimeout(() => hint.remove(), 4200);
+}})();
 </script>
+
+<style>
+kbd {{
+    display:inline-block;
+    background:#2a2a32;
+    color:#e8e6e3;
+    border:1px solid #3a3a44;
+    border-radius:5px;
+    padding:1px 6px;
+    font-size:10px;
+    font-family:'Space Mono', monospace;
+}}
+</style>
 """, body_class="review-mode")
 
 # ── Review done ──────────────────────────────────────────────────────────────
@@ -1332,11 +1394,24 @@ MANAGE_HTML = base_template("Gérer", "manage", f"""
 
 <h2 style="font-size:1.2rem;margin-bottom:16px;">🗂️ Gérer les cartes</h2>
 
+{{% if never_count %}}
+<a href="/manage?filter=never_reviewed"
+   class="card-list-item {{% if filter_mode == 'never_reviewed' %}}active{{% endif %}}"
+   style="margin-bottom:16px;border-color:{{% if filter_mode == 'never_reviewed' %}}var(--danger){{% else %}}var(--border){{% endif %}};background:{{% if filter_mode == 'never_reviewed' %}}rgba(229,49,112,0.08){{% else %}}transparent{{% endif %}}">
+    <span style="font-size:1.1rem;">🕳️</span>
+    <span class="preview" style="color:{{% if filter_mode == 'never_reviewed' %}}var(--danger){{% else %}}var(--text){{% endif %}}">
+        Jamais révisées
+    </span>
+    <span class="badge badge-danger" style="margin-left:auto;margin-right:8px;">{{{{ never_count }}}}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{{% endif %}}
+
 {{% if boxes %}}
 <p class="section-title">Boîtes</p>
 <div class="box-grid">
     {{% for box in boxes %}}
-    <a href="/manage?box={{{{ box }}}}" class="box-item {{% if selected_box == box %}}active{{% endif %}}">
+    <a href="/manage?box={{{{ box }}}}" class="box-item {{% if selected_box == box and not filter_mode %}}active{{% endif %}}">
         <span class="box-num">{{{{ box }}}}</span>
         <span class="box-count">n°{{{{ box }}}}</span>
     </a>
@@ -1349,7 +1424,21 @@ MANAGE_HTML = base_template("Gérer", "manage", f"""
 </div>
 {{% endif %}}
 
-{{% if selected_box is not none %}}
+{{% if filter_mode == 'never_reviewed' %}}
+<p class="section-title">🕳️ Jamais révisées — {{{{ cards|length }}}} cartes</p>
+{{% for card in cards %}}
+<a href="/card/{{{{ card.id }}}}" class="card-list-item">
+    {{% if card.marked %}}<span class="marked-icon">🔖</span>{{% endif %}}
+    {{% if card.recto_path and card.recto_path.startswith('http') %}}
+        <img src="{{{{ card.recto_path }}}}" class="thumb" loading="lazy">
+    {{% elif card.recto_path %}}
+        <img src="/{{{{ card.recto_path }}}}" class="thumb" loading="lazy">
+    {{% endif %}}
+    <span class="preview">{{{{ card.recto_text or '🖼️ Image' }}}}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{{% endfor %}}
+{{% elif selected_box is not none %}}
 <p class="section-title">Boîte {{{{ selected_box }}}} — {{{{ cards|length }}}} cartes</p>
 {{% for card in cards %}}
 <a href="/card/{{{{ card.id }}}}" class="card-list-item">
@@ -1810,7 +1899,7 @@ new Chart(document.getElementById('stageChart'), {
 
 // ── NEW: Health horizontal bar chart ───────────────────────────────────────
 const healthRaw = {{ health_data | tojson }};
-new Chart(document.getElementById('healthChart'), {
+const healthChart = new Chart(document.getElementById('healthChart'), {
     type: 'bar',
     data: {
         labels: Object.keys(healthRaw),
@@ -1830,6 +1919,13 @@ new Chart(document.getElementById('healthChart'), {
             x: { ticks: { color: colors.text2 }, grid: { color: colors.border }, beginAtZero: true },
             y: { ticks: { color: colors.text2 }, grid: { display: false } }
         }
+    }
+});
+document.getElementById('healthChart').style.cursor = 'pointer';
+document.getElementById('healthChart').addEventListener('click', function(e) {
+    const pts = healthChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+    if (pts.length && pts[0].index === 3) {  // index 3 = "Jamais révisées"
+        window.location.href = '/manage?filter=never_reviewed';
     }
 });
 </script>
