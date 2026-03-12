@@ -1336,7 +1336,6 @@ REVIEW_HTML = base_template("Révision", "review", f"""
     <!-- Swipe indicator overlays -->
     <div class="swipe-indicator swipe-correct" id="swipeCorrect">✅</div>
     <div class="swipe-indicator swipe-incorrect" id="swipeIncorrect">❌</div>
-    <div class="swipe-indicator swipe-pass" id="swipePass">⏭️</div>
     <div class="swipe-indicator swipe-reveal" id="swipeReveal">👁️</div>
 
     <div class="card-content">
@@ -1431,13 +1430,11 @@ REVIEW_HTML = base_template("Révision", "review", f"""
 }}
 .swipe-correct   {{ right: 20px; }}
 .swipe-incorrect {{ left: 20px; }}
-.swipe-pass      {{ left: 50%; transform: translate(-50%, -50%); }}
 .swipe-reveal    {{ left: 50%; transform: translate(-50%, -50%); }}
 
 /* Border glow during swipe drag */
 #swipeCard.drag-correct   {{ border-color: rgba(44,182,125,0.6);  box-shadow: 0 0 20px rgba(44,182,125,0.2); }}
 #swipeCard.drag-incorrect {{ border-color: rgba(229,49,112,0.6);  box-shadow: 0 0 20px rgba(229,49,112,0.2); }}
-#swipeCard.drag-pass      {{ border-color: rgba(148,146,157,0.6); box-shadow: 0 0 20px rgba(148,146,157,0.15); }}
 #swipeCard.drag-reveal    {{ border-color: rgba(127,90,240,0.6);  box-shadow: 0 0 20px rgba(127,90,240,0.2); }}
 
 /* Swipe hint badge */
@@ -1539,12 +1536,11 @@ document.addEventListener('keydown', function(e) {{
     const indicators = {{
         correct:   document.getElementById('swipeCorrect'),
         incorrect: document.getElementById('swipeIncorrect'),
-        pass:      document.getElementById('swipePass'),
         reveal:    document.getElementById('swipeReveal'),
     }};
 
     function clearDragClasses() {{
-        card.classList.remove('drag-correct','drag-incorrect','drag-pass','drag-reveal');
+        card.classList.remove('drag-correct','drag-incorrect','drag-reveal');
         Object.values(indicators).forEach(el => el.style.opacity = '0');
     }}
 
@@ -1557,7 +1553,6 @@ document.addEventListener('keydown', function(e) {{
         }}
         if (direction === 'vertical') {{
             if (absDy < THRESHOLD) return null;
-            if (dy < 0 && answerVisible()) return 'pass';       // swipe up = pass
             if (dy > 0 && !answerVisible()) return 'reveal';    // swipe down = reveal
         }}
         return null;
@@ -1612,10 +1607,7 @@ document.addEventListener('keydown', function(e) {{
             card.style.transform = `translateY(${{clampDy}}px)`;
 
             clearDragClasses();
-            if (dy < -THRESHOLD * 0.5 && answerVisible()) {{
-                card.classList.add('drag-pass');
-                indicators.pass.style.opacity = Math.min(1, (-dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
-            }} else if (dy > THRESHOLD * 0.5 && !answerVisible()) {{
+            if (dy > THRESHOLD * 0.5 && !answerVisible()) {{
                 card.classList.add('drag-reveal');
                 indicators.reveal.style.opacity = Math.min(1, (dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
             }}
@@ -1644,11 +1636,6 @@ document.addEventListener('keydown', function(e) {{
             card.style.transform = `translateX(${{-window.innerWidth}}px) rotate(-20deg)`;
             card.style.opacity = '0';
             setTimeout(() => answerAndGo('incorrect'), 200);
-        }} else if (action === 'pass') {{
-            card.classList.add('fly-out');
-            card.style.transform = `translateY(${{-window.innerHeight}}px)`;
-            card.style.opacity = '0';
-            setTimeout(() => answerAndGo('pass'), 200);
         }} else {{
             // Snap back
             card.classList.add('snap-back');
@@ -1665,7 +1652,7 @@ document.addEventListener('keydown', function(e) {{
     const hint = document.createElement('div');
     hint.className = 'swipe-hint';
     if (answerVisible()) {{
-        hint.innerHTML = '<span>👉 Correct</span><span>👈 Faux</span><span>👆 Pass</span>';
+        hint.innerHTML = '<span>👉 Correct</span><span>👈 Faux</span>';
     }} else {{
         hint.innerHTML = '<span>👇 Voir la réponse</span>';
     }}

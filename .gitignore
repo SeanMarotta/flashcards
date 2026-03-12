@@ -1,1 +1,4 @@
 *.pyc
+backups/*
+review_sessions/*
+__pycache__/*
