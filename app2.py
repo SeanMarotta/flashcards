@@ -33,6 +33,13 @@ MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
 MAX_NEW_CARDS_PER_DAY = 10
+MAX_DAILY_REVIEWS = 350
+
+def box_interval(box):
+    """Intervalle de révision : linéaire pour les boîtes 1-8, puis box^1.1."""
+    if box <= 8:
+        return box
+    return round(box ** 1.1)
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
@@ -232,7 +239,12 @@ def next_available_review_date(all_cards):
 
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
-    return [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
+    due = [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
+    if len(due) <= MAX_DAILY_REVIEWS:
+        return due, len(due)
+    # Priority: low boxes first, then most overdue
+    due.sort(key=lambda c: (c.get("box", 1), c.get("next_review_date", "")))
+    return due[:MAX_DAILY_REVIEWS], len(due)
 
 def get_marked_cards():
     return [c for c in load_flashcards() if c.get("marked", False)]
@@ -278,10 +290,10 @@ def serve_audio(filename):
 @app.route("/")
 @login_required
 def index():
-    daily = get_daily_review_cards()
+    daily, total_due = get_daily_review_cards()
     marked = get_marked_cards()
     return render_template("index.html", title="Réviser", active="review", body_class="",
-                           daily_count=len(daily), marked_count=len(marked))
+                           daily_count=len(daily), total_due=total_due, marked_count=len(marked))
 
 # ── Review session ───────────────────────────────────────────────────────────
 
@@ -290,7 +302,7 @@ def index():
 def review_start(mode):
     cleanup_stale_sessions()
     if mode == "daily":
-        cards = get_daily_review_cards()
+        cards, _ = get_daily_review_cards()
     elif mode == "marked":
         cards = get_marked_cards()
     else:
@@ -375,7 +387,7 @@ def review_answer(result):
                 # pass → no change
                 if result != "pass":
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
-                    all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                    all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
     save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
     return redirect(url_for("review_card"))
@@ -504,7 +516,7 @@ def card_edit(card_id):
         all_cards[idx]["box"] = new_box
         base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
         base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
-        all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
+        all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=box_interval(new_box))).strftime("%Y-%m-%d")
 
         # Recto
         recto_upload = request.files.get("recto_upload")
