@@ -4,42 +4,56 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0c0c0f">
+<meta name="theme-color" content="#09090b">
 <title>{{ title }}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
 
 :root {
-    --bg: #0c0c0f;
-    --surface: #16161a;
-    --surface2: #1e1e24;
-    --border: #2a2a32;
-    --text: #e8e6e3;
-    --text2: #94929d;
-    --accent: #7f5af0;
-    --accent2: #2cb67d;
-    --danger: #e53170;
-    --warning: #fbbf24;
-    --radius: 16px;
+    --bg: #09090b;
+    --surface: #131316;
+    --surface2: #1a1a1f;
+    --surface3: #222228;
+    --border: rgba(255,255,255,.06);
+    --border-hover: rgba(255,255,255,.12);
+    --text: #ececef;
+    --text2: #71717a;
+    --accent: #8b5cf6;
+    --accent-glow: rgba(139,92,246,.15);
+    --accent2: #34d399;
+    --accent2-glow: rgba(52,211,153,.15);
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+    --radius: 14px;
     --radius-sm: 10px;
+    --transition: .2s cubic-bezier(.4,0,.2,1);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ── Scrollbar ───────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
 body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    line-height: 1.6;
 }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--accent); text-decoration: none; transition: color var(--transition); }
+a:hover { color: #a78bfa; }
 
 .container {
-    max-width: 560px;
+    max-width: 540px;
     margin: 0 auto;
     padding: 0 20px 100px 20px;
 }
@@ -49,32 +63,36 @@ a { color: var(--accent); text-decoration: none; }
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(12,12,15,.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(9,9,11,.8);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-bottom: 1px solid var(--border);
-    padding: 14px 20px;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 .topbar h1 {
-    font-family: 'Space Mono', monospace;
-    font-size: 1rem;
-    letter-spacing: -0.5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 .topbar-actions { display: flex; gap: 6px; }
 
-/* ── Bottom nav ──────────────── */
 /* ── Fixed review action bar ── */
 .review-action-bar {
     position: fixed;
     bottom: 0;
     left: 0; right: 0;
     z-index: 110;
-    background: rgba(12,12,15,.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(9,9,11,.92);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-top: 1px solid var(--border);
     padding: 12px 16px max(12px, env(safe-area-inset-bottom));
 }
@@ -82,45 +100,61 @@ a { color: var(--accent); text-decoration: none; }
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 10px;
-    max-width: 560px;
+    max-width: 540px;
     margin: 0 auto;
 }
 .review-action-bar .btn { font-size: 1rem; padding: 16px 12px; }
 
-/* When review bar is active, hide bottom nav and add extra padding */
 body.review-mode .bottomnav { display: none; }
 body.review-mode .container { padding-bottom: 120px; }
 
+/* ── Bottom nav ──────────────── */
 .bottomnav {
     position: fixed;
     bottom: 0;
     left: 0; right: 0;
     z-index: 100;
-    background: rgba(12,12,15,.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(9,9,11,.88);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: space-around;
-    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    padding: 6px 0 max(6px, env(safe-area-inset-bottom));
 }
 .bottomnav a {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     color: var(--text2);
-    font-size: 0.7rem;
-    padding: 6px 12px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 8px 14px;
     border-radius: 12px;
-    transition: all .2s;
+    transition: all var(--transition);
+    position: relative;
 }
-.bottomnav a.active,
-.bottomnav a:hover {
+.bottomnav a.active {
     color: var(--accent);
-    background: rgba(127,90,240,.08);
 }
-.bottomnav a svg { width: 22px; height: 22px; }
+.bottomnav a.active::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+}
+.bottomnav a:hover {
+    color: var(--text);
+    background: rgba(255,255,255,.04);
+}
+.bottomnav a svg { width: 20px; height: 20px; stroke-width: 1.8; }
 
 /* ── Cards / Surfaces ────────── */
 .card {
@@ -129,13 +163,17 @@ body.review-mode .container { padding-bottom: 120px; }
     border-radius: var(--radius);
     padding: 24px;
     margin-bottom: 16px;
-    transition: transform .15s;
+    transition: all var(--transition);
+    position: relative;
+}
+.card:hover {
+    border-color: var(--border-hover);
 }
 .card:active { transform: scale(0.985); }
 
 .card-content {
-    font-size: 1.25rem;
-    line-height: 1.5;
+    font-size: 1.2rem;
+    line-height: 1.6;
     font-weight: 500;
     text-align: center;
     padding: 20px 0;
@@ -153,31 +191,52 @@ body.review-mode .container { padding-bottom: 120px; }
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 14px 24px;
-    border-radius: var(--radius-sm);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.95rem;
+    padding: 12px 24px;
+    border-radius: 99px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
     font-weight: 600;
     border: none;
     cursor: pointer;
-    transition: all .2s;
+    transition: all var(--transition);
     text-decoration: none;
     width: 100%;
+    letter-spacing: -0.01em;
 }
 .btn:active { transform: scale(0.97); }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: #6b46d6; }
-.btn-success { background: var(--accent2); color: #fff; }
-.btn-success:hover { background: #24a06e; }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #c42a5f; }
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 0 0 var(--accent-glow);
+}
+.btn-primary:hover {
+    background: #7c3aed;
+    box-shadow: 0 4px 24px var(--accent-glow);
+}
+.btn-success {
+    background: var(--accent2);
+    color: #fff;
+    box-shadow: 0 0 0 0 var(--accent2-glow);
+}
+.btn-success:hover {
+    background: #2bb583;
+    box-shadow: 0 4px 24px var(--accent2-glow);
+}
+.btn-danger {
+    background: var(--danger);
+    color: #fff;
+}
+.btn-danger:hover { background: #e11d48; }
 .btn-ghost {
     background: transparent;
     color: var(--text);
     border: 1px solid var(--border);
 }
-.btn-ghost:hover { background: var(--surface2); }
-.btn-sm { padding: 10px 16px; font-size: 0.85rem; }
+.btn-ghost:hover {
+    background: var(--surface2);
+    border-color: var(--border-hover);
+}
+.btn-sm { padding: 8px 16px; font-size: 0.82rem; }
 
 .btn-row {
     display: grid;
@@ -196,7 +255,7 @@ body.review-mode .container { padding-bottom: 120px; }
 .progress-wrap {
     background: var(--surface2);
     border-radius: 99px;
-    height: 6px;
+    height: 4px;
     margin: 16px 0 8px;
     overflow: hidden;
 }
@@ -205,12 +264,13 @@ body.review-mode .container { padding-bottom: 120px; }
     background: linear-gradient(90deg, var(--accent), var(--accent2));
     border-radius: 99px;
     transition: width .4s ease;
+    box-shadow: 0 0 12px var(--accent-glow);
 }
 .progress-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text2);
     text-align: center;
-    font-family: 'Space Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 /* ── Badges / chips ──────────── */
@@ -218,43 +278,47 @@ body.review-mode .container { padding-bottom: 120px; }
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 99px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    font-family: 'Space Mono', monospace;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
 }
-.badge-accent { background: rgba(127,90,240,.15); color: var(--accent); }
-.badge-green { background: rgba(44,182,125,.15); color: var(--accent2); }
-.badge-warning { background: rgba(251,191,36,.15); color: var(--warning); }
-.badge-danger { background: rgba(229,49,112,.15); color: var(--danger); }
+.badge-accent { background: var(--accent-glow); color: var(--accent); }
+.badge-green { background: var(--accent2-glow); color: var(--accent2); }
+.badge-warning { background: rgba(245,158,11,.12); color: var(--warning); }
+.badge-danger { background: rgba(244,63,94,.12); color: var(--danger); }
 
 /* ── Stats grid ──────────────── */
 .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 20px;
 }
 .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 16px 12px;
+    padding: 16px 10px;
     text-align: center;
+    transition: border-color var(--transition);
 }
+.stat-card:hover { border-color: var(--border-hover); }
 .stat-value {
-    font-family: 'Space Mono', monospace;
-    font-size: 1.4rem;
-    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 600;
     color: var(--accent);
 }
 .stat-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text2);
     margin-top: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
+    font-weight: 500;
 }
 
 /* ── Chart ────────────────────── */
@@ -266,22 +330,23 @@ body.review-mode .container { padding-bottom: 120px; }
     margin-bottom: 16px;
 }
 .chart-card h3 {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text2);
     margin-bottom: 12px;
     font-weight: 500;
+    letter-spacing: 0.01em;
 }
 
 /* ── Forms ────────────────────── */
-.form-group { margin-bottom: 16px; }
+.form-group { margin-bottom: 18px; }
 .form-group label {
     display: block;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text2);
     margin-bottom: 6px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
 }
 .form-group input[type="text"],
 .form-group input[type="number"],
@@ -289,23 +354,26 @@ body.review-mode .container { padding-bottom: 120px; }
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 12px 16px;
-    background: var(--surface2);
+    padding: 11px 14px;
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 1rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
     outline: none;
-    transition: border-color .2s;
+    transition: all var(--transition);
 }
 .form-group input:focus,
 .form-group textarea:focus,
-.form-group select:focus { border-color: var(--accent); }
+.form-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
 .form-group textarea { min-height: 80px; resize: vertical; }
 .form-group input[type="file"] {
     color: var(--text2);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
 }
 
 /* ── Flash messages ──────────── */
@@ -313,19 +381,24 @@ body.review-mode .container { padding-bottom: 120px; }
     padding: 12px 16px;
     border-radius: var(--radius-sm);
     margin-bottom: 16px;
-    font-size: 0.9rem;
-    animation: slideDown .3s ease;
+    font-size: 0.88rem;
+    font-weight: 500;
+    animation: slideDown .35s cubic-bezier(.4,0,.2,1);
+    border-left: 3px solid;
 }
-.flash-success { background: rgba(44,182,125,.12); color: var(--accent2); border: 1px solid rgba(44,182,125,.25); }
-.flash-error { background: rgba(229,49,112,.12); color: var(--danger); border: 1px solid rgba(229,49,112,.25); }
-.flash-info { background: rgba(127,90,240,.12); color: var(--accent); border: 1px solid rgba(127,90,240,.25); }
+.flash-success { background: rgba(52,211,153,.08); color: var(--accent2); border-left-color: var(--accent2); }
+.flash-error { background: rgba(244,63,94,.08); color: var(--danger); border-left-color: var(--danger); }
+.flash-info { background: var(--accent-glow); color: var(--accent); border-left-color: var(--accent); }
 
-@keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes slideDown {
+    from { opacity:0; transform:translateY(-8px); }
+    to { opacity:1; transform:translateY(0); }
+}
 
 /* ── Box list ────────────────── */
 .box-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
     gap: 8px;
 }
 .box-item {
@@ -338,41 +411,45 @@ body.review-mode .container { padding-bottom: 120px; }
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     text-decoration: none;
-    transition: all .2s;
+    transition: all var(--transition);
 }
 .box-item:hover, .box-item.active {
     border-color: var(--accent);
-    background: rgba(127,90,240,.06);
+    background: var(--accent-glow);
+    box-shadow: 0 0 16px var(--accent-glow);
 }
-.box-num { font-family:'Space Mono',monospace; font-weight:700; font-size:1.1rem; color:var(--accent); }
-.box-count { font-size:0.7rem; color:var(--text2); margin-top:2px; }
+.box-num { font-family:'JetBrains Mono',monospace; font-weight:600; font-size:1.05rem; color:var(--accent); }
+.box-count { font-size:0.65rem; color:var(--text2); margin-top:2px; }
 
 /* ── Card list items ─────────── */
 .card-list-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 14px 16px;
+    padding: 12px 16px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     margin-bottom: 8px;
     text-decoration: none;
     color: var(--text);
-    transition: all .2s;
+    transition: all var(--transition);
 }
-.card-list-item:hover { border-color: var(--accent); }
+.card-list-item:hover {
+    border-color: var(--border-hover);
+    background: var(--surface2);
+}
 .card-list-item .preview {
     flex: 1;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .card-list-item .marked-icon { color: var(--warning); }
 .card-list-item img.thumb {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     object-fit: cover;
     border-radius: 8px;
     flex-shrink: 0;
@@ -380,19 +457,19 @@ body.review-mode .container { padding-bottom: 120px; }
 
 /* ── Misc ────────────────────── */
 .section-title {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: var(--text2);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin: 24px 0 12px;
+    letter-spacing: 1.2px;
+    margin: 28px 0 12px;
     font-weight: 600;
 }
 .empty-state {
     text-align: center;
-    padding: 48px 20px;
+    padding: 56px 20px;
     color: var(--text2);
 }
-.empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+.empty-state .icon { font-size: 2.8rem; margin-bottom: 14px; opacity: .7; }
 
 .meta-row {
     display: flex;
@@ -402,18 +479,20 @@ body.review-mode .container { padding-bottom: 120px; }
 }
 
 .detail-face {
-    background: var(--surface2);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     padding: 20px;
     margin-bottom: 12px;
     text-align: center;
 }
 .detail-face h4 {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     color: var(--text2);
     margin-bottom: 12px;
+    font-weight: 600;
 }
 .detail-face img { max-width:100%; max-height:40vh; object-fit:contain; border-radius:8px; }
 
@@ -424,30 +503,37 @@ body.review-mode .container { padding-bottom: 120px; }
     justify-content: center;
     min-height: 100dvh;
     padding: 20px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(139,92,246,.06) 0%, transparent 60%);
 }
 .login-box {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 40px 32px;
+    padding: 44px 36px;
     width: 100%;
     max-width: 380px;
     text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,.4);
 }
 .login-box h1 {
-    font-family: 'Space Mono', monospace;
-    font-size: 1.4rem;
-    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
-.login-box p { color: var(--text2); font-size: 0.9rem; margin-bottom: 24px; }
+.login-box p { color: var(--text2); font-size: 0.88rem; margin-bottom: 28px; }
 
 /* ── Review done ─────────────── */
 .done-wrap {
     text-align: center;
     padding: 60px 20px;
 }
-.done-wrap .emoji { font-size: 4rem; margin-bottom: 16px; }
-.done-wrap h2 { margin-bottom: 8px; }
+.done-wrap .emoji { font-size: 3.5rem; margin-bottom: 16px; }
+.done-wrap h2 { margin-bottom: 8px; font-weight: 600; }
 .done-wrap p { color: var(--text2); margin-bottom: 24px; }
 
 /* ── Confirm dialog ──────────── */
@@ -455,8 +541,8 @@ body.review-mode .container { padding-bottom: 120px; }
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.6);
-    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,.7);
+    backdrop-filter: blur(8px);
     z-index: 200;
     align-items: center;
     justify-content: center;
@@ -471,21 +557,34 @@ body.review-mode .container { padding-bottom: 120px; }
     max-width: 340px;
     width: 100%;
     text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,.5);
+    animation: scaleIn .2s cubic-bezier(.4,0,.2,1);
 }
-.confirm-box p { margin-bottom: 20px; font-size: 0.95rem; }
+.confirm-box p { margin-bottom: 20px; font-size: 0.92rem; }
+
+@keyframes scaleIn {
+    from { opacity:0; transform:scale(.95); }
+    to { opacity:1; transform:scale(1); }
+}
+
+/* ── Selection ───────────────── */
+::selection {
+    background: var(--accent-glow);
+    color: var(--text);
+}
 </style>
 </head>
 <body class="{{ body_class }}">
 {% block body %}
 <div class="topbar">
-    <h1>⚡ Flashcards</h1>
+    <h1>Flashcards</h1>
     <div class="topbar-actions">
         {% if body_class == "review-mode" %}
         <form method="POST" action="/review/quit" style="display:inline;">
-            <button type="submit" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.75rem;">🏠 Menu</button>
+            <button type="submit" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.72rem;">Menu</button>
         </form>
         {% endif %}
-        <a href="/logout" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.75rem;">Déconnexion</a>
+        <a href="/logout" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.72rem;">Sortir</a>
     </div>
 </div>
 
@@ -503,22 +602,22 @@ body.review-mode .container { padding-bottom: 120px; }
 
 <nav class="bottomnav">
     <a href="/" class="{% if active == 'review' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Réviser</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Réviser</span>
     </a>
     <a href="/manage" class="{% if active == 'manage' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>Gérer</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>Gérer</span>
     </a>
     <a href="/create" class="{% if active == 'create' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Créer</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Créer</span>
     </a>
     <a href="/dashboard" class="{% if active == 'dashboard' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Stats</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Stats</span>
     </a>
     <a href="/zen" class="{% if active == 'zen' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 15s2 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg><span>Zen</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 15s2 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg><span>Zen</span>
     </a>
     <a href="/backups" class="{% if active == 'backups' %}active{% endif %}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12a10 10 0 0 1-10 10"/></svg><span>Sauvegardes</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12a10 10 0 0 1-10 10"/></svg><span>Backups</span>
     </a>
 </nav>
 {% endblock %}
