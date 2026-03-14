@@ -32,6 +32,7 @@ BACKUP_DIR = "backups"
 MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
+MAX_NEW_CARDS_PER_DAY = 10
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
@@ -212,6 +213,22 @@ def save_uploaded_audio(file_storage):
 def index_by_id(cards):
     """Build a dict {card_id: (index, card)} for O(1) lookup."""
     return {c["id"]: (i, c) for i, c in enumerate(cards)}
+
+def next_available_review_date(all_cards):
+    """Find the earliest day (starting tomorrow) with fewer than MAX_NEW_CARDS_PER_DAY new cards scheduled."""
+    from collections import Counter
+    tomorrow = datetime.now() + timedelta(days=1)
+    # Count new cards (box 1, never reviewed) per scheduled date
+    new_card_counts = Counter(
+        c["next_review_date"] for c in all_cards
+        if c.get("box") == 1 and c.get("last_reviewed_date") is None
+    )
+    day = tomorrow
+    while True:
+        date_str = day.strftime("%Y-%m-%d")
+        if new_card_counts.get(date_str, 0) < MAX_NEW_CARDS_PER_DAY:
+            return date_str
+        day += timedelta(days=1)
 
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -584,6 +601,7 @@ def create():
         if (recto_path or recto_text_val or recto_audio) and (verso_path or verso_text_val or verso_audio):
             with locked_flashcards() as all_cards:
                 now = datetime.now()
+                review_date = next_available_review_date(all_cards)
                 new_card = {
                     "box": 1,
                     "creation_date": now.strftime("%Y-%m-%d"),
@@ -591,7 +609,7 @@ def create():
                     "id": str(uuid.uuid4()),
                     "last_reviewed_date": None,
                     "marked": False,
-                    "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
+                    "next_review_date": review_date,
                     "recto_path": recto_path,
                     "recto_text": recto_text_val,
                     "recto_audio": recto_audio,
