@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="font-size:1.2rem;margin-bottom:16px;">➕ Nouvelle carte</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <p class="section-title">Recto</p>
+    <div class="form-group">
+        <label>Texte</label>
+        <input type="text" name="recto_text" placeholder="Question ou mot...">
+    </div>
+    <div class="form-group">
+        <label>URL image</label>
+        <input type="text" name="recto_url" placeholder="https://...">
+    </div>
+    <div class="form-group">
+        <label>Upload image</label>
+        <input type="file" name="recto_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio (mp3, wav, ogg…)</label>
+        <input type="file" name="recto_audio_upload" accept="audio/*">
+    </div>
+
+    <p class="section-title">Verso</p>
+    <div class="form-group">
+        <label>Texte</label>
+        <input type="text" name="verso_text" placeholder="Réponse...">
+    </div>
+    <div class="form-group">
+        <label>URL image</label>
+        <input type="text" name="verso_url" placeholder="https://...">
+    </div>
+    <div class="form-group">
+        <label>Upload image</label>
+        <input type="file" name="verso_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio (mp3, wav, ogg…)</label>
+        <input type="file" name="verso_audio_upload" accept="audio/*">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Ajouter la carte</button>
+</form>
+{% endblock %}

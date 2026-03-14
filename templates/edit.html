@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+{% from '_macros.html' import render_content %}
+
+<h2 style="font-size:1.2rem;margin-bottom:16px;">✏️ Modifier la carte</h2>
+
+<div class="detail-face">
+    <h4>Recto actuel</h4>
+    {{ render_content(card.recto_path, card.recto_text, card.recto_audio) }}
+</div>
+<div class="detail-face">
+    <h4>Verso actuel</h4>
+    {{ render_content(card.verso_path, card.verso_text, card.verso_audio) }}
+</div>
+
+<form method="POST" enctype="multipart/form-data">
+    {% if from_review %}<input type="hidden" name="from_review" value="1">{% endif %}
+
+    <div class="form-group">
+        <label>Boîte</label>
+        <input type="number" name="box" value="{{ card.box }}" min="1" max="60">
+    </div>
+
+    <p class="section-title">Recto</p>
+    <div class="form-group">
+        <label>Texte</label>
+        <textarea name="recto_text">{{ card.recto_text or '' }}</textarea>
+    </div>
+    <div class="form-group">
+        <label>URL image</label>
+        <input type="text" name="recto_url" value="{{ card.recto_path if card.recto_path and card.recto_path.startswith('http') else '' }}">
+    </div>
+    <div class="form-group">
+        <label>Upload image</label>
+        <input type="file" name="recto_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio — {% if card.recto_audio %}fichier actuel : {{ card.recto_audio }}{% else %}aucun{% endif %}</label>
+        <input type="file" name="recto_audio_upload" accept="audio/*">
+    </div>
+
+    <p class="section-title">Verso</p>
+    <div class="form-group">
+        <label>Texte</label>
+        <textarea name="verso_text">{{ card.verso_text or '' }}</textarea>
+    </div>
+    <div class="form-group">
+        <label>URL image</label>
+        <input type="text" name="verso_url" value="{{ card.verso_path if card.verso_path and card.verso_path.startswith('http') else '' }}">
+    </div>
+    <div class="form-group">
+        <label>Upload image</label>
+        <input type="file" name="verso_upload" accept="image/*">
+    </div>
+    <div class="form-group">
+        <label>🎵 Audio — {% if card.verso_audio %}fichier actuel : {{ card.verso_audio }}{% else %}aucun{% endif %}</label>
+        <input type="file" name="verso_audio_upload" accept="audio/*">
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="margin-bottom:12px;">Sauvegarder</button>
+    <a href="{% if from_review %}/review{% else %}/card/{{ card.id }}{% endif %}" class="btn btn-ghost">Annuler</a>
+</form>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+{% from '_macros.html' import render_content %}
+
+<div style="padding:20px 0 8px;text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:8px;">⚡</div>
+    <h2 style="font-size:1.3rem;margin-bottom:4px;">Prêt à réviser ?</h2>
+    <p style="color:var(--text2);font-size:0.9rem;">Choisis ton mode de révision</p>
+</div>
+
+<a href="/review/start/daily" class="btn btn-primary" style="margin-bottom:12px;">
+    😃 Révision du jour — {{ daily_count }} cartes
+</a>
+<a href="/review/start/marked" class="btn btn-ghost" style="margin-bottom:12px;">
+    📦 Cartes marquées — {{ marked_count }} cartes
+</a>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+{% from '_macros.html' import render_content %}
+
+<a href="/manage?box={{ card.box }}" style="font-size:0.85rem;color:var(--text2);">← Boîte {{ card.box }}</a>
+
+<div style="margin-top:16px;">
+    <div class="meta-row">
+        <span class="badge badge-accent">Boîte {{ card.box }}</span>
+        <span class="badge {% if card.marked %}badge-warning{% else %}badge-green{% endif %}">
+            {% if card.marked %}🔖 Marquée{% else %}Non marquée{% endif %}
+        </span>
+    </div>
+
+    <div style="font-size:0.8rem;color:var(--text2);margin:8px 0 16px;">
+        Créée le {{ card.creation_date }} · Révisée le {{ card.last_reviewed_date or 'jamais' }} · Prochaine le {{ card.next_review_date }}
+    </div>
+
+    <div class="detail-face">
+        <h4>Recto</h4>
+        {{ render_content(card.recto_path, card.recto_text, card.recto_audio) }}
+    </div>
+    <div class="detail-face">
+        <h4>Verso</h4>
+        {{ render_content(card.verso_path, card.verso_text, card.verso_audio) }}
+    </div>
+
+    <div class="btn-row">
+        <a href="/card/{{ card.id }}/edit" class="btn btn-ghost btn-sm">✏️ Modifier</a>
+        <form method="POST" action="/card/{{ card.id }}/toggle_mark" style="display:inline;">
+            <button type="submit" class="btn btn-ghost btn-sm">
+                {% if card.marked %}🔖 Démarquer{% else %}🔖 Marquer{% endif %}
+            </button>
+        </form>
+        <button class="btn btn-ghost btn-sm" onclick="showConfirm()" style="color:var(--danger)">🗑️ Supprimer</button>
+    </div>
+</div>
+
+<div class="confirm-overlay" id="confirmDelete">
+    <div class="confirm-box">
+        <p>Supprimer cette carte ?</p>
+        <div class="btn-row-2">
+            <form method="POST" action="/card/{{ card.id }}/delete" style="display:inline;">
+                <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+            </form>
+            <button class="btn btn-ghost btn-sm" onclick="hideConfirm()">Annuler</button>
+        </div>
+    </div>
+</div>
+<script>
+function showConfirm() { document.getElementById('confirmDelete').classList.add('show'); }
+function hideConfirm() { document.getElementById('confirmDelete').classList.remove('show'); }
+</script>
+{% endblock %}

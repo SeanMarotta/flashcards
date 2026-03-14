@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+{% from '_macros.html' import render_content %}
+
+<h2 style="font-size:1.2rem;margin-bottom:16px;">🗂️ Gérer les cartes</h2>
+
+{% if never_count %}
+<a href="/manage?filter=never_reviewed"
+   class="card-list-item {% if filter_mode == 'never_reviewed' %}active{% endif %}"
+   style="margin-bottom:16px;border-color:{% if filter_mode == 'never_reviewed' %}var(--danger){% else %}var(--border){% endif %};background:{% if filter_mode == 'never_reviewed' %}rgba(229,49,112,0.08){% else %}transparent{% endif %}">
+    <span style="font-size:1.1rem;">🕳️</span>
+    <span class="preview" style="color:{% if filter_mode == 'never_reviewed' %}var(--danger){% else %}var(--text){% endif %}">
+        Jamais révisées
+    </span>
+    <span class="badge badge-danger" style="margin-left:auto;margin-right:8px;">{{ never_count }}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endif %}
+
+{% if boxes %}
+<p class="section-title">Boîtes</p>
+<div class="box-grid">
+    {% for box in boxes %}
+    <a href="/manage?box={{ box }}" class="box-item {% if selected_box == box and not filter_mode %}active{% endif %}">
+        <span class="box-num">{{ box }}</span>
+        <span class="box-count">n°{{ box }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="icon">📭</div>
+    <p>Aucune carte. Créez-en une !</p>
+</div>
+{% endif %}
+
+{% if filter_mode == 'never_reviewed' %}
+<p class="section-title">🕳️ Jamais révisées — {{ cards|length }} cartes</p>
+{% for card in cards %}
+<a href="/card/{{ card.id }}" class="card-list-item">
+    {% if card.marked %}<span class="marked-icon">🔖</span>{% endif %}
+    {% if card.recto_path and card.recto_path.startswith('http') %}
+        <img src="{{ card.recto_path }}" class="thumb" loading="lazy">
+    {% elif card.recto_path %}
+        <img src="/{{ card.recto_path }}" class="thumb" loading="lazy">
+    {% endif %}
+    <span class="preview">{{ card.recto_text or '🖼️ Image' }}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endfor %}
+{% elif selected_box is not none %}
+<p class="section-title">Boîte {{ selected_box }} — {{ cards|length }} cartes</p>
+{% for card in cards %}
+<a href="/card/{{ card.id }}" class="card-list-item">
+    {% if card.marked %}<span class="marked-icon">🔖</span>{% endif %}
+    {% if card.recto_path and card.recto_path.startswith('http') %}
+        <img src="{{ card.recto_path }}" class="thumb" loading="lazy">
+    {% elif card.recto_path %}
+        <img src="/{{ card.recto_path }}" class="thumb" loading="lazy">
+    {% endif %}
+    <span class="preview">{{ card.recto_text or '🖼️ Image' }}</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endfor %}
+{% endif %}
+{% endblock %}

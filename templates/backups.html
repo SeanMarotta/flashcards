@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="font-size:1.2rem;margin-bottom:4px;">🕐 Sauvegardes automatiques</h2>
+<p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px;">
+    Une sauvegarde est créée automatiquement avant chaque modification. Les {{ max_backups }} plus récentes sont conservées.
+</p>
+
+{% if not backups %}
+<div class="empty-state">
+    <div class="icon">📭</div>
+    <p>Aucune sauvegarde pour l'instant.<br>Elle sera créée lors de ta prochaine modification.</p>
+</div>
+{% else %}
+
+{% for b in backups %}
+<div class="backup-item" id="bi-{{ loop.index }}">
+    <div class="backup-info">
+        <div class="backup-label">{{ b.label }}</div>
+        <div class="backup-meta">{{ b.count }} cartes · {{ b.size_kb }} Ko</div>
+    </div>
+    <div class="backup-actions">
+        <button class="btn btn-ghost btn-sm" onclick="togglePreview('{{ b.filename }}', {{ loop.index }})">👁 Aperçu</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--warning)"
+                onclick="confirmRestore('{{ b.filename }}', '{{ b.label }}')">↩️ Restaurer</button>
+    </div>
+    <div class="backup-preview" id="preview-{{ loop.index }}" style="display:none;"></div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+<!-- Restore confirm overlay -->
+<div class="confirm-overlay" id="confirmRestoreOverlay">
+    <div class="confirm-box">
+        <p style="margin-bottom:8px;">Restaurer cette version ?</p>
+        <p id="restoreLabel" style="font-size:0.82rem;color:var(--text2);margin-bottom:16px;"></p>
+        <p style="font-size:0.8rem;color:var(--warning);margin-bottom:16px;">
+            ⚠️ L'état actuel sera sauvegardé automatiquement avant la restauration.
+        </p>
+        <div class="btn-row-2">
+            <form id="restoreForm" method="POST" action="#" style="display:inline;">
+                <button type="submit" class="btn btn-danger btn-sm">Restaurer</button>
+            </form>
+            <button class="btn btn-ghost btn-sm" onclick="hideRestoreConfirm()">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.backup-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.backup-info { margin-bottom: 10px; }
+.backup-label { font-size: 0.95rem; font-weight: 500; }
+.backup-meta { font-size: 0.78rem; color: var(--text2); margin-top: 3px; }
+.backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.backup-preview {
+    margin-top: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    font-size: 0.82rem;
+    color: var(--text2);
+}
+.preview-row {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.preview-row:last-child { border-bottom: none; }
+.preview-recto { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-verso { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-box { font-size: 0.72rem; background: rgba(127,90,240,.15); color: var(--accent); border-radius: 4px; padding: 1px 6px; flex-shrink: 0; }
+</style>
+
+<script>
+function confirmRestore(filename, label) {
+    document.getElementById('restoreLabel').textContent = label;
+    document.getElementById('restoreForm').action = '/backups/restore/' + filename;
+    document.getElementById('confirmRestoreOverlay').classList.add('show');
+}
+function hideRestoreConfirm() {
+    document.getElementById('confirmRestoreOverlay').classList.remove('show');
+}
+
+const previewCache = {};
+async function togglePreview(filename, idx) {
+    const el = document.getElementById('preview-' + idx);
+    if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+    if (previewCache[filename]) { el.innerHTML = previewCache[filename]; el.style.display = 'block'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<span style="color:var(--text2)">Chargement…</span>';
+    try {
+        const r = await fetch('/backups/preview/' + filename);
+        const data = await r.json();
+        if (data.error) { el.innerHTML = '<span style="color:var(--danger)">Erreur : ' + data.error + '</span>'; return; }
+        let html = `<div style="margin-bottom:8px;font-weight:500;">${data.count} cartes — aperçu des 5 premières :</div>`;
+        html += data.sample.map(c =>
+            `<div class="preview-row">
+                <span class="preview-recto">${c.recto}</span>
+                <span class="preview-verso">${c.verso}</span>
+                <span class="preview-box">Boîte ${c.box}</span>
+            </div>`
+        ).join('');
+        previewCache[filename] = html;
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = "<span style='color:var(--danger)'>Impossible de charger l'aperçu.</span>";
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="done-wrap">
+    <div class="emoji">🎉</div>
+    <h2>Session terminée !</h2>
+    <p>{{ total }} carte{{ 's' if total > 1 else '' }} révisée{{ 's' if total > 1 else '' }}</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:24px 0;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:#2cb67d;">{{ correct }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">✅ Correct</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:#e53170;">{{ incorrect }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">❌ Faux</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 8px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:700;color:var(--text2);">{{ pass_count }}</div>
+            <div style="font-size:0.75rem;color:var(--text2);margin-top:4px;">⏭️ Pass</div>
+        </div>
+    </div>
+
+    <div style="font-size:0.9rem;color:var(--text2);margin-bottom:24px;">⏱️ Durée : {{ duration }}</div>
+
+    <a href="/" class="btn btn-primary" style="max-width:280px;margin:0 auto;">Retour</a>
+</div>
+{% endblock %}
