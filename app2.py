@@ -4,10 +4,12 @@ Flask webapp mobile-first, remplacement de l'app Streamlit.
 Templates dans le dossier templates/.
 """
 
+import fcntl
 import json
 import os
 import uuid
 import random
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -146,6 +148,8 @@ def list_backups():
         result.append({"filename": fname, "label": label, "count": count, "size_kb": size_kb})
     return result
 
+LOCK_FILE = CARDS_FILE + ".lock"
+
 def load_flashcards():
     if not os.path.exists(CARDS_FILE):
         return []
@@ -159,6 +163,23 @@ def save_flashcards(cards):
     create_backup()
     with open(CARDS_FILE, "w", encoding="utf-8") as f:
         json.dump(cards, f, indent=4, ensure_ascii=False, sort_keys=True)
+
+@contextmanager
+def locked_flashcards():
+    """Load, yield, and save flashcards with an exclusive file lock.
+    Usage:
+        with locked_flashcards() as cards:
+            # modify cards in place
+    Cards are saved automatically on exit (unless an exception occurs).
+    """
+    with open(LOCK_FILE, "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            cards = load_flashcards()
+            yield cards
+            save_flashcards(cards)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -187,6 +208,10 @@ def save_uploaded_audio(file_storage):
         file_storage.save(path)
         return unique_name  # store only filename, served via /audios/
     return None
+
+def index_by_id(cards):
+    """Build a dict {card_id: (index, card)} for O(1) lookup."""
+    return {c["id"]: (i, c) for i, c in enumerate(cards)}
 
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -321,9 +346,10 @@ def review_answer(result):
         pass_count += 1
     if idx < len(cards):
         card = cards[idx]
-        all_cards = load_flashcards()
-        for i, c in enumerate(all_cards):
-            if c["id"] == card["id"]:
+        with locked_flashcards() as all_cards:
+            card_index = index_by_id(all_cards)
+            if card["id"] in card_index:
+                i, c = card_index[card["id"]]
                 now = datetime.now()
                 if result == "correct":
                     all_cards[i]["box"] = min(60, c["box"] + 1)
@@ -334,8 +360,6 @@ def review_answer(result):
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
                     all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
-                break
-        save_flashcards(all_cards)
     save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
     return redirect(url_for("review_card"))
 
@@ -344,20 +368,18 @@ def review_answer(result):
 @app.route("/review/toggle_mark/<card_id>", methods=["POST"])
 @login_required
 def review_toggle_mark(card_id):
-    all_cards = load_flashcards()
-    for i, c in enumerate(all_cards):
-        if c["id"] == card_id:
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id in card_index:
+            i, c = card_index[card_id]
             all_cards[i]["marked"] = not c.get("marked", False)
             # Also update server-side review session
             state = load_review_state()
-            cards = state["cards"]
-            for ri, rc in enumerate(cards):
-                if rc["id"] == card_id:
-                    cards[ri]["marked"] = all_cards[i]["marked"]
-                    break
-            save_review_state(cards, state["index"], state["show_answer"])
-            break
-    save_flashcards(all_cards)
+            session_index = index_by_id(state["cards"])
+            if card_id in session_index:
+                ri, _ = session_index[card_id]
+                state["cards"][ri]["marked"] = all_cards[i]["marked"]
+            save_review_state(state["cards"], state["index"], state["show_answer"])
     return redirect(url_for("review_card"))
 
 # ── Delete from review ───────────────────────────────────────────────────────
@@ -365,13 +387,13 @@ def review_toggle_mark(card_id):
 @app.route("/review/delete/<card_id>", methods=["POST"])
 @login_required
 def review_delete(card_id):
-    all_cards = load_flashcards()
-    card = next((c for c in all_cards if c["id"] == card_id), None)
-    if card:
-        delete_image_file(card.get("recto_path"))
-        delete_image_file(card.get("verso_path"))
-        all_cards = [c for c in all_cards if c["id"] != card_id]
-        save_flashcards(all_cards)
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        _, card = card_index.get(card_id, (None, None))
+        if card:
+            delete_image_file(card.get("recto_path"))
+            delete_image_file(card.get("verso_path"))
+            all_cards[:] = [c for c in all_cards if c["id"] != card_id]
     # Remove from server-side review session
     state = load_review_state()
     new_cards = [c for c in state["cards"] if c["id"] != card_id]
@@ -412,7 +434,7 @@ def manage():
 @login_required
 def card_detail(card_id):
     all_cards = load_flashcards()
-    card = next((c for c in all_cards if c["id"] == card_id), None)
+    _, card = index_by_id(all_cards).get(card_id, (None, None))
     if not card:
         flash("Carte introuvable.", "error")
         return redirect(url_for("manage"))
@@ -421,38 +443,46 @@ def card_detail(card_id):
 @app.route("/card/<card_id>/delete", methods=["POST"])
 @login_required
 def card_delete(card_id):
-    all_cards = load_flashcards()
-    card = next((c for c in all_cards if c["id"] == card_id), None)
-    if card:
-        delete_image_file(card.get("recto_path"))
-        delete_image_file(card.get("verso_path"))
-        all_cards = [c for c in all_cards if c["id"] != card_id]
-        save_flashcards(all_cards)
-        flash("Carte supprimée.", "success")
+    with locked_flashcards() as all_cards:
+        _, card = index_by_id(all_cards).get(card_id, (None, None))
+        if card:
+            delete_image_file(card.get("recto_path"))
+            delete_image_file(card.get("verso_path"))
+            all_cards[:] = [c for c in all_cards if c["id"] != card_id]
+            flash("Carte supprimée.", "success")
     return redirect(url_for("manage"))
 
 @app.route("/card/<card_id>/toggle_mark", methods=["POST"])
 @login_required
 def card_toggle_mark(card_id):
-    all_cards = load_flashcards()
-    for i, c in enumerate(all_cards):
-        if c["id"] == card_id:
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id in card_index:
+            i, c = card_index[card_id]
             all_cards[i]["marked"] = not c.get("marked", False)
-            break
-    save_flashcards(all_cards)
     return redirect(request.referrer or url_for("manage"))
 
 @app.route("/card/<card_id>/edit", methods=["GET", "POST"])
 @login_required
 def card_edit(card_id):
-    all_cards = load_flashcards()
-    card = next((c for c in all_cards if c["id"] == card_id), None)
-    if not card:
-        flash("Carte introuvable.", "error")
-        return redirect(url_for("manage"))
+    if request.method == "GET":
+        all_cards = load_flashcards()
+        _, card = index_by_id(all_cards).get(card_id, (None, None))
+        if not card:
+            flash("Carte introuvable.", "error")
+            return redirect(url_for("manage"))
+        from_review = request.args.get("from_review", "")
+        return render_template("edit.html", title="Modifier", active="manage", body_class="",
+                               card=card, from_review=from_review)
 
-    if request.method == "POST":
-        idx = next(i for i, c in enumerate(all_cards) if c["id"] == card_id)
+    # POST — lock for read-modify-write
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id not in card_index:
+            flash("Carte introuvable.", "error")
+            return redirect(url_for("manage"))
+        idx, card = card_index[card_id]
+
         new_box = int(request.form.get("box", card["box"]))
         all_cards[idx]["box"] = new_box
         base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
@@ -499,24 +529,19 @@ def card_edit(card_id):
         if verso_audio_upload and verso_audio_upload.filename:
             all_cards[idx]["verso_audio"] = save_uploaded_audio(verso_audio_upload)
 
-        save_flashcards(all_cards)
-        flash("Carte modifiée !", "success")
+    flash("Carte modifiée !", "success")
 
-        # If editing from review, go back to review
-        if request.form.get("from_review"):
-            # Update server-side review session
-            state = load_review_state()
-            for ri, rc in enumerate(state["cards"]):
-                if rc["id"] == card_id:
-                    state["cards"][ri] = all_cards[idx]
-                    break
-            save_review_state(state["cards"], state["index"], state["show_answer"])
-            return redirect(url_for("review_card"))
-        return redirect(url_for("card_detail", card_id=card_id))
-
-    from_review = request.args.get("from_review", "")
-    return render_template("edit.html", title="Modifier", active="manage", body_class="",
-                           card=card, from_review=from_review)
+    # If editing from review, go back to review
+    if request.form.get("from_review"):
+        # Update server-side review session
+        state = load_review_state()
+        session_index = index_by_id(state["cards"])
+        if card_id in session_index:
+            ri, _ = session_index[card_id]
+            state["cards"][ri] = all_cards[idx]
+        save_review_state(state["cards"], state["index"], state["show_answer"])
+        return redirect(url_for("review_card"))
+    return redirect(url_for("card_detail", card_id=card_id))
 
 # ── Create card ──────────────────────────────────────────────────────────────
 
@@ -557,25 +582,24 @@ def create():
             verso_audio = save_uploaded_audio(verso_audio_upload)
 
         if (recto_path or recto_text_val or recto_audio) and (verso_path or verso_text_val or verso_audio):
-            all_cards = load_flashcards()
-            now = datetime.now()
-            new_card = {
-                "box": 1,
-                "creation_date": now.strftime("%Y-%m-%d"),
-                "current_face": "recto",
-                "id": str(uuid.uuid4()),
-                "last_reviewed_date": None,
-                "marked": False,
-                "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
-                "recto_path": recto_path,
-                "recto_text": recto_text_val,
-                "recto_audio": recto_audio,
-                "verso_path": verso_path,
-                "verso_text": verso_text_val,
-                "verso_audio": verso_audio,
-            }
-            all_cards.append(new_card)
-            save_flashcards(all_cards)
+            with locked_flashcards() as all_cards:
+                now = datetime.now()
+                new_card = {
+                    "box": 1,
+                    "creation_date": now.strftime("%Y-%m-%d"),
+                    "current_face": "recto",
+                    "id": str(uuid.uuid4()),
+                    "last_reviewed_date": None,
+                    "marked": False,
+                    "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
+                    "recto_path": recto_path,
+                    "recto_text": recto_text_val,
+                    "recto_audio": recto_audio,
+                    "verso_path": verso_path,
+                    "verso_text": verso_text_val,
+                    "verso_audio": verso_audio,
+                }
+                all_cards.append(new_card)
             flash("Carte ajoutée !", "success")
             return redirect(url_for("create"))
         else:
@@ -702,9 +726,10 @@ def backup_restore(filename):
         return redirect(url_for("backups"))
     try:
         with open(path, "r", encoding="utf-8") as f:
-            cards = json.load(f)
-        save_flashcards(cards)  # this will itself create a backup of the current state first
-        flash(f"✅ Restauration réussie — {len(cards)} cartes rechargées.", "success")
+            restored = json.load(f)
+        with locked_flashcards() as cards:
+            cards[:] = restored
+        flash(f"✅ Restauration réussie — {len(restored)} cartes rechargées.", "success")
     except Exception as e:
         flash(f"Erreur lors de la restauration : {e}", "error")
     return redirect(url_for("backups"))
