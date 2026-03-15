@@ -32,7 +32,7 @@ BACKUP_DIR = "backups"
 MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
-MAX_NEW_CARDS_PER_DAY = 10
+MAX_NEW_CARDS_PER_DAY = 50
 MAX_DAILY_REVIEWS = 350
 
 def box_interval(box):
