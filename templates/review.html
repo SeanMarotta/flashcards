@@ -5,7 +5,10 @@
 <div class="progress-wrap">
     <div class="progress-bar" style="width:{{ ((idx+1)/total*100)|round }}%"></div>
 </div>
-<div class="progress-label">{{ idx+1 }}/{{ total }}</div>
+<div class="progress-label">
+    {{ idx+1 }}/{{ total }}
+    <span id="timer" style="margin-left:12px;color:var(--text2);font-size:0.85rem;">00:00</span>
+</div>
 
 <div class="card" id="swipeCard">
     <!-- Swipe indicator overlays -->
@@ -324,6 +327,24 @@ document.addEventListener('keydown', function(e) {
 
     card.addEventListener('touchend', endSwipe, { passive: true });
     card.addEventListener('touchcancel', endSwipe, { passive: true });
+})();
+
+// ── Session timer ────────────────────────────────────────────────────────────
+(function() {
+    const KEY = 'reviewSessionStart';
+    if ({{ idx }} === 0) {
+        sessionStorage.setItem(KEY, Date.now());
+    }
+    const start = parseInt(sessionStorage.getItem(KEY)) || Date.now();
+    const timerEl = document.getElementById('timer');
+    function update() {
+        const elapsed = Math.floor((Date.now() - start) / 1000);
+        const m = Math.floor(elapsed / 60);
+        const s = elapsed % 60;
+        timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    update();
+    setInterval(update, 1000);
 })();
 
 // ── Swipe hint tooltip ───────────────────────────────────────────────────────
