@@ -32,14 +32,14 @@ BACKUP_DIR = "backups"
 MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
-MAX_NEW_CARDS_PER_DAY = 50
+MAX_NEW_CARDS_PER_DAY = 30
 MAX_DAILY_REVIEWS = 350
 
 def box_interval(box):
     """Intervalle de révision : linéaire pour les boîtes 1-8, puis box^1.1."""
     if box <= 8:
         return box
-    return round(box ** 1.1)
+    return round(box ** 1.2)
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
