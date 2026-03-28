@@ -32,8 +32,8 @@ BACKUP_DIR = "backups"
 MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
-MAX_NEW_CARDS_PER_DAY = 30
-MAX_DAILY_REVIEWS = 350
+MAX_NEW_CARDS_PER_DAY = 10
+MAX_DAILY_REVIEWS = 200
 
 def box_interval(box):
     """Intervalle de révision : linéaire pour les boîtes 1-8, puis box^1.1."""
@@ -237,14 +237,52 @@ def next_available_review_date(all_cards):
             return date_str
         day += timedelta(days=1)
 
+def load_balanced_date(all_cards, target_date):
+    """Find target_date or the nearest future date with capacity < MAX_DAILY_REVIEWS."""
+    from collections import Counter
+    date_counts = Counter(c.get("next_review_date", "") for c in all_cards)
+    day = datetime.strptime(target_date, "%Y-%m-%d")
+    for _ in range(60):
+        date_str = day.strftime("%Y-%m-%d")
+        if date_counts.get(date_str, 0) < MAX_DAILY_REVIEWS:
+            return date_str
+        day += timedelta(days=1)
+    return day.strftime("%Y-%m-%d")
+
+def redistribute_backlog():
+    """Redistribute excess due cards to future days, respecting MAX_DAILY_REVIEWS."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with locked_flashcards() as all_cards:
+        due = [(i, c) for i, c in enumerate(all_cards) if c.get("next_review_date", "") <= today]
+        if len(due) <= MAX_DAILY_REVIEWS:
+            return 0
+        # Priority: low boxes first, then most overdue → keep those for today
+        due.sort(key=lambda ic: (ic[1].get("box", 1), ic[1].get("next_review_date", "")))
+        keep = due[:MAX_DAILY_REVIEWS]
+        excess = due[MAX_DAILY_REVIEWS:]
+        # Count scheduled cards per future date
+        from collections import Counter
+        date_counts = Counter(c.get("next_review_date", "") for c in all_cards)
+        # Remove today's due from counts (we're redistributing them)
+        for _, c in excess:
+            date_counts[c["next_review_date"]] -= 1
+        # Assign excess cards to the nearest future days with capacity
+        day = datetime.now() + timedelta(days=1)
+        redistributed = 0
+        for idx, card in excess:
+            date_str = day.strftime("%Y-%m-%d")
+            while date_counts.get(date_str, 0) >= MAX_DAILY_REVIEWS:
+                day += timedelta(days=1)
+                date_str = day.strftime("%Y-%m-%d")
+            all_cards[idx]["next_review_date"] = date_str
+            date_counts[date_str] += 1
+            redistributed += 1
+    return redistributed
+
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
     due = [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
-    if len(due) <= MAX_DAILY_REVIEWS:
-        return due, len(due)
-    # Priority: low boxes first, then most overdue
-    due.sort(key=lambda c: (c.get("box", 1), c.get("next_review_date", "")))
-    return due[:MAX_DAILY_REVIEWS], len(due)
+    return due, len(due)
 
 def get_marked_cards():
     return [c for c in load_flashcards() if c.get("marked", False)]
@@ -302,6 +340,9 @@ def index():
 def review_start(mode):
     cleanup_stale_sessions()
     if mode == "daily":
+        redistributed = redistribute_backlog()
+        if redistributed:
+            flash(f"{redistributed} cartes excédentaires redistribuées sur les prochains jours.", "info")
         cards, _ = get_daily_review_cards()
     elif mode == "marked":
         cards = get_marked_cards()
@@ -387,7 +428,8 @@ def review_answer(result):
                 # pass → no change
                 if result != "pass":
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
-                    all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
+                    target = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
+                    all_cards[i]["next_review_date"] = load_balanced_date(all_cards, target)
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
     save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
     return redirect(url_for("review_card"))
@@ -516,7 +558,8 @@ def card_edit(card_id):
         all_cards[idx]["box"] = new_box
         base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
         base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
-        all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=box_interval(new_box))).strftime("%Y-%m-%d")
+        target = (base_dt + timedelta(days=box_interval(new_box))).strftime("%Y-%m-%d")
+        all_cards[idx]["next_review_date"] = load_balanced_date(all_cards, target)
 
         # Recto
         recto_upload = request.files.get("recto_upload")
