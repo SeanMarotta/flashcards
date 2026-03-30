@@ -33,7 +33,7 @@ MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
 MAX_NEW_CARDS_PER_DAY = 10
-MAX_DAILY_REVIEWS = 200
+MAX_DAILY_REVIEWS = 250
 
 def box_interval(box):
     """Intervalle de révision : linéaire pour les boîtes 1-8, puis box^1.1."""
