@@ -2,3 +2,4 @@
 backups/*
 review_sessions/*
 __pycache__/*
+venv/*

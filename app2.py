@@ -32,14 +32,6 @@ BACKUP_DIR = "backups"
 MAX_BACKUPS = 20
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
-MAX_NEW_CARDS_PER_DAY = 10
-MAX_DAILY_REVIEWS = 250
-
-def box_interval(box):
-    """Intervalle de révision : linéaire pour les boîtes 1-8, puis box^1.1."""
-    if box <= 8:
-        return box
-    return round(box ** 1.2)
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
@@ -221,68 +213,9 @@ def index_by_id(cards):
     """Build a dict {card_id: (index, card)} for O(1) lookup."""
     return {c["id"]: (i, c) for i, c in enumerate(cards)}
 
-def next_available_review_date(all_cards):
-    """Find the earliest day (starting tomorrow) with fewer than MAX_NEW_CARDS_PER_DAY new cards scheduled."""
-    from collections import Counter
-    tomorrow = datetime.now() + timedelta(days=1)
-    # Count new cards (box 1, never reviewed) per scheduled date
-    new_card_counts = Counter(
-        c["next_review_date"] for c in all_cards
-        if c.get("box") == 1 and c.get("last_reviewed_date") is None
-    )
-    day = tomorrow
-    while True:
-        date_str = day.strftime("%Y-%m-%d")
-        if new_card_counts.get(date_str, 0) < MAX_NEW_CARDS_PER_DAY:
-            return date_str
-        day += timedelta(days=1)
-
-def load_balanced_date(all_cards, target_date):
-    """Find target_date or the nearest future date with capacity < MAX_DAILY_REVIEWS."""
-    from collections import Counter
-    date_counts = Counter(c.get("next_review_date", "") for c in all_cards)
-    day = datetime.strptime(target_date, "%Y-%m-%d")
-    for _ in range(60):
-        date_str = day.strftime("%Y-%m-%d")
-        if date_counts.get(date_str, 0) < MAX_DAILY_REVIEWS:
-            return date_str
-        day += timedelta(days=1)
-    return day.strftime("%Y-%m-%d")
-
-def redistribute_backlog():
-    """Redistribute excess due cards to future days, respecting MAX_DAILY_REVIEWS."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    with locked_flashcards() as all_cards:
-        due = [(i, c) for i, c in enumerate(all_cards) if c.get("next_review_date", "") <= today]
-        if len(due) <= MAX_DAILY_REVIEWS:
-            return 0
-        # Priority: low boxes first, then most overdue → keep those for today
-        due.sort(key=lambda ic: (ic[1].get("box", 1), ic[1].get("next_review_date", "")))
-        keep = due[:MAX_DAILY_REVIEWS]
-        excess = due[MAX_DAILY_REVIEWS:]
-        # Count scheduled cards per future date
-        from collections import Counter
-        date_counts = Counter(c.get("next_review_date", "") for c in all_cards)
-        # Remove today's due from counts (we're redistributing them)
-        for _, c in excess:
-            date_counts[c["next_review_date"]] -= 1
-        # Assign excess cards to the nearest future days with capacity
-        day = datetime.now() + timedelta(days=1)
-        redistributed = 0
-        for idx, card in excess:
-            date_str = day.strftime("%Y-%m-%d")
-            while date_counts.get(date_str, 0) >= MAX_DAILY_REVIEWS:
-                day += timedelta(days=1)
-                date_str = day.strftime("%Y-%m-%d")
-            all_cards[idx]["next_review_date"] = date_str
-            date_counts[date_str] += 1
-            redistributed += 1
-    return redistributed
-
 def get_daily_review_cards():
     today = datetime.now().strftime("%Y-%m-%d")
-    due = [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
-    return due, len(due)
+    return [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
 
 def get_marked_cards():
     return [c for c in load_flashcards() if c.get("marked", False)]
@@ -302,6 +235,7 @@ def login():
     if request.method == "POST":
         if request.form.get("password") == APP_PASSWORD:
             session["logged_in"] = True
+            cleanup_stale_sessions()
             return redirect(url_for("index"))
         flash("Mot de passe incorrect.", "error")
     return render_template("login.html", title="Connexion", body_class="", active="")
@@ -328,10 +262,10 @@ def serve_audio(filename):
 @app.route("/")
 @login_required
 def index():
-    daily, total_due = get_daily_review_cards()
+    daily = get_daily_review_cards()
     marked = get_marked_cards()
     return render_template("index.html", title="Réviser", active="review", body_class="",
-                           daily_count=len(daily), total_due=total_due, marked_count=len(marked))
+                           daily_count=len(daily), marked_count=len(marked))
 
 # ── Review session ───────────────────────────────────────────────────────────
 
@@ -340,10 +274,7 @@ def index():
 def review_start(mode):
     cleanup_stale_sessions()
     if mode == "daily":
-        redistributed = redistribute_backlog()
-        if redistributed:
-            flash(f"{redistributed} cartes excédentaires redistribuées sur les prochains jours.", "info")
-        cards, _ = get_daily_review_cards()
+        cards = get_daily_review_cards()
     elif mode == "marked":
         cards = get_marked_cards()
     else:
@@ -428,8 +359,7 @@ def review_answer(result):
                 # pass → no change
                 if result != "pass":
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
-                    target = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
-                    all_cards[i]["next_review_date"] = load_balanced_date(all_cards, target)
+                    all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
     save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
     return redirect(url_for("review_card"))
@@ -558,8 +488,7 @@ def card_edit(card_id):
         all_cards[idx]["box"] = new_box
         base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
         base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
-        target = (base_dt + timedelta(days=box_interval(new_box))).strftime("%Y-%m-%d")
-        all_cards[idx]["next_review_date"] = load_balanced_date(all_cards, target)
+        all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
 
         # Recto
         recto_upload = request.files.get("recto_upload")
@@ -656,7 +585,6 @@ def create():
         if (recto_path or recto_text_val or recto_audio) and (verso_path or verso_text_val or verso_audio):
             with locked_flashcards() as all_cards:
                 now = datetime.now()
-                review_date = next_available_review_date(all_cards)
                 new_card = {
                     "box": 1,
                     "creation_date": now.strftime("%Y-%m-%d"),
@@ -664,7 +592,7 @@ def create():
                     "id": str(uuid.uuid4()),
                     "last_reviewed_date": None,
                     "marked": False,
-                    "next_review_date": review_date,
+                    "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
                     "recto_path": recto_path,
                     "recto_text": recto_text_val,
                     "recto_audio": recto_audio,
@@ -776,7 +704,8 @@ def api_cards():
         cards = [c for c in cards if c["box"] == box]
     if q:
         cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
-    return jsonify(cards[:100])  # Limit for perf
+    truncated = len(cards) > 100
+    return jsonify({"cards": cards[:100], "truncated": truncated, "total": len(cards)})
 
 # ── Backups ──────────────────────────────────────────────────────────────────
 
