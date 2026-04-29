@@ -485,10 +485,14 @@ def card_edit(card_id):
         idx, card = card_index[card_id]
 
         new_box = int(request.form.get("box", card["box"]))
-        all_cards[idx]["box"] = new_box
-        base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
-        base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
-        all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
+        # On ne recalcule next_review_date que si la boîte a effectivement changé,
+        # afin de préserver le calendrier de révision lors d'une simple correction
+        # de contenu (texte, image, audio).
+        if new_box != all_cards[idx]["box"]:
+            all_cards[idx]["box"] = new_box
+            base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
+            base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
+            all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
 
         # Recto
         recto_upload = request.files.get("recto_upload")
