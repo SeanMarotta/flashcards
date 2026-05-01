@@ -64,6 +64,8 @@ def save_review_state(cards, index, show_answer, **extra):
         "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
         "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
         "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+        # last_action: snapshot for the undo feature. None = nothing to undo.
+        "last_action": extra["last_action"] if "last_action" in extra else existing.get("last_action"),
     }
     with open(_review_path(), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
@@ -77,10 +79,12 @@ def load_review_state():
         data.setdefault("incorrect", 0)
         data.setdefault("pass_count", 0)
         data.setdefault("start_time", datetime.now().isoformat())
+        data.setdefault("last_action", None)
         return data
     return {"cards": [], "index": 0, "show_answer": False,
             "correct": 0, "incorrect": 0, "pass_count": 0,
-            "start_time": datetime.now().isoformat()}
+            "start_time": datetime.now().isoformat(),
+            "last_action": None}
 
 def clear_review_state():
     p = _review_path()
@@ -320,7 +324,8 @@ def review_card():
     return render_template(
         "review.html", title="Révision", active="review", body_class="review-mode",
         card=card, question=question, answer=answer,
-        show_answer=show_answer, idx=idx, total=len(cards)
+        show_answer=show_answer, idx=idx, total=len(cards),
+        last_action=state.get("last_action")
     )
 
 @app.route("/review/show")
@@ -339,6 +344,10 @@ def review_answer(result):
     correct = state.get("correct", 0)
     incorrect = state.get("incorrect", 0)
     pass_count = state.get("pass_count", 0)
+
+    # Snapshot for undo: capture counters BEFORE incrementing
+    last_action = None
+
     if result == "correct":
         correct += 1
     elif result == "incorrect":
@@ -351,6 +360,19 @@ def review_answer(result):
             card_index = index_by_id(all_cards)
             if card["id"] in card_index:
                 i, c = card_index[card["id"]]
+                # Capture FULL previous state of this card for undo
+                last_action = {
+                    "card_id": c["id"],
+                    "result": result,
+                    "previous_box": c["box"],
+                    "previous_last_reviewed_date": c.get("last_reviewed_date"),
+                    "previous_next_review_date": c.get("next_review_date"),
+                    "previous_current_face": c.get("current_face", "recto"),
+                    "previous_correct": state.get("correct", 0),
+                    "previous_incorrect": state.get("incorrect", 0),
+                    "previous_pass_count": state.get("pass_count", 0),
+                    "previous_index": idx,
+                }
                 now = datetime.now()
                 if result == "correct":
                     all_cards[i]["box"] = min(60, c["box"] + 1)
@@ -361,7 +383,44 @@ def review_answer(result):
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
                     all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
-    save_review_state(cards, idx + 1, False, correct=correct, incorrect=incorrect, pass_count=pass_count)
+    save_review_state(cards, idx + 1, False,
+                      correct=correct, incorrect=incorrect, pass_count=pass_count,
+                      last_action=last_action)
+    return redirect(url_for("review_card"))
+
+
+# ── Undo last answer ────────────────────────────────────────────────────────
+
+@app.route("/review/undo", methods=["POST", "GET"])
+@login_required
+def review_undo():
+    state = load_review_state()
+    last = state.get("last_action")
+    if not last:
+        # Nothing to undo (race condition: button clicked twice, expired toast, etc.)
+        return redirect(url_for("review_card"))
+
+    # Restore the card's previous state in flashcards.json
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if last["card_id"] in card_index:
+            i, _ = card_index[last["card_id"]]
+            all_cards[i]["box"] = last["previous_box"]
+            # Use direct assignment (None values are valid: never reviewed)
+            all_cards[i]["last_reviewed_date"] = last["previous_last_reviewed_date"]
+            all_cards[i]["next_review_date"]   = last["previous_next_review_date"]
+            all_cards[i]["current_face"]       = last["previous_current_face"]
+
+    # Restore session counters and rewind index by 1
+    save_review_state(
+        state["cards"],
+        last["previous_index"],
+        False,
+        correct=last["previous_correct"],
+        incorrect=last["previous_incorrect"],
+        pass_count=last["previous_pass_count"],
+        last_action=None,  # Clear: no double-undo
+    )
     return redirect(url_for("review_card"))
 
 # ── Toggle mark from review ─────────────────────────────────────────────────
@@ -623,7 +682,7 @@ def dashboard():
         return render_template("dashboard.html", title="Dashboard", active="dashboard", body_class="",
                                total=0, mastery=0, long_term_ratio=0,
                                box_data=[], timeline_data=[], workload_data=[],
-                               activity_data=[], stage_data=[], health_data={},
+                               activity_data=[], stage_data=[],
                                creation_heatmap=[])
 
     box_sum = sum(c["box"] for c in cards)
@@ -679,20 +738,11 @@ def dashboard():
         "Maîtrisé (60)":        sum(1 for c in cards if c["box"] >= 60),
     }
 
-    # ── NEW: Card health (overdue / due today / upcoming / never reviewed) ─────
-    today_str = today.strftime("%Y-%m-%d")
-    health_data = {
-        "En retard":         sum(1 for c in cards if c.get("next_review_date","") < today_str and c.get("last_reviewed_date")),
-        "À réviser":         sum(1 for c in cards if c.get("next_review_date","") == today_str),
-        "À venir":           sum(1 for c in cards if c.get("next_review_date","") > today_str),
-        "Jamais révisées":   sum(1 for c in cards if not c.get("last_reviewed_date")),
-    }
-
     return render_template(
         "dashboard.html", title="Dashboard", active="dashboard", body_class="",
         total=total, mastery=mastery, long_term_ratio=long_term_ratio,
         box_data=box_data, timeline_data=cumulative, workload_data=workload,
-        activity_data=activity_data, stage_data=stage_data, health_data=health_data,
+        activity_data=activity_data, stage_data=stage_data,
         creation_heatmap=creation_heatmap
     )
 

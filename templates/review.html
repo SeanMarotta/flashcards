@@ -52,12 +52,18 @@
 
 <!-- Fixed bottom action bar -->
 <div id="bar-show" class="review-action-bar" style="{% if show_answer %}display:none;{% endif %}">
-    <div class="action-buttons">
-        <button onclick="revealAnswer()" class="btn btn-primary" style="grid-column:1/-1;">Voir la réponse</button>
+    <div class="action-buttons cols-2">
+        <button id="undoBtnShow" class="btn btn-ghost undo-inline"
+                {% if not last_action %}disabled{% endif %}
+                onclick="undoLastAnswer()" title="Annuler la dernière réponse (↑)">↶</button>
+        <button onclick="revealAnswer()" class="btn btn-primary">Voir la réponse</button>
     </div>
 </div>
 <div id="bar-answer" class="review-action-bar" style="{% if not show_answer %}display:none;{% endif %}">
-    <div class="action-buttons">
+    <div class="action-buttons cols-4">
+        <button id="undoBtnAnswer" class="btn btn-ghost undo-inline"
+                {% if not last_action %}disabled{% endif %}
+                onclick="undoLastAnswer()" title="Annuler la dernière réponse (↑)">↶</button>
         <button onclick="answerAndGo('incorrect')" class="btn btn-danger">❌ Faux</button>
         <button onclick="answerAndGo('correct')" class="btn btn-success">✅ Correct</button>
         <button onclick="answerAndGo('pass')" class="btn btn-ghost">⏭️ Pass</button>
@@ -142,6 +148,35 @@
     align-items: center;
     gap: 3px;
 }
+
+/* ── Undo button (inline, in the action bar) ──────────────────────── */
+/* Override the action-buttons grid: undo gets a fixed width, the rest share. */
+.review-action-bar .action-buttons.cols-2 {
+    grid-template-columns: 56px 1fr;
+}
+.review-action-bar .action-buttons.cols-4 {
+    grid-template-columns: 56px 1fr 1fr 1fr;
+}
+.btn.undo-inline {
+    padding: 16px 0;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--text2);
+    transition: color 0.2s, opacity 0.2s, background 0.2s;
+}
+.btn.undo-inline:hover:not(:disabled) {
+    color: var(--accent);
+}
+.btn.undo-inline:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+/* Active state: subtle accent tint while the 4s window is open */
+.btn.undo-inline.active {
+    color: var(--accent);
+    background: rgba(127, 90, 240, 0.08);
+}
 </style>
 
 <div class="confirm-overlay" id="confirmDelete">
@@ -199,6 +234,13 @@ document.addEventListener('keydown', function(e) {
             break;
         case '3':
             if (answerVisible()) answerAndGo('pass');
+            break;
+        case 'ArrowUp':
+            // Undo last answer (only if available)
+            if (window.__canUndo) {
+                e.preventDefault();
+                undoLastAnswer();
+            }
             break;
     }
 });
@@ -359,6 +401,44 @@ document.addEventListener('keydown', function(e) {
     document.body.appendChild(hint);
     setTimeout(() => hint.style.opacity = '0', 4000);
     setTimeout(() => hint.remove(), 5200);
+})();
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  UNDO LAST ANSWER — inline button (active during a 4s window) + ArrowUp
+// ═════════════════════════════════════════════════════════════════════════════
+window.__canUndo = false;
+
+function setUndoButtonsState(active) {
+    document.querySelectorAll('.undo-inline').forEach(btn => {
+        if (active) {
+            btn.removeAttribute('disabled');
+            btn.classList.add('active');
+        } else {
+            btn.setAttribute('disabled', '');
+            btn.classList.remove('active');
+        }
+    });
+    window.__canUndo = active;
+}
+
+function undoLastAnswer() {
+    if (!window.__canUndo || navigating) return;
+    navigating = true;
+    setUndoButtonsState(false);
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/review/undo';
+    document.body.appendChild(form);
+    form.submit();
+}
+
+(function setupUndo() {
+    const hasUndo = {{ 'true' if last_action else 'false' }};
+    if (!hasUndo) return;
+
+    // Open the 4s window
+    requestAnimationFrame(() => setUndoButtonsState(true));
+    setTimeout(() => setUndoButtonsState(false), 4000);
 })();
 </script>
 
