@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="margin:4px 0 14px;">
+    <h2 style="font-size:1.2rem;margin-bottom:2px;">Chord Spark</h2>
+    <p style="color:var(--text2);font-size:0.85rem;">Générateur de progressions d'accords pour la composition</p>
+</div>
+
+<iframe
+    src="/chords/app"
+    title="Chord Spark"
+    style="width:100%;height:calc(100dvh - 190px);min-height:560px;
+           border:1px solid var(--border);border-radius:var(--radius);
+           background:#0d0a08;display:block;">
+</iframe>
+{% endblock %}

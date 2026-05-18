@@ -813,6 +813,20 @@ def backup_preview(filename):
 def zen():
     return render_template("zen.html", title="Zen", active="zen", body_class="")
 
+# ─── Chord Spark — générateur de progressions d'accords ─────────────────────
+
+@app.route("/chords")
+@login_required
+def chords():
+    return render_template("chords.html", title="Accords", active="chords", body_class="")
+
+@app.route("/chords/app")
+@login_required
+def chords_app():
+    # Standalone Chord Spark page, embedded via <iframe> in chords.html.
+    # Served raw (not via Jinja) so its CSS/JS braces aren't parsed as template syntax.
+    return send_from_directory("templates", "chord_spark.html")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
