@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}
+{% from '_macros.html' import render_content %}
+
+{# ════════════════════════════════════════════════════════════════════
+   MODE GRILLE — plusieurs cartes affichées ensemble, notation en lot.
+   Données fournies par la route review_grid() : `cards` est une liste de
+   dicts {id, box, marked, q_path,q_text,q_audio, a_path,a_text,a_audio}.
+   ════════════════════════════════════════════════════════════════════ #}
+
+<style>
+.grid-topline{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:12px; flex-wrap:wrap;
+}
+.grid-topline .spacer{ flex:1; }
+.grid-progresslabel{ font-family:'Space Mono',monospace; font-size:.78rem; color:var(--text2); }
+.grid-progresslabel b{ color:var(--text); }
+
+.gcards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+    gap:10px;
+}
+@media (max-width:520px){ .gcards{ grid-template-columns:repeat(2,1fr); gap:8px; } }
+
+.gcard{
+    position:relative;
+    height:192px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:12px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    transition:border-color .2s, box-shadow .2s, transform .12s;
+}
+.gcard.g-ok{ border-color:var(--accent2); box-shadow:0 0 0 1px var(--accent2); }
+.gcard.g-no{ border-color:var(--danger); box-shadow:0 0 0 1px var(--danger); }
+
+.gcard-head{ display:flex; align-items:center; gap:6px; flex-shrink:0; margin-bottom:6px; }
+.gcard-head .badge{ font-size:.6rem; padding:2px 7px; }
+
+.gcard-q{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; cursor:pointer; }
+.gcard-q::after{
+    content:'toucher pour retourner';
+    position:absolute; bottom:8px; left:0; right:0; text-align:center;
+    font-family:'Space Mono',monospace; font-size:.55rem; color:var(--text2);
+    opacity:.55; pointer-events:none;
+}
+.gcard.flipped .gcard-q{ display:none; }
+.gcard-a{ flex:1; min-height:0; display:none; flex-direction:column; gap:6px; }
+.gcard.flipped .gcard-a{ display:flex; }
+.gcard-qmini{ flex-shrink:0; font-size:.66rem; color:var(--text2); font-style:italic;
+    text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.fit-pane{ min-height:0; overflow:hidden; line-height:1.25; font-weight:500; width:100%; }
+.gcard-q .fit-pane{ display:flex; align-items:center; justify-content:center; height:100%; }
+.gcard-a .fit-pane{ flex:1; display:flex; align-items:center; justify-content:center; text-align:center; }
+.fit-pane img{ max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; }
+.gcard-a .fit-pane > div{ color:var(--accent2); }
+
+.gcard-grade{ display:grid; grid-template-columns:1fr 1fr; gap:7px; flex-shrink:0; }
+.gbtn{ padding:8px 0; border-radius:8px; font-size:1rem; font-weight:700; line-height:1;
+    background:var(--surface2); border:1px solid var(--border); cursor:pointer;
+    transition:all .15s; color:var(--text2); }
+.gbtn.no{ color:var(--danger); }
+.gbtn.ok{ color:var(--accent2); }
+.gbtn.no:hover{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.gbtn.ok:hover{ background:var(--accent2); color:#fff; border-color:var(--accent2); }
+.gcard.g-no .gbtn.no{ background:var(--danger); color:#fff; border-color:var(--danger); }
+.gcard.g-ok .gbtn.ok{ background:var(--accent2); color:#fff; border-color:var(--accent2); }
+
+.gcard-audio audio{ width:100%; margin-top:6px; }
+</style>
+
+<div class="progress-wrap">
+    <div class="progress-bar" style="width:{{ (idx / total * 100)|round }}%"></div>
+</div>
+
+<div class="grid-topline">
+    <span class="badge badge-accent">Fournée {{ cur_batch }}/{{ total_batches }}</span>
+    <span class="spacer"></span>
+    <span class="grid-progresslabel"><b id="gradedCount">0</b>/{{ cards|length }} notées</span>
+    <button type="button" class="btn btn-ghost btn-sm" style="width:auto;padding:7px 13px;" onclick="revealAll()">Tout révéler</button>
+</div>
+
+<form method="POST" action="/review/grid/answer" id="gridForm">
+    <div class="gcards">
+        {% for c in cards %}
+        <div class="gcard" data-id="{{ c.id }}">
+            <div class="gcard-head">
+                <span class="badge badge-accent">Boîte {{ c.box }}</span>
+                {% if c.marked %}<span class="badge badge-warning">🔖</span>{% endif %}
+            </div>
+
+            <div class="gcard-q" onclick="flip(this.parentNode)">
+                <div class="fit-pane" data-max="26">{{ render_content(c.q_path, c.q_text, c.q_audio) }}</div>
+            </div>
+
+            <div class="gcard-a">
+                {% if c.q_text %}<div class="gcard-qmini">{{ c.q_text }}</div>{% endif %}
+                <div class="fit-pane" data-max="22">{{ render_content(c.a_path, c.a_text, c.a_audio) }}</div>
+                <div class="gcard-grade">
+                    <button type="button" class="gbtn no" onclick="grade('{{ c.id }}','no')">✗</button>
+                    <button type="button" class="gbtn ok" onclick="grade('{{ c.id }}','ok')">✓</button>
+                </div>
+            </div>
+
+            <input type="hidden" name="grade_{{ c.id }}" id="grade_{{ c.id }}" value="">
+        </div>
+        {% endfor %}
+    </div>
+</form>
+
+<div class="review-action-bar">
+    <div style="max-width:540px;margin:0 auto;">
+        <button type="submit" form="gridForm" class="btn btn-primary" id="submitBtn">
+            Valider la fournée →
+        </button>
+    </div>
+</div>
+
+<script>
+const TOTAL_IN_BATCH = {{ cards|length }};
+const IS_LAST = {{ 'true' if (idx + batch) >= total else 'false' }};
+
+// ── Auto-ajustement du texte pour qu'il tienne sans scroll ──────────────────
+function fitPane(pane){
+    if (!pane || pane.querySelector('img')) return;          // images : gérées par le CSS
+    const max = parseFloat(pane.dataset.max || '24');
+    let size = max;
+    pane.style.fontSize = size + 'px';
+    let guard = 0;
+    while (pane.scrollHeight > pane.clientHeight - 3 && size > 11 && guard < 80){
+        size -= 1; pane.style.fontSize = size + 'px'; guard++;
+    }
+}
+function fitAll(){ document.querySelectorAll('.gcard-q .fit-pane').forEach(fitPane); }
+
+// ── Retourner une carte ─────────────────────────────────────────────────────
+function flip(card){
+    if (card.classList.contains('flipped')) return;
+    card.classList.add('flipped');
+    card.querySelectorAll('.gcard-a .fit-pane').forEach(fitPane);
+}
+function revealAll(){
+    document.querySelectorAll('.gcard').forEach(c => flip(c));
+}
+
+// ── Noter une carte ─────────────────────────────────────────────────────────
+function grade(id, g){
+    document.getElementById('grade_' + id).value = g;
+    const card = document.querySelector('.gcard[data-id="' + id + '"]');
+    card.classList.remove('g-ok', 'g-no');
+    card.classList.add('g-' + g);
+    updateCount();
+}
+function updateCount(){
+    let n = 0;
+    document.querySelectorAll('.gcard').forEach(c => {
+        if (document.getElementById('grade_' + c.dataset.id).value) n++;
+    });
+    document.getElementById('gradedCount').textContent = n;
+    const btn = document.getElementById('submitBtn');
+    if (n < TOTAL_IN_BATCH){
+        btn.textContent = 'Valider — ' + (TOTAL_IN_BATCH - n) + ' non notées passeront';
+    } else {
+        btn.textContent = IS_LAST ? 'Terminer la session' : 'Fournée suivante →';
+    }
+}
+
+window.addEventListener('load', fitAll);
+window.addEventListener('resize', () => {
+    fitAll();
+    document.querySelectorAll('.gcard.flipped .fit-pane').forEach(fitPane);
+});
+</script>
+{% endblock %}

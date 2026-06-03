@@ -2,6 +2,71 @@
 {% block content %}
 {% from '_macros.html' import render_content %}
 
+{# ════════════════════════════════════════════════════════════════════
+   RÉVISION FOCUS — la carte tient TOUJOURS dans l'écran (zéro scroll).
+   Question et réponse partagent la hauteur ; le texte s'auto-ajuste.
+   Tout le comportement existant est conservé : reveal, swipe, undo,
+   clavier, marquer / modifier / supprimer, minuteur.
+   ════════════════════════════════════════════════════════════════════ #}
+
+<style>
+/* ── Mise en page sans-scroll (n'affecte que la page de révision) ── */
+body.review-mode{ overflow:hidden; }
+body.review-mode .topbar{ position:static; }
+body.review-mode{ display:flex; flex-direction:column; height:100dvh; }
+body.review-mode .container{
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+    padding-top:14px;
+    padding-bottom:104px;            /* place pour la barre d'action fixe */
+}
+.progress-wrap{ flex-shrink:0; }
+.progress-label{ flex-shrink:0; }
+.review-meta{ flex-shrink:0; }
+.review-tools{ flex-shrink:0; }
+
+/* ── La carte occupe l'espace restant et ne déborde jamais ── */
+#swipeCard{
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    margin-bottom:10px;
+}
+.qpane{
+    flex:1; min-height:0;
+    display:flex; align-items:center; justify-content:center;
+}
+#answer-section{
+    flex:0 0 0; min-height:0; overflow:hidden;
+    border-top:1px solid transparent;
+    margin-top:0; padding-top:0;
+    transition:opacity .4s ease, margin .3s ease, padding .3s ease, border-color .3s ease;
+}
+#swipeCard.revealed #answer-section{
+    flex:1 1 0;
+    border-top-color:var(--border);
+    margin-top:12px; padding-top:12px;
+}
+.qpane .card-content,
+#answer-section .card-content{
+    width:100%; height:100%; padding:0;
+    display:flex; align-items:center; justify-content:center;
+}
+
+/* ── Conteneur d'auto-ajustement ── */
+.fit-pane{
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; overflow:hidden; line-height:1.35;
+}
+.fit-pane img{ max-width:100%; max-height:100%; object-fit:contain; border-radius:var(--radius-sm); }
+.fit-pane audio{ margin-top:10px; }
+#answer-section .fit-pane > div{ color:var(--text); }
+
+.review-meta{ display:flex; gap:8px; justify-content:center; margin-bottom:8px; }
+.review-tools{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+</style>
+
 <div class="progress-wrap">
     <div class="progress-bar" style="width:{{ ((idx+1)/total*100)|round }}%"></div>
 </div>
@@ -10,37 +75,41 @@
     <span id="timer" style="margin-left:12px;color:var(--text2);font-size:0.85rem;">00:00</span>
 </div>
 
-<div class="card" id="swipeCard">
-    <!-- Swipe indicator overlays -->
+<div class="card {% if show_answer %}revealed{% endif %}" id="swipeCard">
+    <!-- Overlays de swipe -->
     <div class="swipe-indicator swipe-correct" id="swipeCorrect">✅</div>
     <div class="swipe-indicator swipe-incorrect" id="swipeIncorrect">❌</div>
     <div class="swipe-indicator swipe-reveal" id="swipeReveal">👁️</div>
 
-    <div class="card-content">
-        {{ render_content(
-            card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path,
-            card.recto_text if (card.current_face|default('recto'))=='recto' else card.verso_text,
-            card.recto_audio if (card.current_face|default('recto'))=='recto' else card.verso_audio
-        ) }}
+    <div class="card-content qpane">
+        <div class="fit-pane" data-max="42">
+            {{ render_content(
+                card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path,
+                card.recto_text if (card.current_face|default('recto'))=='recto' else card.verso_text,
+                card.recto_audio if (card.current_face|default('recto'))=='recto' else card.verso_audio
+            ) }}
+        </div>
     </div>
 
-    <div id="answer-section" style="border-top:1px solid var(--border);padding-top:20px;margin-top:12px;opacity:{% if show_answer %}1{% else %}0{% endif %};transition:opacity 0.5s ease;{% if not show_answer %}pointer-events:none;{% endif %}">
-        <div class="card-content" style="padding-top:8px;">
-            {{ render_content(
-                card.verso_path if (card.current_face|default('recto'))=='recto' else card.recto_path,
-                card.verso_text if (card.current_face|default('recto'))=='recto' else card.recto_text,
-                card.verso_audio if (card.current_face|default('recto'))=='recto' else card.recto_audio
-            ) }}
+    <div id="answer-section" style="opacity:{% if show_answer %}1{% else %}0{% endif %};{% if not show_answer %}pointer-events:none;{% endif %}">
+        <div class="card-content">
+            <div class="fit-pane" data-max="38">
+                {{ render_content(
+                    card.verso_path if (card.current_face|default('recto'))=='recto' else card.recto_path,
+                    card.verso_text if (card.current_face|default('recto'))=='recto' else card.recto_text,
+                    card.verso_audio if (card.current_face|default('recto'))=='recto' else card.recto_audio
+                ) }}
+            </div>
         </div>
     </div>
 </div>
 
-<div class="meta-row" style="justify-content:center;">
+<div class="review-meta">
     <span class="badge badge-accent">Boîte {{ card.box }}</span>
     {% if card.marked %}<span class="badge badge-warning">🔖 Marquée</span>{% endif %}
 </div>
 
-<div class="btn-row" style="margin-top:8px;">
+<div class="review-tools">
     <form method="POST" action="/review/toggle_mark/{{ card.id }}" style="display:inline;">
         <button type="submit" class="btn btn-ghost btn-sm">
             {% if card.marked %}🔖 Démarquer{% else %}🔖 Marquer{% endif %}
@@ -50,7 +119,7 @@
     <button class="btn btn-ghost btn-sm" onclick="showConfirm()" style="color:var(--danger)">🗑️ Supprimer</button>
 </div>
 
-<!-- Fixed bottom action bar -->
+<!-- Barre d'action fixe -->
 <div id="bar-show" class="review-action-bar" style="{% if show_answer %}display:none;{% endif %}">
     <div class="action-buttons cols-2">
         <button id="undoBtnShow" class="btn btn-ghost undo-inline"
@@ -91,17 +160,10 @@
     user-select: none;
     -webkit-user-select: none;
     will-change: transform;
-    overflow: hidden;
 }
-#swipeCard.swiping {
-    transition: none !important;
-}
-#swipeCard.snap-back {
-    transition: transform 0.35s cubic-bezier(.22,.68,0,.98) !important;
-}
-#swipeCard.fly-out {
-    transition: transform 0.35s cubic-bezier(.55,.06,.68,.19), opacity 0.3s ease !important;
-}
+#swipeCard.swiping { transition: none !important; }
+#swipeCard.snap-back { transition: transform 0.35s cubic-bezier(.22,.68,0,.98) !important; }
+#swipeCard.fly-out { transition: transform 0.35s cubic-bezier(.55,.06,.68,.19), opacity 0.3s ease !important; }
 
 .swipe-indicator {
     position: absolute;
@@ -118,15 +180,13 @@
 .swipe-incorrect { left: 20px; }
 .swipe-reveal    { left: 50%; transform: translate(-50%, -50%); }
 
-/* Border glow during swipe drag */
 #swipeCard.drag-correct   { border-color: rgba(44,182,125,0.6);  box-shadow: 0 0 20px rgba(44,182,125,0.2); }
 #swipeCard.drag-incorrect { border-color: rgba(229,49,112,0.6);  box-shadow: 0 0 20px rgba(229,49,112,0.2); }
 #swipeCard.drag-reveal    { border-color: rgba(127,90,240,0.6);  box-shadow: 0 0 20px rgba(127,90,240,0.2); }
 
-/* Swipe hint badge */
 .swipe-hint {
     position: fixed;
-    bottom: 90px;
+    bottom: 92px;
     left: 50%;
     transform: translateX(-50%);
     background: var(--surface);
@@ -143,20 +203,10 @@
     align-items: center;
     gap: 10px;
 }
-.swipe-hint span {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-}
+.swipe-hint span { display: inline-flex; align-items: center; gap: 3px; }
 
-/* ── Undo button (inline, in the action bar) ──────────────────────── */
-/* Override the action-buttons grid: undo gets a fixed width, the rest share. */
-.review-action-bar .action-buttons.cols-2 {
-    grid-template-columns: 56px 1fr;
-}
-.review-action-bar .action-buttons.cols-4 {
-    grid-template-columns: 56px 1fr 1fr 1fr;
-}
+.review-action-bar .action-buttons.cols-2 { grid-template-columns: 56px 1fr; }
+.review-action-bar .action-buttons.cols-4 { grid-template-columns: 56px 1fr 1fr 1fr; }
 .btn.undo-inline {
     padding: 16px 0;
     font-size: 1.4rem;
@@ -164,19 +214,9 @@
     color: var(--text2);
     transition: color 0.2s, opacity 0.2s, background 0.2s;
 }
-.btn.undo-inline:hover:not(:disabled) {
-    color: var(--accent);
-}
-.btn.undo-inline:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-/* Active state: subtle accent tint while the 4s window is open */
-.btn.undo-inline.active {
-    color: var(--accent);
-    background: rgba(127, 90, 240, 0.08);
-}
+.btn.undo-inline:hover:not(:disabled) { color: var(--accent); }
+.btn.undo-inline:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+.btn.undo-inline.active { color: var(--accent); background: rgba(127, 90, 240, 0.08); }
 </style>
 
 <div class="confirm-overlay" id="confirmDelete">
@@ -195,13 +235,41 @@
 function showConfirm() { document.getElementById('confirmDelete').classList.add('show'); }
 function hideConfirm() { document.getElementById('confirmDelete').classList.remove('show'); }
 let navigating = false;
+
+// ── Auto-ajustement du texte : réduit la police jusqu'à ce que ça tienne ──────
+function fitPane(pane){
+    if (!pane || pane.querySelector('img')) return;     // images : gérées par le CSS
+    const max = parseFloat(pane.dataset.max || '36');
+    let size = max;
+    pane.style.fontSize = size + 'px';
+    if (pane.clientHeight < 24) return;
+    let guard = 0;
+    while (pane.scrollHeight > pane.clientHeight - 3 && size > 13 && guard < 90){
+        size -= 1; pane.style.fontSize = size + 'px'; guard++;
+    }
+}
+function fitAll(){ document.querySelectorAll('#swipeCard .fit-pane').forEach(fitPane); }
+
+// Re-ajuste automatiquement chaque panneau dès que sa taille change
+// (révélation, redimensionnement) — fiable quel que soit le timing des transitions.
+function observeFit(){
+    document.querySelectorAll('#swipeCard .fit-pane').forEach(function(p){
+        fitPane(p);
+        try { new ResizeObserver(function(){ fitPane(p); }).observe(p); } catch(e){}
+    });
+}
+
 async function revealAnswer() {
     fetch('/review/show');
+    document.getElementById('swipeCard').classList.add('revealed');
     const ans = document.getElementById('answer-section');
     ans.style.pointerEvents = 'auto';
     requestAnimationFrame(() => { ans.style.opacity = '1'; });
     document.getElementById('bar-show').style.display = 'none';
     document.getElementById('bar-answer').style.display = '';
+    // Ré-ajuste les deux panneaux une fois la transition de hauteur lancée
+    setTimeout(fitAll, 60);
+    setTimeout(fitAll, 400);
 }
 
 function answerAndGo(result) {
@@ -213,7 +281,7 @@ function answerAndGo(result) {
     setTimeout(() => { window.location.href = '/review/answer/' + result; }, 420);
 }
 
-// ── Keyboard shortcuts ──────────────────────────────────────────────────────
+// ── Raccourcis clavier ───────────────────────────────────────────────────────
 const answerVisible = () => document.getElementById('bar-answer').style.display !== 'none';
 document.addEventListener('keydown', function(e) {
     if (document.getElementById('confirmDelete').classList.contains('show')) return;
@@ -236,11 +304,7 @@ document.addEventListener('keydown', function(e) {
             if (answerVisible()) answerAndGo('pass');
             break;
         case 'ArrowUp':
-            // Undo last answer (only if available)
-            if (window.__canUndo) {
-                e.preventDefault();
-                undoLastAnswer();
-            }
+            if (window.__canUndo) { e.preventDefault(); undoLastAnswer(); }
             break;
     }
 });
@@ -252,10 +316,9 @@ document.addEventListener('keydown', function(e) {
     const card = document.getElementById('swipeCard');
     if (!card) return;
 
-    const THRESHOLD  = 70;   // px to trigger action
-    const SHOW_RATIO = 0.25; // opacity ramp speed
+    const THRESHOLD  = 70;
     let startX = 0, startY = 0, dx = 0, dy = 0, swiping = false;
-    let direction = null; // 'horizontal' or 'vertical'
+    let direction = null;
 
     const indicators = {
         correct:   document.getElementById('swipeCorrect'),
@@ -272,12 +335,12 @@ document.addEventListener('keydown', function(e) {
         const absDx = Math.abs(dx), absDy = Math.abs(dy);
         if (direction === 'horizontal') {
             if (absDx < THRESHOLD) return null;
-            if (!answerVisible()) return null; // no horizontal swipe before reveal
+            if (!answerVisible()) return null;
             return dx > 0 ? 'correct' : 'incorrect';
         }
         if (direction === 'vertical') {
             if (absDy < THRESHOLD) return null;
-            if (dy > 0 && !answerVisible()) return 'reveal';    // swipe down = reveal
+            if (dy > 0 && !answerVisible()) return 'reveal';
         }
         return null;
     }
@@ -285,14 +348,10 @@ document.addEventListener('keydown', function(e) {
     card.addEventListener('touchstart', function(e) {
         if (navigating) return;
         if (document.getElementById('confirmDelete').classList.contains('show')) return;
-        // Don't intercept if touch is on a button/link inside card
         if (e.target.closest('a, button, audio')) return;
         const t = e.touches[0];
-        startX = t.clientX;
-        startY = t.clientY;
-        dx = 0; dy = 0;
-        swiping = true;
-        direction = null;
+        startX = t.clientX; startY = t.clientY;
+        dx = 0; dy = 0; swiping = true; direction = null;
         card.classList.add('swiping');
         card.classList.remove('snap-back','fly-out');
     }, { passive: true });
@@ -302,38 +361,29 @@ document.addEventListener('keydown', function(e) {
         const t = e.touches[0];
         dx = t.clientX - startX;
         dy = t.clientY - startY;
-
-        // Lock direction after 10px of movement
         if (!direction) {
             const absDx = Math.abs(dx), absDy = Math.abs(dy);
-            if (absDx > 10 || absDy > 10) {
-                direction = absDx > absDy ? 'horizontal' : 'vertical';
-            } else {
-                return;
-            }
+            if (absDx > 10 || absDy > 10) direction = absDx > absDy ? 'horizontal' : 'vertical';
+            else return;
         }
-
-        // Apply visual transform
         if (direction === 'horizontal' && answerVisible()) {
-            const rotate = dx * 0.04; // subtle tilt
+            const rotate = dx * 0.04;
             card.style.transform = `translateX(${dx}px) rotate(${rotate}deg)`;
-
             clearDragClasses();
             if (dx > THRESHOLD * 0.5) {
                 card.classList.add('drag-correct');
-                indicators.correct.style.opacity = Math.min(1, (dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+                indicators.correct.style.opacity = Math.min(1, (dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7));
             } else if (dx < -THRESHOLD * 0.5) {
                 card.classList.add('drag-incorrect');
-                indicators.incorrect.style.opacity = Math.min(1, (-dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+                indicators.incorrect.style.opacity = Math.min(1, (-dx - THRESHOLD * 0.3) / (THRESHOLD * 0.7));
             }
         } else if (direction === 'vertical') {
             const clampDy = Math.max(-120, Math.min(120, dy));
             card.style.transform = `translateY(${clampDy}px)`;
-
             clearDragClasses();
             if (dy > THRESHOLD * 0.5 && !answerVisible()) {
                 card.classList.add('drag-reveal');
-                indicators.reveal.style.opacity = Math.min(1, (dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7) );
+                indicators.reveal.style.opacity = Math.min(1, (dy - THRESHOLD * 0.3) / (THRESHOLD * 0.7));
             }
         }
     }, { passive: true });
@@ -343,9 +393,7 @@ document.addEventListener('keydown', function(e) {
         swiping = false;
         card.classList.remove('swiping');
         clearDragClasses();
-
         const action = getSwipeAction();
-
         if (action === 'reveal') {
             card.classList.add('snap-back');
             card.style.transform = '';
@@ -361,7 +409,6 @@ document.addEventListener('keydown', function(e) {
             card.style.opacity = '0';
             setTimeout(() => answerAndGo('incorrect'), 200);
         } else {
-            // Snap back
             card.classList.add('snap-back');
             card.style.transform = '';
         }
@@ -371,12 +418,10 @@ document.addEventListener('keydown', function(e) {
     card.addEventListener('touchcancel', endSwipe, { passive: true });
 })();
 
-// ── Session timer ────────────────────────────────────────────────────────────
+// ── Minuteur de session ──────────────────────────────────────────────────────
 (function() {
     const KEY = 'reviewSessionStart';
-    if ({{ idx }} === 0) {
-        sessionStorage.setItem(KEY, Date.now());
-    }
+    if ({{ idx }} === 0) sessionStorage.setItem(KEY, Date.now());
     const start = parseInt(sessionStorage.getItem(KEY)) || Date.now();
     const timerEl = document.getElementById('timer');
     function update() {
@@ -389,38 +434,28 @@ document.addEventListener('keydown', function(e) {
     setInterval(update, 1000);
 })();
 
-// ── Swipe hint tooltip ───────────────────────────────────────────────────────
+// ── Indice de swipe ──────────────────────────────────────────────────────────
 (function() {
     const hint = document.createElement('div');
     hint.className = 'swipe-hint';
-    if (answerVisible()) {
-        hint.innerHTML = '<span>👉 Correct</span><span>👈 Faux</span>';
-    } else {
-        hint.innerHTML = '<span>👇 Voir la réponse</span>';
-    }
+    if (answerVisible()) hint.innerHTML = '<span>👉 Correct</span><span>👈 Faux</span>';
+    else hint.innerHTML = '<span>👇 Voir la réponse</span>';
     document.body.appendChild(hint);
     setTimeout(() => hint.style.opacity = '0', 4000);
     setTimeout(() => hint.remove(), 5200);
 })();
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  UNDO LAST ANSWER — inline button (active during a 4s window) + ArrowUp
+//  UNDO LAST ANSWER
 // ═════════════════════════════════════════════════════════════════════════════
 window.__canUndo = false;
-
 function setUndoButtonsState(active) {
     document.querySelectorAll('.undo-inline').forEach(btn => {
-        if (active) {
-            btn.removeAttribute('disabled');
-            btn.classList.add('active');
-        } else {
-            btn.setAttribute('disabled', '');
-            btn.classList.remove('active');
-        }
+        if (active) { btn.removeAttribute('disabled'); btn.classList.add('active'); }
+        else { btn.setAttribute('disabled', ''); btn.classList.remove('active'); }
     });
     window.__canUndo = active;
 }
-
 function undoLastAnswer() {
     if (!window.__canUndo || navigating) return;
     navigating = true;
@@ -431,15 +466,17 @@ function undoLastAnswer() {
     document.body.appendChild(form);
     form.submit();
 }
-
 (function setupUndo() {
     const hasUndo = {{ 'true' if last_action else 'false' }};
     if (!hasUndo) return;
-
-    // Open the 4s window
     requestAnimationFrame(() => setUndoButtonsState(true));
     setTimeout(() => setUndoButtonsState(false), 4000);
 })();
+
+// ── Ajustement initial + au redimensionnement ────────────────────────────────
+window.addEventListener('load', observeFit);
+window.addEventListener('resize', fitAll);
+requestAnimationFrame(observeFit);
 </script>
 
 {% endblock %}

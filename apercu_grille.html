@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aperçu — Grille</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+/* ── Sous-ensemble de base.html (variables + classes utilisées) ── */
+:root{
+    --bg:#09090b;--surface:#131316;--surface2:#1a1a1f;--surface3:#222228;
+    --border:rgba(255,255,255,.06);--border-hover:rgba(255,255,255,.12);
+    --text:#ececef;--text2:#71717a;--accent:#8b5cf6;--accent-glow:rgba(139,92,246,.15);
+    --accent2:#34d399;--accent2-glow:rgba(52,211,153,.15);--danger:#f43f5e;--warning:#f59e0b;
+    --radius:14px;--radius-sm:10px;--transition:.2s cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.6;display:flex;flex-direction:column;height:100dvh;}
+.topbar{position:static;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(9,9,11,.8);}
+.topbar h1{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:600;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:99px;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;border:none;cursor:pointer;transition:all var(--transition);text-decoration:none;width:100%;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#7c3aed;}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--surface2);}
+.btn-sm{padding:8px 16px;font-size:.82rem;}
+.container{max-width:540px;margin:0 auto;width:100%;padding:14px 20px 104px;flex:1;min-height:0;display:flex;flex-direction:column;}
+.progress-wrap{background:var(--surface2);border-radius:99px;height:4px;margin:0 0 8px;overflow:hidden;flex-shrink:0;}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:.7rem;font-weight:600;font-family:'Space Mono',monospace;}
+.badge-accent{background:var(--accent-glow);color:var(--accent);}
+.badge-warning{background:rgba(245,158,11,.12);color:var(--warning);}
+.review-action-bar{position:fixed;bottom:0;left:0;right:0;z-index:110;background:rgba(9,9,11,.92);backdrop-filter:blur(24px);border-top:1px solid var(--border);padding:12px 16px max(12px,env(safe-area-inset-bottom));}
+
+/* ── Styles spécifiques Grille (identiques au template review_grid.html) ── */
+.grid-topline{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
+.grid-topline .spacer{flex:1;}
+.grid-progresslabel{font-family:'Space Mono',monospace;font-size:.78rem;color:var(--text2);}
+.grid-progresslabel b{color:var(--text);}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;overflow-y:auto;}
+@media (max-width:520px){.gcards{grid-template-columns:repeat(2,1fr);gap:8px;}}
+.gcard{position:relative;height:192px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;display:flex;flex-direction:column;overflow:hidden;transition:border-color .2s,box-shadow .2s;}
+.gcard.g-ok{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2);}
+.gcard.g-no{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger);}
+.gcard-head{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:6px;}
+.gcard-head .badge{font-size:.6rem;padding:2px 7px;}
+.gcard-q{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;}
+.gcard-q::after{content:'toucher pour retourner';position:absolute;bottom:8px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;color:var(--text2);opacity:.55;pointer-events:none;}
+.gcard.flipped .gcard-q{display:none;}
+.gcard-a{flex:1;min-height:0;display:none;flex-direction:column;gap:6px;}
+.gcard.flipped .gcard-a{display:flex;}
+.gcard-qmini{flex-shrink:0;font-size:.66rem;color:var(--text2);font-style:italic;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fit-pane{min-height:0;overflow:hidden;line-height:1.25;font-weight:500;width:100%;}
+.gcard-q .fit-pane{display:flex;align-items:center;justify-content:center;height:100%;}
+.gcard-a .fit-pane{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;}
+.fit-pane img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
+.gcard-a .fit-pane>div{color:var(--accent2);}
+.gcard-grade{display:grid;grid-template-columns:1fr 1fr;gap:7px;flex-shrink:0;}
+.gbtn{padding:8px 0;border-radius:8px;font-size:1rem;font-weight:700;line-height:1;background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text2);}
+.gbtn.no{color:var(--danger);} .gbtn.ok{color:var(--accent2);}
+.gbtn.no:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
+.gbtn.ok:hover{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+.gcard.g-no .gbtn.no{background:var(--danger);color:#fff;border-color:var(--danger);}
+.gcard.g-ok .gbtn.ok{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+.note{max-width:540px;margin:10px auto 0;padding:0 20px;color:var(--text2);font-size:.74rem;text-align:center;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Flashcards</h1><span class="badge badge-accent" style="font-size:.66rem;">APERÇU · Grille</span></div>
+
+<div class="container">
+    <div class="progress-wrap"><div class="progress-bar" style="width:18%"></div></div>
+    <div class="grid-topline">
+        <span class="badge badge-accent">Fournée 1/6</span>
+        <span class="spacer"></span>
+        <span class="grid-progresslabel"><b id="gradedCount">0</b>/8 notées</span>
+        <button type="button" class="btn btn-ghost btn-sm" style="width:auto;padding:7px 13px;" onclick="revealAll()">Tout révéler</button>
+    </div>
+
+    <div class="gcards" id="gcards"></div>
+</div>
+
+<div class="review-action-bar">
+    <div style="max-width:540px;margin:0 auto;">
+        <button type="button" class="btn btn-primary" id="submitBtn" onclick="nextBatch()">Valider la fournée →</button>
+    </div>
+</div>
+
+<script>
+// Données fictives représentatives (texte + 1 image)
+const MOCK = [
+  {box:20, q:"Vent sec et chaud des Alpes ou des Vosges", a:"Le fœhn"},
+  {box:19, q:"Auteur du Père Goriot", a:"Honoré de Balzac", marked:true},
+  {box:23, q:"Vedette hollywoodienne, co-inventrice d'une base du Wi-Fi (1940)", a:"Hedy Lamarr"},
+  {box:8,  q:"Monnaie du Japon", a:"Le yen"},
+  {box:13, q:"Théorème : a² + b² = c² (triangle rectangle)", a:"Théorème de Pythagore"},
+  {box:29, q:"Qui est-ce ?", a:"Virginie Efira", qimg:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Virginie_Efira_Portrait_2023_%281%29_%28cropped%29.jpg/250px-Virginie_Efira_Portrait_2023_%281%29_%28cropped%29.jpg"},
+  {box:9,  q:"Unité de mesure de la pression atmosphérique (SI)", a:"Le pascal (Pa)"},
+  {box:23, q:"Plus vieux métro du monde", a:"Le Métropolitan Railway — London Underground (1863)"},
+];
+
+function tile(c, i){
+  return `<div class="gcard" data-i="${i}">
+    <div class="gcard-head"><span class="badge badge-accent">Boîte ${c.box}</span>${c.marked?'<span class="badge badge-warning">🔖</span>':''}</div>
+    <div class="gcard-q" onclick="flip(${i})">
+      <div class="fit-pane" data-max="26">${c.qimg?`<img src="${c.qimg}" alt="">`:`<div>${c.q}</div>`}</div>
+    </div>
+    <div class="gcard-a">
+      ${c.qimg?'':`<div class="gcard-qmini">${c.q}</div>`}
+      <div class="fit-pane" data-max="22"><div>${c.a}</div></div>
+      <div class="gcard-grade">
+        <button type="button" class="gbtn no" onclick="grade(${i},'no')">✗</button>
+        <button type="button" class="gbtn ok" onclick="grade(${i},'ok')">✓</button>
+      </div>
+    </div>
+  </div>`;
+}
+const grades = {};
+document.getElementById('gcards').innerHTML = MOCK.map(tile).join('');
+
+function fitPane(pane){
+  if(!pane||pane.querySelector('img'))return;
+  const max=parseFloat(pane.dataset.max||'24'); let size=max; pane.style.fontSize=size+'px';
+  let g=0; while(pane.scrollHeight>pane.clientHeight-3&&size>11&&g<80){size--;pane.style.fontSize=size+'px';g++;}
+}
+function fitAll(){document.querySelectorAll('.gcard-q .fit-pane').forEach(fitPane);}
+function flip(i){
+  const card=document.querySelector('.gcard[data-i="'+i+'"]');
+  if(card.classList.contains('flipped'))return;
+  card.classList.add('flipped');
+  card.querySelectorAll('.gcard-a .fit-pane').forEach(fitPane);
+}
+function revealAll(){MOCK.forEach((_,i)=>flip(i));}
+function grade(i,g){
+  grades[i]=g; const card=document.querySelector('.gcard[data-i="'+i+'"]');
+  card.classList.remove('g-ok','g-no'); card.classList.add('g-'+g); updateCount();
+}
+function updateCount(){
+  const n=Object.keys(grades).length;
+  document.getElementById('gradedCount').textContent=n;
+  const btn=document.getElementById('submitBtn');
+  btn.textContent = n<MOCK.length ? 'Valider — '+(MOCK.length-n)+' non notées passeront' : 'Fournée suivante →';
+}
+function nextBatch(){ alert('Démo : ici la fournée suivante se chargerait (route /review/grid/answer).'); }
+window.addEventListener('load',fitAll);
+window.addEventListener('resize',()=>{fitAll();document.querySelectorAll('.gcard.flipped .fit-pane').forEach(fitPane);});
+</script>
+</body>
+</html>

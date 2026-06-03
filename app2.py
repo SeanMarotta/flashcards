@@ -468,6 +468,193 @@ def review_quit():
     clear_review_state()
     return redirect(url_for("index"))
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  MODE GRILLE — révision multi-cartes (notation en lot)
+#  ───────────────────────────────────────────────────────────────────────────────
+#  À COLLER dans app2.py, par exemple juste APRÈS la route `/review/quit`
+#  (la fonction review_quit), et AVANT la section "Manage cards".
+#
+#  ✅ Bloc 100 % additif : n'édite aucune fonction existante.
+#  ✅ Réutilise tes helpers existants : get_daily_review_cards, get_marked_cards,
+#     locked_flashcards, index_by_id, cleanup_stale_sessions, REVIEW_DIR, etc.
+#  ✅ Utilise un fichier d'état séparé ({sid}_grid.json) pour ne pas interférer
+#     avec la session de révision carte-par-carte.
+#  ✅ Logique Leitner identique à /review/answer (boîte ±1, flip de current_face,
+#     recalcul de next_review_date).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+GRID_DEFAULT_BATCH = 6          # nombre de cartes par fournée (modifiable via ?size=)
+
+
+def _grid_path():
+    sid = session.get("_review_sid")
+    if not sid:
+        sid = str(uuid.uuid4())
+        session["_review_sid"] = sid
+    return os.path.join(REVIEW_DIR, f"{sid}_grid.json")
+
+
+def save_grid_state(cards, index, batch, **extra):
+    p = _grid_path()
+    existing = {}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    data = {
+        "cards": cards,
+        "index": index,
+        "batch": batch,
+        "correct": extra.get("correct", existing.get("correct", 0)),
+        "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
+        "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
+        "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+    }
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def load_grid_state():
+    p = _grid_path()
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"cards": [], "index": 0, "batch": GRID_DEFAULT_BATCH,
+            "correct": 0, "incorrect": 0, "pass_count": 0,
+            "start_time": datetime.now().isoformat()}
+
+
+def clear_grid_state():
+    p = _grid_path()
+    if os.path.exists(p):
+        os.remove(p)
+
+
+def _card_faces(card):
+    """Retourne les faces question/réponse en respectant current_face
+    (exactement la même logique que la route /review)."""
+    is_recto = card.get("current_face", "recto") == "recto"
+    if is_recto:
+        q_path, q_text, q_audio = card.get("recto_path"), card.get("recto_text"), card.get("recto_audio")
+        a_path, a_text, a_audio = card.get("verso_path"), card.get("verso_text"), card.get("verso_audio")
+    else:
+        q_path, q_text, q_audio = card.get("verso_path"), card.get("verso_text"), card.get("verso_audio")
+        a_path, a_text, a_audio = card.get("recto_path"), card.get("recto_text"), card.get("recto_audio")
+    return {
+        "id": card["id"], "box": card.get("box"), "marked": card.get("marked", False),
+        "q_path": q_path, "q_text": q_text, "q_audio": q_audio,
+        "a_path": a_path, "a_text": a_text, "a_audio": a_audio,
+    }
+
+
+@app.route("/review/grid/start/<mode>")
+@login_required
+def review_grid_start(mode):
+    cleanup_stale_sessions()
+    batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
+    batch = max(2, min(24, batch))
+    if mode == "daily":
+        cards = get_daily_review_cards()
+    elif mode == "marked":
+        cards = get_marked_cards()
+    else:
+        cards = []
+    random.shuffle(cards)
+    if not cards:
+        flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
+        return redirect(url_for("index"))
+    save_grid_state(cards, 0, batch, correct=0, incorrect=0, pass_count=0,
+                    start_time=datetime.now().isoformat())
+    return redirect(url_for("review_grid"))
+
+
+@app.route("/review/grid")
+@login_required
+def review_grid():
+    state = load_grid_state()
+    cards = state["cards"]
+    idx = state["index"]
+    batch = state.get("batch", GRID_DEFAULT_BATCH)
+
+    # Fin de session → écran de bilan (réutilise review_done.html)
+    if not cards or idx >= len(cards):
+        try:
+            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
+            elapsed = int((datetime.now() - start_dt).total_seconds())
+        except Exception:
+            elapsed = 0
+        minutes, seconds = divmod(elapsed, 60)
+        summary = {
+            "correct": state.get("correct", 0),
+            "incorrect": state.get("incorrect", 0),
+            "pass_count": state.get("pass_count", 0),
+            "total": len(cards),
+            "duration": f"{minutes}m {seconds:02d}s",
+        }
+        clear_grid_state()
+        return render_template("review_done.html", title="Terminé !", active="review",
+                               body_class="", **summary)
+
+    batch_cards = [_card_faces(c) for c in cards[idx: idx + batch]]
+    cur_batch = idx // batch + 1
+    total_batches = (len(cards) + batch - 1) // batch
+    return render_template(
+        "review_grid.html", title="Révision — Grille", active="review",
+        body_class="review-mode", cards=batch_cards,
+        idx=idx, total=len(cards), batch=batch,
+        cur_batch=cur_batch, total_batches=total_batches,
+    )
+
+
+@app.route("/review/grid/answer", methods=["POST"])
+@login_required
+def review_grid_answer():
+    state = load_grid_state()
+    cards = state["cards"]
+    idx = state["index"]
+    batch = state.get("batch", GRID_DEFAULT_BATCH)
+    correct = state.get("correct", 0)
+    incorrect = state.get("incorrect", 0)
+    pass_count = state.get("pass_count", 0)
+
+    batch_ids = [c["id"] for c in cards[idx: idx + batch]]
+    # Champs du formulaire : grade_<id> = "ok" | "no" | "" (vide → passée)
+    grades = {cid: request.form.get(f"grade_{cid}", "") for cid in batch_ids}
+
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        now = datetime.now()
+        for cid, g in grades.items():
+            if g == "ok":
+                correct += 1
+            elif g == "no":
+                incorrect += 1
+            else:
+                pass_count += 1           # non notée = passée (aucun changement de boîte)
+            if g in ("ok", "no") and cid in card_index:
+                i, c = card_index[cid]
+                if g == "ok":
+                    all_cards[i]["box"] = min(60, c["box"] + 1)
+                else:
+                    all_cards[i]["box"] = max(1, c["box"] - 1)
+                all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
+                all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
+
+    save_grid_state(cards, idx + batch, batch,
+                    correct=correct, incorrect=incorrect, pass_count=pass_count)
+    return redirect(url_for("review_grid"))
+
+
+@app.route("/review/grid/quit", methods=["POST", "GET"])
+@login_required
+def review_grid_quit():
+    clear_grid_state()
+    return redirect(url_for("index"))
+
+
 # ── Manage cards ─────────────────────────────────────────────────────────────
 
 @app.route("/manage")
