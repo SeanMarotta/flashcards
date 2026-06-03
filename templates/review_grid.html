@@ -55,7 +55,7 @@
 .gcard-qmini{ flex-shrink:0; font-size:.66rem; color:var(--text2); font-style:italic;
     text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.fit-pane{ min-height:0; overflow:hidden; line-height:1.25; font-weight:500; width:100%; }
+.fit-pane{ min-height:0; overflow:hidden; line-height:1.22; font-weight:500; width:100%; padding:3px; }
 .gcard-q .fit-pane{ display:flex; align-items:center; justify-content:center; height:100%; }
 .gcard-a .fit-pane{ flex:1; display:flex; align-items:center; justify-content:center; text-align:center; }
 .fit-pane img{ max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; }
@@ -96,12 +96,12 @@
             </div>
 
             <div class="gcard-q" onclick="flip(this.parentNode)">
-                <div class="fit-pane" data-max="26">{{ render_content(c.q_path, c.q_text, c.q_audio) }}</div>
+                <div class="fit-pane" data-max="32">{{ render_content(c.q_path, c.q_text, c.q_audio) }}</div>
             </div>
 
             <div class="gcard-a">
                 {% if c.q_text %}<div class="gcard-qmini">{{ c.q_text }}</div>{% endif %}
-                <div class="fit-pane" data-max="22">{{ render_content(c.a_path, c.a_text, c.a_audio) }}</div>
+                <div class="fit-pane" data-max="28">{{ render_content(c.a_path, c.a_text, c.a_audio) }}</div>
                 <div class="gcard-grade">
                     <button type="button" class="gbtn no" onclick="grade('{{ c.id }}','no')">✗</button>
                     <button type="button" class="gbtn ok" onclick="grade('{{ c.id }}','ok')">✓</button>
@@ -132,10 +132,11 @@ function fitPane(pane){
     const max = parseFloat(pane.dataset.max || '24');
     let size = max;
     pane.style.fontSize = size + 'px';
-    let guard = 0;
-    while (pane.scrollHeight > pane.clientHeight - 3 && size > 11 && guard < 80){
-        size -= 1; pane.style.fontSize = size + 'px'; guard++;
+    let guard = 0, shrunk = false;
+    while (pane.scrollHeight > pane.clientHeight + 1 && size > 11 && guard < 80){
+        size -= 1; pane.style.fontSize = size + 'px'; guard++; shrunk = true;
     }
+    if (shrunk && size > 11){ size -= 1; pane.style.fontSize = size + 'px'; }
 }
 function fitAll(){ document.querySelectorAll('.gcard-q .fit-pane').forEach(fitPane); }
 

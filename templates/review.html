@@ -43,7 +43,7 @@ body.review-mode .container{
     transition:opacity .4s ease, margin .3s ease, padding .3s ease, border-color .3s ease;
 }
 #swipeCard.revealed #answer-section{
-    flex:1 1 0;
+    flex:1.4 1 0;
     border-top-color:var(--border);
     margin-top:12px; padding-top:12px;
 }
@@ -57,7 +57,7 @@ body.review-mode .container{
 .fit-pane{
     width:100%; height:100%;
     display:flex; align-items:center; justify-content:center;
-    text-align:center; overflow:hidden; line-height:1.35;
+    text-align:center; overflow:hidden; line-height:1.32; padding:6px;
 }
 .fit-pane img{ max-width:100%; max-height:100%; object-fit:contain; border-radius:var(--radius-sm); }
 .fit-pane audio{ margin-top:10px; }
@@ -82,7 +82,7 @@ body.review-mode .container{
     <div class="swipe-indicator swipe-reveal" id="swipeReveal">👁️</div>
 
     <div class="card-content qpane">
-        <div class="fit-pane" data-max="42">
+        <div class="fit-pane" data-max="54">
             {{ render_content(
                 card.recto_path if (card.current_face|default('recto'))=='recto' else card.verso_path,
                 card.recto_text if (card.current_face|default('recto'))=='recto' else card.verso_text,
@@ -93,7 +93,7 @@ body.review-mode .container{
 
     <div id="answer-section" style="opacity:{% if show_answer %}1{% else %}0{% endif %};{% if not show_answer %}pointer-events:none;{% endif %}">
         <div class="card-content">
-            <div class="fit-pane" data-max="38">
+            <div class="fit-pane" data-max="48">
                 {{ render_content(
                     card.verso_path if (card.current_face|default('recto'))=='recto' else card.recto_path,
                     card.verso_text if (card.current_face|default('recto'))=='recto' else card.recto_text,
@@ -243,10 +243,11 @@ function fitPane(pane){
     let size = max;
     pane.style.fontSize = size + 'px';
     if (pane.clientHeight < 24) return;
-    let guard = 0;
-    while (pane.scrollHeight > pane.clientHeight - 3 && size > 13 && guard < 90){
-        size -= 1; pane.style.fontSize = size + 'px'; guard++;
+    let guard = 0, shrunk = false;
+    while (pane.scrollHeight > pane.clientHeight + 1 && size > 13 && guard < 90){
+        size -= 1; pane.style.fontSize = size + 'px'; guard++; shrunk = true;
     }
+    if (shrunk && size > 13){ size -= 1; pane.style.fontSize = size + 'px'; }  // marge anti-rognage
 }
 function fitAll(){ document.querySelectorAll('#swipeCard .fit-pane').forEach(fitPane); }
 
