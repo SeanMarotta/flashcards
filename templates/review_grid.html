@@ -43,12 +43,6 @@
 
 .gcard-q{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
     text-align:center; cursor:pointer; }
-.gcard-q::after{
-    content:'toucher pour retourner';
-    position:absolute; bottom:8px; left:0; right:0; text-align:center;
-    font-family:'Space Mono',monospace; font-size:.55rem; color:var(--text2);
-    opacity:.55; pointer-events:none;
-}
 .gcard.flipped .gcard-q{ display:none; }
 .gcard-a{ flex:1; min-height:0; display:none; flex-direction:column; gap:6px; }
 .gcard.flipped .gcard-a{ display:flex; }
@@ -75,10 +69,6 @@
 .gcard-audio audio{ width:100%; margin-top:6px; }
 </style>
 
-<div class="progress-wrap">
-    <div class="progress-bar" style="width:{{ (idx / total * 100)|round }}%"></div>
-</div>
-
 <div class="grid-topline">
     <span class="badge badge-accent">Fournée {{ cur_batch }}/{{ total_batches }}</span>
     <span class="spacer"></span>
@@ -92,7 +82,11 @@
         <div class="gcard" data-id="{{ c.id }}">
             <div class="gcard-head">
                 <span class="badge badge-accent">Boîte {{ c.box }}</span>
-                {% if c.marked %}<span class="badge badge-warning">🔖</span>{% endif %}
+                <button type="button"
+                        class="gcard-mark{% if c.marked %} on{% endif %}"
+                        data-id="{{ c.id }}"
+                        title="Marquer / démarquer cette carte"
+                        onclick="toggleMark(this)">🔖</button>
             </div>
 
             <div class="gcard-q" onclick="flip(this.parentNode)">
@@ -123,6 +117,15 @@
 </div>
 
 <script>
+
+// ── Marquer / démarquer une carte (en arrière-plan, sans recharger) ──────────
+function toggleMark(btn){
+    const id = btn.dataset.id;
+    btn.classList.toggle('on');                 // retour visuel immédiat
+    fetch('/card/' + id + '/toggle_mark', { method: 'POST' })
+        .catch(() => { btn.classList.toggle('on'); });   // annule si échec réseau
+}
+
 const TOTAL_IN_BATCH = {{ cards|length }};
 const IS_LAST = {{ 'true' if (idx + batch) >= total else 'false' }};
 

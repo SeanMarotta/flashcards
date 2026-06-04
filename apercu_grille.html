@@ -25,8 +25,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .btn-ghost:hover{background:var(--surface2);}
 .btn-sm{padding:8px 16px;font-size:.82rem;}
 .container{max-width:540px;margin:0 auto;width:100%;padding:14px 20px 104px;flex:1;min-height:0;display:flex;flex-direction:column;}
-.progress-wrap{background:var(--surface2);border-radius:99px;height:4px;margin:0 0 8px;overflow:hidden;flex-shrink:0;}
-.progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:.7rem;font-weight:600;font-family:'Space Mono',monospace;}
 .badge-accent{background:var(--accent-glow);color:var(--accent);}
 .badge-warning{background:rgba(245,158,11,.12);color:var(--warning);}
@@ -45,7 +43,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .gcard-head{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-bottom:6px;}
 .gcard-head .badge{font-size:.6rem;padding:2px 7px;}
 .gcard-q{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;}
-.gcard-q::after{content:'toucher pour retourner';position:absolute;bottom:8px;left:0;right:0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;color:var(--text2);opacity:.55;pointer-events:none;}
 .gcard.flipped .gcard-q{display:none;}
 .gcard-a{flex:1;min-height:0;display:none;flex-direction:column;gap:6px;}
 .gcard.flipped .gcard-a{display:flex;}
@@ -69,7 +66,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="topbar"><h1>Flashcards</h1><span class="badge badge-accent" style="font-size:.66rem;">APERÇU · Grille</span></div>
 
 <div class="container">
-    <div class="progress-wrap"><div class="progress-bar" style="width:18%"></div></div>
     <div class="grid-topline">
         <span class="badge badge-accent">Fournée 1/6</span>
         <span class="spacer"></span>
