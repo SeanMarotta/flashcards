@@ -483,7 +483,7 @@ def review_quit():
 #     recalcul de next_review_date).
 # ═══════════════════════════════════════════════════════════════════════════════
 
-GRID_DEFAULT_BATCH = 6          # nombre de cartes par fournée (modifiable via ?size=)
+GRID_DEFAULT_BATCH = 10         # nombre de cartes par fournée (modifiable via ?size=)
 
 
 def _grid_path():
@@ -553,12 +553,7 @@ def _card_faces(card):
 @login_required
 def review_grid_start(mode):
     cleanup_stale_sessions()
-    # Taille de fournée : explicite via ?size=, sinon selon l'orientation du
-    # téléphone au démarrage (10 cartes en paysage, 6 en portrait). Le cookie
-    # `grid_orient` est posé par le script d'orientation de base.html.
-    batch = request.args.get("size", type=int)
-    if batch is None:
-        batch = 10 if request.cookies.get("grid_orient") == "landscape" else GRID_DEFAULT_BATCH
+    batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
     batch = max(2, min(24, batch))
     if mode == "daily":
         cards = get_daily_review_cards()
