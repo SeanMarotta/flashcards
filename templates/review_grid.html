@@ -67,6 +67,45 @@
 .gcard.g-ok .gbtn.ok{ background:var(--accent2); color:#fff; border-color:var(--accent2); }
 
 .gcard-audio audio{ width:100%; margin-top:6px; }
+
+/* ── Barre du bas : Menu + Fournée (paysage) + Valider ── */
+.grid-actionrow{ display:flex; align-items:center; gap:10px; max-width:540px; margin:0 auto; }
+.grid-actionrow .btn-primary{ flex:1; }
+.grid-ls-only{ display:none; }              /* masqués en portrait/ordinateur */
+
+/* ════════════════════════════════════════════════════════════════════
+   PAYSAGE TÉLÉPHONE — 10 cartes (5 colonnes × 2 rangées), interface épurée.
+   Ne se déclenche que sur écran court en paysage (téléphone) : ni en
+   portrait, ni sur ordinateur (hauteur > 540px).
+   ════════════════════════════════════════════════════════════════════ */
+@media (orientation:landscape) and (max-height:540px){
+    .topbar{ display:none; }                /* libère la hauteur (page grille uniquement) */
+    .grid-topline{ display:none; }          /* Fournée/notées/Tout révéler retirés du haut */
+
+    body.review-mode .container{
+        max-width:none;                     /* utilise toute la largeur paysage */
+        height:100dvh;
+        display:flex; flex-direction:column;
+        padding:8px 12px 62px;              /* 62px : place pour la barre du bas compacte */
+    }
+    #gridForm{ flex:1; min-height:0; display:flex; flex-direction:column; }
+    .gcards{
+        flex:1; min-height:0;
+        grid-template-columns:repeat(5,1fr);
+        grid-auto-rows:1fr;                 /* 2 rangées égales qui remplissent la hauteur */
+        gap:7px; overflow-y:auto;
+    }
+    .gcard{ height:auto; min-height:0; padding:8px; }
+    .gcard-head{ margin-bottom:4px; }
+    .gcard-head .badge{ font-size:.54rem; padding:1px 6px; }
+    .gcard-qmini{ font-size:.58rem; }
+    .gcard-grade{ gap:5px; }
+    .gbtn{ padding:5px 0; font-size:.9rem; }
+
+    .review-action-bar{ padding:8px 12px max(8px,env(safe-area-inset-bottom)); }
+    .grid-actionrow{ max-width:none; }
+    .grid-ls-only{ display:inline-flex; }   /* Menu + Fournée visibles en paysage */
+}
 </style>
 
 <div class="grid-topline">
@@ -109,7 +148,10 @@
 </form>
 
 <div class="review-action-bar">
-    <div style="max-width:540px;margin:0 auto;">
+    <div class="grid-actionrow">
+        <button type="button" class="btn btn-ghost btn-sm grid-ls-only" style="width:auto;"
+                onclick="quitGrid()">Menu</button>
+        <span class="badge badge-accent grid-ls-only">Fournée {{ cur_batch }}/{{ total_batches }}</span>
         <button type="submit" form="gridForm" class="btn btn-primary" id="submitBtn">
             Valider la fournée →
         </button>
@@ -124,6 +166,13 @@ function toggleMark(btn){
     btn.classList.toggle('on');                 // retour visuel immédiat
     fetch('/card/' + id + '/toggle_mark', { method: 'POST' })
         .catch(() => { btn.classList.toggle('on'); });   // annule si échec réseau
+}
+
+// ── Quitter la session (bouton Menu de la barre du bas, visible en paysage) ──
+function quitGrid(){
+    if (confirm('Quitter la session ? Les cartes non validées de cette fournée ne seront pas notées.')){
+        window.location.href = '/review/grid/quit';
+    }
 }
 
 const TOTAL_IN_BATCH = {{ cards|length }};

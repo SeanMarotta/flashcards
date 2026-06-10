@@ -623,6 +623,23 @@ body.review-mode .container { padding-bottom: 120px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12a10 10 0 0 1-10 10"/></svg><span>Backups</span>
     </a>
 </nav>
+
+<script>
+/* Mémorise l'orientation (téléphone en paysage) dans un cookie, pour que le mode
+   Grille démarre avec 10 cartes en paysage et 6 en portrait. Le seuil de hauteur
+   est aligné sur le média CSS « (orientation:landscape) and (max-height:540px) ». */
+(function(){
+    function setOrient(){
+        var landscape = window.matchMedia('(orientation: landscape)').matches
+                        && window.innerHeight <= 540;
+        document.cookie = 'grid_orient=' + (landscape ? 'landscape' : 'portrait')
+                        + ';path=/;max-age=31536000;samesite=Lax';
+    }
+    setOrient();
+    window.addEventListener('resize', setOrient);
+    window.addEventListener('orientationchange', setOrient);
+})();
+</script>
 {% endblock %}
 </body>
 </html>

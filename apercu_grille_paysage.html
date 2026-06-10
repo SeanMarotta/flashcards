@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aperçu — Grille Paysage (10 cartes)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+:root{
+    --bg:#09090b;--surface:#131316;--surface2:#1a1a1f;--surface3:#222228;
+    --border:rgba(255,255,255,.06);--border-hover:rgba(255,255,255,.12);
+    --text:#ececef;--text2:#71717a;--accent:#8b5cf6;--accent-glow:rgba(139,92,246,.15);
+    --accent2:#34d399;--accent2-glow:rgba(52,211,153,.15);--danger:#f43f5e;--warning:#f59e0b;
+    --radius:14px;--radius-sm:10px;--transition:.2s cubic-bezier(.4,0,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:#000;color:var(--text);min-height:100dvh;
+     -webkit-font-smoothing:antialiased;line-height:1.6;
+     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px 12px;}
+
+.preview-caption{text-align:center;}
+.preview-caption h2{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;
+     background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.preview-caption p{font-size:.8rem;color:var(--text2);margin-top:4px;}
+
+/* ── Cadre « téléphone en paysage » (pour visualiser sur ordinateur) ── */
+.device{
+    width:min(880px,96vw);
+    aspect-ratio:844 / 390;
+    background:#0b0b0e;
+    border:10px solid #1c1c22;
+    border-radius:38px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;
+    overflow:hidden;
+    position:relative;
+    display:flex;flex-direction:column;
+}
+.device::after{ /* encoche caméra (côté droit en paysage) */
+    content:'';position:absolute;top:50%;right:6px;transform:translateY(-50%);
+    width:6px;height:54px;background:#000;border-radius:6px;opacity:.85;
+}
+
+/* ── UI app (sous-ensemble de base.html / review_grid.html) ── */
+.topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+    padding:8px 18px;border-bottom:1px solid var(--border);background:rgba(9,9,11,.8);}
+.topbar h1{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:600;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:.66rem;font-weight:600;font-family:'Space Mono',monospace;}
+.badge-accent{background:var(--accent-glow);color:var(--accent);}
+.badge-warning{background:rgba(245,158,11,.12);color:var(--warning);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:99px;
+    font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;border:none;cursor:pointer;transition:all var(--transition);width:100%;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-sm{padding:6px 13px;font-size:.76rem;}
+
+.container{flex:1;min-height:0;display:flex;flex-direction:column;
+    width:100%;padding:10px 16px 64px;position:relative;}
+
+.grid-topline{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;}
+.grid-topline .spacer{flex:1;}
+.grid-progresslabel{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text2);}
+.grid-progresslabel b{color:var(--text);}
+
+/* ── La grille paysage : 5 colonnes × 2 rangées = 10 cartes ── */
+.gcards{flex:1;min-height:0;display:grid;
+    grid-template-columns:repeat(5,1fr);
+    grid-auto-rows:1fr;
+    gap:7px;overflow-y:auto;}
+
+.gcard{position:relative;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:8px;display:flex;flex-direction:column;
+    overflow:hidden;transition:border-color .2s,box-shadow .2s;}
+.gcard.g-ok{border-color:var(--accent2);box-shadow:0 0 0 1px var(--accent2);}
+.gcard.g-no{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger);}
+.gcard-head{display:flex;align-items:center;gap:5px;flex-shrink:0;margin-bottom:4px;}
+.gcard-head .badge{font-size:.54rem;padding:1px 6px;}
+.gcard-q{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;}
+.gcard.flipped .gcard-q{display:none;}
+.gcard-a{flex:1;min-height:0;display:none;flex-direction:column;gap:4px;}
+.gcard.flipped .gcard-a{display:flex;}
+.gcard-qmini{flex-shrink:0;font-size:.58rem;color:var(--text2);font-style:italic;
+    text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fit-pane{min-height:0;overflow:hidden;line-height:1.2;font-weight:500;width:100%;
+    overflow-wrap:break-word;word-break:break-word;hyphens:auto;}
+.gcard-q .fit-pane{display:flex;align-items:center;justify-content:center;height:100%;}
+.gcard-a .fit-pane{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;}
+.fit-pane img{width:100%;height:100%;object-fit:contain;border-radius:7px;}
+.gcard-a .fit-pane>div{color:var(--accent2);}
+.gcard-grade{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0;}
+.gbtn{padding:5px 0;border-radius:7px;font-size:.85rem;font-weight:700;line-height:1;
+    background:var(--surface2);border:1px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text2);}
+.gbtn.no{color:var(--danger);} .gbtn.ok{color:var(--accent2);}
+.gbtn.no:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
+.gbtn.ok:hover{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+.gcard.g-no .gbtn.no{background:var(--danger);color:#fff;border-color:var(--danger);}
+.gcard.g-ok .gbtn.ok{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+
+.review-action-bar{position:absolute;bottom:0;left:0;right:0;z-index:110;
+    background:rgba(9,9,11,.92);border-top:1px solid var(--border);padding:8px 16px;}
+.review-action-bar .btn{padding:9px 20px;font-size:.85rem;}
+.review-action-bar .action-row{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto;}
+.review-action-bar .action-row .badge{flex-shrink:0;}
+.review-action-bar .action-row .btn-primary{flex:1;}
+</style>
+</head>
+<body>
+
+<div class="preview-caption">
+    <h2>Mode Grille — Paysage</h2>
+    <p>10 cartes affichées ensemble (5 colonnes × 2 rangées) · aperçu statique</p>
+</div>
+
+<div class="device">
+    <div class="container">
+        <div class="gcards" id="gcards"></div>
+
+        <div class="review-action-bar">
+            <div class="action-row">
+                <button type="button" class="btn btn-ghost btn-sm" style="width:auto;" onclick="alert('Démo : retour au menu (quitte la session)')">Menu</button>
+                <span class="badge badge-accent">Fournée 1/4</span>
+                <button type="button" class="btn btn-primary" id="submitBtn" onclick="nextBatch()">Valider la fournée →</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 10 cartes fictives représentatives (texte, mot long, et une image)
+const MOCK = [
+  {box:20, q:"Vent sec et chaud des Alpes ou des Vosges", a:"Le fœhn"},
+  {box:19, q:"Auteur du Père Goriot", a:"Honoré de Balzac", marked:true},
+  {box:23, q:"Vedette hollywoodienne, co-inventrice d'une base du Wi-Fi (1940)", a:"Hedy Lamarr"},
+  {box:8,  q:"Monnaie du Japon", a:"Le yen"},
+  {box:13, q:"Théorème : a² + b² = c²", a:"Théorème de Pythagore"},
+  {box:29, q:"Qui est-ce ?", a:"Virginie Efira", qimg:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Virginie_Efira_Portrait_2023_%281%29_%28cropped%29.jpg/250px-Virginie_Efira_Portrait_2023_%281%29_%28cropped%29.jpg"},
+  {box:9,  q:"Unité SI de pression atmosphérique", a:"Le pascal (Pa)"},
+  {box:23, q:"Plus vieux métro du monde", a:"London Underground (1863)"},
+  {box:15, q:"Plus longue maladie au nom imprononçable", a:"Pneumonoultramicroscopicsilicovolcanoconiosis"},
+  {box:11, q:"Capitale de l'Australie", a:"Canberra"},
+];
+
+function tile(c, i){
+  return `<div class="gcard" data-i="${i}">
+    <div class="gcard-head"><span class="badge badge-accent">Boîte ${c.box}</span>${c.marked?'<span class="badge badge-warning">🔖</span>':''}</div>
+    <div class="gcard-q" onclick="flip(${i})">
+      <div class="fit-pane" data-max="20">${c.qimg?`<img src="${c.qimg}" alt="">`:`<div>${c.q}</div>`}</div>
+    </div>
+    <div class="gcard-a">
+      ${c.qimg?'':`<div class="gcard-qmini">${c.q}</div>`}
+      <div class="fit-pane" data-max="17"><div>${c.a}</div></div>
+      <div class="gcard-grade">
+        <button type="button" class="gbtn no" onclick="grade(${i},'no')">✗</button>
+        <button type="button" class="gbtn ok" onclick="grade(${i},'ok')">✓</button>
+      </div>
+    </div>
+  </div>`;
+}
+const grades = {};
+document.getElementById('gcards').innerHTML = MOCK.map(tile).join('');
+
+function fitPane(pane){
+  if(!pane||pane.querySelector('img'))return;
+  const max=parseFloat(pane.dataset.max||'18'); let size=max; pane.style.fontSize=size+'px';
+  let g=0; while((pane.scrollHeight>pane.clientHeight-2||pane.scrollWidth>pane.clientWidth+1)&&size>9&&g<80){size--;pane.style.fontSize=size+'px';g++;}
+}
+function fitAll(){document.querySelectorAll('.gcard-q .fit-pane').forEach(fitPane);}
+function flip(i){
+  const card=document.querySelector('.gcard[data-i="'+i+'"]');
+  if(card.classList.contains('flipped'))return;
+  card.classList.add('flipped');
+  card.querySelectorAll('.gcard-a .fit-pane').forEach(fitPane);
+}
+function revealAll(){MOCK.forEach((_,i)=>flip(i));}
+function grade(i,g){
+  grades[i]=g; const card=document.querySelector('.gcard[data-i="'+i+'"]');
+  card.classList.remove('g-ok','g-no'); card.classList.add('g-'+g); updateCount();
+}
+function updateCount(){
+  const n=Object.keys(grades).length;
+  const btn=document.getElementById('submitBtn');
+  btn.textContent = n<MOCK.length ? 'Valider — '+(MOCK.length-n)+' non notées passeront' : 'Fournée suivante →';
+}
+function nextBatch(){ alert('Démo : ici la fournée suivante (10 cartes) se chargerait.'); }
+window.addEventListener('load',fitAll);
+window.addEventListener('resize',()=>{fitAll();document.querySelectorAll('.gcard.flipped .fit-pane').forEach(fitPane);});
+</script>
+</body>
+</html>

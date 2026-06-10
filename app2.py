@@ -553,7 +553,12 @@ def _card_faces(card):
 @login_required
 def review_grid_start(mode):
     cleanup_stale_sessions()
-    batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
+    # Taille de fournée : explicite via ?size=, sinon selon l'orientation du
+    # téléphone au démarrage (10 cartes en paysage, 6 en portrait). Le cookie
+    # `grid_orient` est posé par le script d'orientation de base.html.
+    batch = request.args.get("size", type=int)
+    if batch is None:
+        batch = 10 if request.cookies.get("grid_orient") == "landscape" else GRID_DEFAULT_BATCH
     batch = max(2, min(24, batch))
     if mode == "daily":
         cards = get_daily_review_cards()
