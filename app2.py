@@ -198,8 +198,21 @@ def save_uploaded_image(file_storage):
     return None
 
 def delete_image_file(path):
-    if path and not path.startswith("http") and os.path.exists(path):
-        os.remove(path)
+    """Remove a local image file, but ONLY if it resolves inside IMAGE_DIR.
+    Remote URLs (http/https) and any path that escapes IMAGE_DIR (e.g. a hostile
+    or malformed card path like "flashcards.json" or "../secret") are ignored, so
+    deleting a card can never remove arbitrary files on disk."""
+    if not path or path.startswith("http"):
+        return
+    try:
+        base = os.path.realpath(IMAGE_DIR)
+        target = os.path.realpath(path)
+        if target == base or not target.startswith(base + os.sep):
+            return
+        if os.path.exists(target):
+            os.remove(target)
+    except OSError:
+        pass
 
 def allowed_audio_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_AUDIO
@@ -857,6 +870,134 @@ def create():
             flash("Le recto et le verso doivent avoir un contenu.", "error")
 
     return render_template("create.html", title="Créer", active="create", body_class="")
+
+# ── Bulk create cards (paste JSON) ───────────────────────────────────────────
+
+def _text_field(entry, key):
+    """Validate + strip a text face value. Must be a string (or absent).
+    Returns the stripped string, None if empty/absent. Raises ValueError on a
+    non-string value so the all-or-nothing import reports it instead of silently
+    coercing e.g. {"a": 1} into the literal text "{'a': 1}"."""
+    val = entry.get(key)
+    if val is None:
+        return None
+    if not isinstance(val, str):
+        raise ValueError(f"{key} doit être une chaîne de caractères.")
+    return val.strip() or None
+
+def _http_path_field(entry, *keys):
+    """Validate + strip an image-path face value across alias keys.
+    Must be an http(s) URL (or absent) — that is the only value domain the
+    single-card create() route produces, and restricting to it keeps a hostile
+    or relative path (e.g. "flashcards.json") from ever being stored and later
+    handed to delete_image_file(). Returns the first non-empty URL, or None."""
+    for key in keys:
+        val = entry.get(key)
+        if val is None:
+            continue
+        if not isinstance(val, str):
+            raise ValueError(f"{key} doit être une URL (chaîne de caractères).")
+        s = val.strip()
+        if not s:
+            continue
+        if not s.lower().startswith(("http://", "https://")):
+            raise ValueError(f"{key} doit être une URL http(s).")
+        return s
+    return None
+
+def _build_card(entry, creation_date, next_review_date):
+    """Turn one import entry (dict) into a full card, or raise ValueError.
+
+    Accepts recto_text/verso_text and, optionally, recto_path/verso_path
+    (image URLs — recto_url/verso_url are accepted as aliases). When a face has
+    both a path and text, the path wins and the text is dropped (mirrors create()).
+    """
+    if not isinstance(entry, dict):
+        raise ValueError("ce n'est pas un objet JSON.")
+    recto_text = _text_field(entry, "recto_text")
+    verso_text = _text_field(entry, "verso_text")
+    recto_path = _http_path_field(entry, "recto_path", "recto_url")
+    verso_path = _http_path_field(entry, "verso_path", "verso_url")
+    if recto_path:
+        recto_text = None
+    if verso_path:
+        verso_text = None
+    if not (recto_text or recto_path):
+        raise ValueError("recto vide (recto_text ou recto_path requis).")
+    if not (verso_text or verso_path):
+        raise ValueError("verso vide (verso_text ou verso_path requis).")
+    return {
+        "box": 1,
+        "creation_date": creation_date,
+        "current_face": "recto",
+        "id": str(uuid.uuid4()),
+        "last_reviewed_date": None,
+        "marked": False,
+        "next_review_date": next_review_date,
+        "recto_path": recto_path,
+        "recto_text": recto_text,
+        "recto_audio": None,
+        "verso_path": verso_path,
+        "verso_text": verso_text,
+        "verso_audio": None,
+    }
+
+@app.route("/create/bulk", methods=["GET", "POST"])
+@login_required
+def create_bulk():
+    if request.method == "GET":
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload="")
+
+    raw = request.form.get("payload", "").strip()
+    if not raw:
+        flash("Le champ est vide — collez votre JSON.", "error")
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload=raw)
+
+    # Parse JSON, tolerating a double-encoded payload ("[ ... ]" pasted as a string).
+    try:
+        data = json.loads(raw)
+        if isinstance(data, str):
+            data = json.loads(data)
+    except json.JSONDecodeError as e:
+        flash(f"JSON invalide : {e}", "error")
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload=raw)
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        flash("Le JSON doit être une liste d'objets (ou un objet unique).", "error")
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload=raw)
+    if not data:
+        flash("La liste est vide — aucune carte à importer.", "error")
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload=raw)
+
+    # All-or-nothing: validate everything first so nothing is silently dropped.
+    now = datetime.now()
+    creation_date = now.strftime("%Y-%m-%d")
+    next_review_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    new_cards = []
+    errors = []
+    for i, entry in enumerate(data, start=1):
+        try:
+            new_cards.append(_build_card(entry, creation_date, next_review_date))
+        except ValueError as e:
+            errors.append(f"Entrée {i} : {e}")
+
+    if errors:
+        flash(f"❌ Aucune carte importée — {len(errors)} entrée(s) invalide(s). Corrigez puis réessayez.", "error")
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="", payload=raw, errors=errors)
+
+    with locked_flashcards() as all_cards:
+        all_cards.extend(new_cards)
+    flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !", "success")
+    return redirect(url_for("create_bulk"))
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
 

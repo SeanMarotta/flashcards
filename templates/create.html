@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 style="font-size:1.2rem;margin-bottom:16px;">➕ Nouvelle carte</h2>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;">
+    <h2 style="font-size:1.2rem;">➕ Nouvelle carte</h2>
+    <a href="/create/bulk" class="btn btn-ghost btn-sm" style="width:auto;">📋 Import en masse</a>
+</div>
 
 <form method="POST" enctype="multipart/form-data">
     <p class="section-title">Recto</p>
