@@ -942,18 +942,27 @@ def _build_card(entry, creation_date, next_review_date):
         "verso_audio": None,
     }
 
+BULK_MAX_PER_DAY = 20   # cartes importées planifiées par jour (étalement du next_review_date)
+
 @app.route("/create/bulk", methods=["GET", "POST"])
 @login_required
 def create_bulk():
-    if request.method == "GET":
+    # Per-day spread cap (configurable via the form/query; falsy or <1 → default).
+    per_day = request.values.get("max_per_day", BULK_MAX_PER_DAY, type=int) or BULK_MAX_PER_DAY
+    per_day = max(1, per_day)
+
+    def render(payload="", errors=None):
         return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload="")
+                               active="create", body_class="",
+                               payload=payload, errors=errors, max_per_day=per_day)
+
+    if request.method == "GET":
+        return render()
 
     raw = request.form.get("payload", "").strip()
     if not raw:
         flash("Le champ est vide — collez votre JSON.", "error")
-        return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload=raw)
+        return render(payload=raw)
 
     # Parse JSON, tolerating a double-encoded payload ("[ ... ]" pasted as a string).
     try:
@@ -962,41 +971,50 @@ def create_bulk():
             data = json.loads(data)
     except json.JSONDecodeError as e:
         flash(f"JSON invalide : {e}", "error")
-        return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload=raw)
+        return render(payload=raw)
 
     if isinstance(data, dict):
         data = [data]
     if not isinstance(data, list):
         flash("Le JSON doit être une liste d'objets (ou un objet unique).", "error")
-        return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload=raw)
+        return render(payload=raw)
     if not data:
         flash("La liste est vide — aucune carte à importer.", "error")
-        return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload=raw)
+        return render(payload=raw)
 
     # All-or-nothing: validate everything first so nothing is silently dropped.
     now = datetime.now()
     creation_date = now.strftime("%Y-%m-%d")
-    next_review_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
     new_cards = []
     errors = []
     for i, entry in enumerate(data, start=1):
         try:
-            new_cards.append(_build_card(entry, creation_date, next_review_date))
+            new_cards.append(_build_card(entry, creation_date, tomorrow))
         except ValueError as e:
             errors.append(f"Entrée {i} : {e}")
 
     if errors:
         flash(f"❌ Aucune carte importée — {len(errors)} entrée(s) invalide(s). Corrigez puis réessayez.", "error")
-        return render_template("create_bulk.html", title="Import en masse",
-                               active="create", body_class="", payload=raw, errors=errors)
+        return render(payload=raw, errors=errors)
+
+    # Spread the first review: at most `per_day` imported cards land on the same
+    # day, starting tomorrow, keeping the pasted order. Avoids dumping a whole
+    # batch onto a single review day.
+    for idx, card in enumerate(new_cards):
+        day_offset = 1 + idx // per_day
+        card["next_review_date"] = (now + timedelta(days=day_offset)).strftime("%Y-%m-%d")
 
     with locked_flashcards() as all_cards:
         all_cards.extend(new_cards)
-    flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !", "success")
+
+    days = (len(new_cards) - 1) // per_day + 1
+    if days > 1:
+        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s), étalées sur {days} jours "
+              f"(max {per_day}/jour, à partir de demain).", "success")
+    else:
+        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !", "success")
     return redirect(url_for("create_bulk"))
 
 # ── Dashboard ────────────────────────────────────────────────────────────────

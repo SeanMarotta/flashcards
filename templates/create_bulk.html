@@ -7,8 +7,10 @@
 
 <p style="color:var(--text2);font-size:0.88rem;margin-bottom:16px;">
     Collez une liste JSON d'objets <code>recto_text</code> / <code>verso_text</code>.
-    Toutes les cartes sont ajoutées en boîte&nbsp;1. <strong>Tout&#8209;ou&#8209;rien</strong>&nbsp;:
-    si une entrée est invalide, rien n'est importé et l'erreur est signalée.
+    Les cartes sont ajoutées en boîte&nbsp;1 et <strong>étalées dans le temps</strong>
+    (max {{ max_per_day }}/jour, à partir de demain) pour ne pas surcharger une seule
+    journée. <strong>Tout&#8209;ou&#8209;rien</strong>&nbsp;: si une entrée est invalide,
+    rien n'est importé et l'erreur est signalée.
 </p>
 
 <details style="margin-bottom:16px;">
@@ -54,6 +56,11 @@
                   placeholder='[&#10;  { "recto_text": "...", "verso_text": "..." }&#10;]'>{{ payload }}</textarea>
     </div>
     <p id="counter" style="color:var(--text2);font-size:0.78rem;margin:-8px 0 16px;font-family:'Space Mono',monospace;">&nbsp;</p>
+    <div class="form-group" style="max-width:220px;">
+        <label>Cartes par jour (étalement)</label>
+        <input type="number" name="max_per_day" id="max_per_day" min="1" step="1"
+               value="{{ max_per_day }}">
+    </div>
     <button type="submit" class="btn btn-primary">Importer les cartes</button>
 </form>
 
@@ -61,6 +68,8 @@
 (function () {
     const ta = document.getElementById('payload');
     const counter = document.getElementById('counter');
+    const perDayInput = document.getElementById('max_per_day');
+    function perDay() { const v = parseInt(perDayInput.value, 10); return (v && v > 0) ? v : 20; }
     function update() {
         const raw = ta.value.trim();
         if (!raw) { counter.textContent = ' '; counter.style.color = 'var(--text2)'; return; }
@@ -85,10 +94,16 @@
             const hasVerso = c && (txt(c.verso_text) || url(c.verso_path) || url(c.verso_url));
             if (hasRecto && hasVerso) valid++; else bad++;
         }
-        counter.textContent = '✓ ' + valid + ' carte(s) détectée(s)' + (bad ? ' — ' + bad + ' incomplète(s)' : '');
+        let msg = '✓ ' + valid + ' carte(s) détectée(s)' + (bad ? ' — ' + bad + ' incomplète(s)' : '');
+        if (valid > 0) {
+            const days = Math.ceil(valid / perDay());
+            msg += ' → ' + days + ' jour' + (days > 1 ? 's' : '') + ' (' + perDay() + '/j)';
+        }
+        counter.textContent = msg;
         counter.style.color = bad ? 'var(--warning)' : 'var(--accent2)';
     }
     ta.addEventListener('input', update);
+    perDayInput.addEventListener('input', update);
     update();
 })();
 </script>
