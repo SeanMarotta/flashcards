@@ -1037,7 +1037,10 @@ def create_bulk():
     if request.method == "GET":
         return render()
 
-    raw = request.form.get("payload", "").strip()
+    # Strip surrounding whitespace and a UTF-8 BOM (str.strip() doesn't treat
+    # as whitespace) so a .json saved by a Windows editor still parses instead of
+    # failing json.loads. The extra .strip() handles a BOM-then-whitespace order.
+    raw = request.form.get("payload", "").strip().lstrip("﻿").strip()
     if not raw:
         flash("Le champ est vide — collez votre JSON.", "error")
         return render(payload=raw)

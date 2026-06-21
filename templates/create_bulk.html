@@ -6,7 +6,9 @@
 </div>
 
 <p style="color:var(--text2);font-size:0.88rem;margin-bottom:16px;">
-    Collez une liste JSON d'objets <code>recto_text</code> / <code>verso_text</code>.
+    Collez une liste JSON d'objets <code>recto_text</code> / <code>verso_text</code>,
+    ou <strong>chargez un fichier <code>.json</code></strong> (bouton ci&#8209;dessous ou
+    glisser&#8209;déposer sur l'éditeur).
     Les cartes sont ajoutées en boîte&nbsp;1 et <strong>étalées dans le temps</strong>
     (max {{ max_per_day }}/jour, à partir de demain) pour ne pas surcharger une seule
     journée. <strong>Tout&#8209;ou&#8209;rien</strong>&nbsp;: si une entrée est invalide,
@@ -55,7 +57,13 @@
 
 <form method="POST" action="/create/bulk" enctype="multipart/form-data">
     <div class="form-group">
-        <label>JSON à importer</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+            <label style="margin:0;">JSON à importer</label>
+            <label for="jsonfile" class="btn btn-ghost btn-sm" style="width:auto;cursor:pointer;margin:0;">
+                📂 Charger un fichier .json
+            </label>
+            <input type="file" id="jsonfile" accept=".json,application/json" style="display:none;">
+        </div>
         <textarea name="payload" id="payload" spellcheck="false"
                   style="min-height:300px;font-family:'Space Mono',monospace;font-size:0.82rem;line-height:1.5;"
                   placeholder='[&#10;  { "recto_text": "...", "verso_text": "..." }&#10;]'>{{ payload }}</textarea>
@@ -89,7 +97,7 @@
     const perDayInput = document.getElementById('max_per_day');
     function perDay() { const v = parseInt(perDayInput.value, 10); return (v && v > 0) ? v : 20; }
     function update() {
-        const raw = ta.value.trim();
+        const raw = ta.value.replace(/^﻿/, '').trim();
         if (!raw) { counter.textContent = ' '; counter.style.color = 'var(--text2)'; return; }
         let data;
         try {
@@ -129,6 +137,72 @@
     ta.addEventListener('input', update);
     perDayInput.addEventListener('input', update);
     update();
+
+    // Load a .json file into the textarea (client-side) instead of typing it.
+    // The file only fills the editor — the user still reviews it and submits the
+    // textarea, so the existing parse/validation/counter flow is untouched.
+    const jsonFile = document.getElementById('jsonfile');
+    function looksLikeJson(file) {
+        const t = (file.type || '').toLowerCase();
+        return t === 'application/json' || t === 'text/json' || /\.json$/i.test(file.name || '');
+    }
+    function loadJsonFile(file) {
+        if (!file) return;
+        // Only ever read .json files: a dropped image/PDF read as text would just
+        // dump binary garbage into the editor (drag-and-drop bypasses `accept`).
+        if (!looksLikeJson(file)) {
+            counter.textContent = '⚠ Fichier ignoré (sélectionnez un .json) : ' + file.name;
+            counter.style.color = 'var(--danger)';
+            return;
+        }
+        // Loading replaces the editor; confirm first if there's unsaved content,
+        // since a programmatic value set isn't reliably undoable with Ctrl+Z.
+        if (ta.value.trim() &&
+            !confirm('Remplacer le contenu actuel de l\'éditeur par « ' + file.name + ' » ?')) {
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Strip a leading BOM (common from Windows editors) so JSON.parse and
+            // the server's json.loads accept the payload.
+            const text = (typeof reader.result === 'string' ? reader.result : '').replace(/^﻿/, '');
+            ta.value = text;
+            update();
+            ta.focus();
+            if (!text.trim()) {
+                counter.textContent = '⚠ Fichier vide : ' + file.name;
+                counter.style.color = 'var(--warning)';
+            } else {
+                // Distinct, file-specific message on bad JSON (not the transient
+                // "…pour le moment…" used while typing).
+                try { JSON.parse(text); }
+                catch (e) {
+                    counter.textContent = '⚠ « ' + file.name + ' » n\'est pas un JSON valide.';
+                    counter.style.color = 'var(--danger)';
+                }
+            }
+        };
+        reader.onerror = () => {
+            counter.textContent = '⚠ Impossible de lire « ' + file.name + ' ».';
+            counter.style.color = 'var(--danger)';
+        };
+        reader.readAsText(file);
+    }
+    jsonFile.addEventListener('change', () => {
+        loadJsonFile(jsonFile.files && jsonFile.files[0]);
+        jsonFile.value = '';  // reset so re-selecting the same file fires 'change'
+    });
+    // Bonus: drop a .json file straight onto the editor. Only intercept when a
+    // file is dragged, so normal text drag/drop and selection still work.
+    ['dragover', 'dragenter'].forEach(ev => ta.addEventListener(ev, e => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+            e.preventDefault();
+        }
+    }));
+    ta.addEventListener('drop', e => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) { e.preventDefault(); loadJsonFile(f); }
+    });
 
     // Image dropzone: drag-and-drop sets the file input, and we show a count.
     const dropzone = document.getElementById('dropzone');
