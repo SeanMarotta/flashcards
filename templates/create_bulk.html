@@ -30,8 +30,10 @@
   }
 ]</pre>
     <p style="color:var(--text2);font-size:0.76rem;margin-top:8px;">
-        Optionnel pour une face image&nbsp;: <code>recto_path</code> / <code>verso_path</code>
-        (URL d'image). Si présent, il remplace le texte de cette face.
+        Optionnel pour une face image&nbsp;: <code>recto_path</code> / <code>verso_path</code>.
+        Accepte une URL d'image (<code>http(s)://…</code>) <strong>ou</strong> un chemin
+        vers un fichier de votre dossier <code>images</code> (ex.&nbsp;<code>images/chat.png</code>
+        ou simplement <code>chat.png</code>). Si présent, il remplace le texte de cette face.
     </p>
 </details>
 
@@ -84,14 +86,20 @@
         }
         if (!Array.isArray(data)) data = [data];
         // Mirror the server's rules: text faces must be strings; path faces must
-        // be http(s) URLs. Anything else doesn't count as content.
+        // be an http(s) URL or a local image path (existence is only checked
+        // server-side). Anything else doesn't count as content.
         const txt = v => (typeof v === 'string') ? v.trim() : '';
-        const url = v => { const s = txt(v).toLowerCase();
-            return (s.startsWith('http://') || s.startsWith('https://')) ? s : ''; };
+        const IMG_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+        const img = v => {
+            const s = txt(v); const low = s.toLowerCase();
+            if (low.startsWith('http://') || low.startsWith('https://')) return s;
+            const ext = low.includes('.') ? low.split('.').pop() : '';
+            return IMG_EXT.includes(ext) ? s : '';
+        };
         let valid = 0, bad = 0;
         for (const c of data) {
-            const hasRecto = c && (txt(c.recto_text) || url(c.recto_path) || url(c.recto_url));
-            const hasVerso = c && (txt(c.verso_text) || url(c.verso_path) || url(c.verso_url));
+            const hasRecto = c && (txt(c.recto_text) || img(c.recto_path) || img(c.recto_url));
+            const hasVerso = c && (txt(c.verso_text) || img(c.verso_path) || img(c.verso_url));
             if (hasRecto && hasVerso) valid++; else bad++;
         }
         let msg = '✓ ' + valid + ' carte(s) détectée(s)' + (bad ? ' — ' + bad + ' incomplète(s)' : '');

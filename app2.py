@@ -890,24 +890,54 @@ def _text_field(entry, key):
         raise ValueError(f"{key} doit être une chaîne de caractères.")
     return val.strip() or None
 
-def _http_path_field(entry, *keys):
-    """Validate + strip an image-path face value across alias keys.
-    Must be an http(s) URL (or absent) — that is the only value domain the
-    single-card create() route produces, and restricting to it keeps a hostile
-    or relative path (e.g. "flashcards.json") from ever being stored and later
-    handed to delete_image_file(). Returns the first non-empty URL, or None."""
+def _local_image_path(key, raw):
+    """Resolve a user-supplied local image path to a stored "images/…" value.
+    Accepts both "images/foo.png" and a bare "foo.png"; rejects anything that
+    escapes IMAGE_DIR (absolute paths, "..", a path pointing elsewhere) so a
+    hostile path can never be stored and later handed to delete_image_file().
+    Requires an allowed image extension and that the file actually exists in the
+    folder. Raises ValueError on any problem; otherwise returns the normalised
+    "images/…" path."""
+    rel = raw.replace("\\", "/").strip().lstrip("/")
+    # Tolerate an explicit "images/" prefix as well as a bare filename.
+    if rel.lower().startswith(IMAGE_DIR.lower() + "/"):
+        rel = rel[len(IMAGE_DIR) + 1:]
+    if not rel:
+        raise ValueError(f"{key} : chemin d'image vide.")
+    ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
+        raise ValueError(f"{key} doit être une URL http(s) ou une image ({allowed}).")
+    base = os.path.realpath(IMAGE_DIR)
+    target = os.path.realpath(os.path.join(IMAGE_DIR, rel))
+    if target == base or not target.startswith(base + os.sep):
+        raise ValueError(f"{key} doit pointer vers le dossier « {IMAGE_DIR} ».")
+    if not os.path.isfile(target):
+        raise ValueError(f"{key} : fichier introuvable dans « {IMAGE_DIR} » ({rel}).")
+    # Store the same forward-slash "images/…" form that create() produces.
+    return f"{IMAGE_DIR}/{rel}"
+
+def _image_path_field(entry, *keys):
+    """Validate + strip an image-face value across alias keys.
+    Accepts either an http(s) URL or a local path inside IMAGE_DIR (e.g.
+    "images/foo.png" or "foo.png") — together these are the value domain the
+    single-card create() route produces (a remote URL, or an uploaded file
+    stored under IMAGE_DIR). Restricting to those two forms keeps a hostile or
+    relative path (e.g. "flashcards.json" or "../secret") from ever being stored
+    and later handed to delete_image_file(). Returns the first non-empty value
+    (local paths normalised to "images/…"), or None."""
     for key in keys:
         val = entry.get(key)
         if val is None:
             continue
         if not isinstance(val, str):
-            raise ValueError(f"{key} doit être une URL (chaîne de caractères).")
+            raise ValueError(f"{key} doit être une URL ou un chemin (chaîne de caractères).")
         s = val.strip()
         if not s:
             continue
-        if not s.lower().startswith(("http://", "https://")):
-            raise ValueError(f"{key} doit être une URL http(s).")
-        return s
+        if s.lower().startswith(("http://", "https://")):
+            return s
+        return _local_image_path(key, s)
     return None
 
 def _build_card(entry, creation_date, next_review_date):
@@ -921,8 +951,8 @@ def _build_card(entry, creation_date, next_review_date):
         raise ValueError("ce n'est pas un objet JSON.")
     recto_text = _text_field(entry, "recto_text")
     verso_text = _text_field(entry, "verso_text")
-    recto_path = _http_path_field(entry, "recto_path", "recto_url")
-    verso_path = _http_path_field(entry, "verso_path", "verso_url")
+    recto_path = _image_path_field(entry, "recto_path", "recto_url")
+    verso_path = _image_path_field(entry, "verso_path", "verso_url")
     if recto_path:
         recto_text = None
     if verso_path:
