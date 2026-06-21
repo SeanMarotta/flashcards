@@ -34,6 +34,9 @@
         Accepte une URL d'image (<code>http(s)://…</code>) <strong>ou</strong> un chemin
         vers un fichier de votre dossier <code>images</code> (ex.&nbsp;<code>images/chat.png</code>
         ou simplement <code>chat.png</code>). Si présent, il remplace le texte de cette face.
+        Déposez les fichiers correspondants dans la zone «&nbsp;Images&nbsp;» ci&#8209;dessous&nbsp;:
+        ils sont enregistrés dans le dossier <code>images</code> sous leur nom d'origine, et
+        chaque chemin local doit pointer vers un fichier réellement présent.
     </p>
 </details>
 
@@ -50,7 +53,7 @@
 </div>
 {% endif %}
 
-<form method="POST" action="/create/bulk">
+<form method="POST" action="/create/bulk" enctype="multipart/form-data">
     <div class="form-group">
         <label>JSON à importer</label>
         <textarea name="payload" id="payload" spellcheck="false"
@@ -58,6 +61,19 @@
                   placeholder='[&#10;  { "recto_text": "...", "verso_text": "..." }&#10;]'>{{ payload }}</textarea>
     </div>
     <p id="counter" style="color:var(--text2);font-size:0.78rem;margin:-8px 0 16px;font-family:'Space Mono',monospace;">&nbsp;</p>
+    <div class="form-group">
+        <label>Images (optionnel)</label>
+        <label id="dropzone" for="images" style="display:block;cursor:pointer;border:2px dashed var(--border);
+                    border-radius:var(--radius-sm);padding:20px;text-align:center;color:var(--text2);
+                    font-size:0.84rem;transition:border-color .15s,background .15s;">
+            📁 Déposez vos images ici, ou <span style="color:var(--accent);">cliquez pour parcourir</span><br>
+            <span style="font-size:0.76rem;">Sélectionnez les fichiers de votre dossier <code>images</code>
+            (ils sont enregistrés sous leur nom d'origine).</span>
+        </label>
+        <input type="file" name="images" id="images" multiple accept="image/*" style="display:none;">
+        <p id="img-counter" style="color:var(--text2);font-size:0.78rem;margin:8px 0 0;
+                  font-family:'Space Mono',monospace;">&nbsp;</p>
+    </div>
     <div class="form-group" style="max-width:220px;">
         <label>Cartes par jour (étalement)</label>
         <input type="number" name="max_per_day" id="max_per_day" min="1" step="1"
@@ -113,6 +129,31 @@
     ta.addEventListener('input', update);
     perDayInput.addEventListener('input', update);
     update();
+
+    // Image dropzone: drag-and-drop sets the file input, and we show a count.
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('images');
+    const imgCounter = document.getElementById('img-counter');
+    function updateImgCount() {
+        const n = fileInput.files ? fileInput.files.length : 0;
+        imgCounter.textContent = n ? ('🖼 ' + n + ' image(s) sélectionnée(s)') : ' ';
+        imgCounter.style.color = n ? 'var(--accent2)' : 'var(--text2)';
+    }
+    fileInput.addEventListener('change', updateImgCount);
+    ['dragover', 'dragenter'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault(); dropzone.style.borderColor = 'var(--accent)';
+        dropzone.style.background = 'rgba(99,102,241,.06)';
+    }));
+    ['dragleave', 'dragend', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+        e.preventDefault(); dropzone.style.borderColor = 'var(--border)';
+        dropzone.style.background = 'transparent';
+    }));
+    dropzone.addEventListener('drop', e => {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            updateImgCount();
+        }
+    });
 })();
 </script>
 {% endblock %}

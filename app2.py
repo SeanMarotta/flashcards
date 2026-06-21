@@ -202,6 +202,46 @@ def save_uploaded_image(file_storage):
         return path
     return None
 
+def _safe_image_basename(filename):
+    """Reduce an uploaded filename to a safe basename to store in IMAGE_DIR.
+    Unlike save_uploaded_image() (which assigns a UUID), the bulk importer keeps
+    the *original* name so a JSON path like "images/chat.png" or "chat.png" still
+    resolves to it. We strip any directory part (handles folder uploads whose
+    filename is "images/chat.png"), reject empty / "." / ".." and disallowed
+    extensions, but preserve accents and spaces so the name matches the JSON.
+    Returns the safe basename, or None if the file should be skipped."""
+    if not filename:
+        return None
+    name = os.path.basename(filename.replace("\\", "/")).strip()
+    if not name or name in (".", "..") or not allowed_file(name):
+        return None
+    return name
+
+def save_bulk_images(file_list):
+    """Save uploaded image files into IMAGE_DIR under their original basename.
+    Returns (created, skipped): `created` is the list of paths that did not exist
+    before (safe to delete on a rollback), `skipped` the filenames we refused
+    (bad extension / name). Pre-existing same-named files are overwritten and are
+    NOT reported as created, so a rollback never deletes images already on disk."""
+    created, skipped = [], []
+    for fs in file_list:
+        if not fs or not fs.filename:
+            continue
+        name = _safe_image_basename(fs.filename)
+        if not name:
+            skipped.append(fs.filename)
+            continue
+        dest = os.path.join(IMAGE_DIR, name)
+        existed = os.path.exists(dest)
+        try:
+            fs.save(dest)
+        except OSError:
+            skipped.append(fs.filename)
+            continue
+        if not existed:
+            created.append(dest)
+    return created, skipped
+
 def delete_image_file(path):
     """Remove a local image file, but ONLY if it resolves inside IMAGE_DIR.
     Remote URLs (http/https) and any path that escapes IMAGE_DIR (e.g. a hostile
@@ -899,9 +939,12 @@ def _local_image_path(key, raw):
     folder. Raises ValueError on any problem; otherwise returns the normalised
     "images/…" path."""
     rel = raw.replace("\\", "/").strip().lstrip("/")
-    # Tolerate an explicit "images/" prefix as well as a bare filename.
-    if rel.lower().startswith(IMAGE_DIR.lower() + "/"):
-        rel = rel[len(IMAGE_DIR) + 1:]
+    # Tolerate an explicit "<folder>/" prefix (the folder NAME, e.g. "images/")
+    # as well as a bare filename. Match on the basename so it still works if
+    # IMAGE_DIR is configured to an absolute or nested path.
+    folder = os.path.basename(os.path.normpath(IMAGE_DIR)) or IMAGE_DIR
+    if rel.lower().startswith(folder.lower() + "/"):
+        rel = rel[len(folder) + 1:]
     if not rel:
         raise ValueError(f"{key} : chemin d'image vide.")
     ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
@@ -1017,6 +1060,12 @@ def create_bulk():
         flash("La liste est vide — aucune carte à importer.", "error")
         return render(payload=raw)
 
+    # Save any dropped images first, under their original name, so local JSON
+    # paths ("images/chat.png" or "chat.png") resolve during validation below.
+    # `created` tracks files new to this request so a failed (all-or-nothing)
+    # import can roll them back without touching images already on disk.
+    created, skipped = save_bulk_images(request.files.getlist("images"))
+
     # All-or-nothing: validate everything first so nothing is silently dropped.
     now = datetime.now()
     creation_date = now.strftime("%Y-%m-%d")
@@ -1031,7 +1080,15 @@ def create_bulk():
             errors.append(f"Entrée {i} : {e}")
 
     if errors:
+        # Roll back images this request created so a rejected import leaves no trace.
+        for p in created:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
         flash(f"❌ Aucune carte importée — {len(errors)} entrée(s) invalide(s). Corrigez puis réessayez.", "error")
+        if skipped:
+            flash(f"⚠️ {len(skipped)} fichier(s) ignoré(s) (format non supporté).", "warning")
         return render(payload=raw, errors=errors)
 
     # Spread the first review: at most `per_day` imported cards land on the same
@@ -1045,11 +1102,14 @@ def create_bulk():
         all_cards.extend(new_cards)
 
     days = (len(new_cards) - 1) // per_day + 1
+    img_note = f" {len(created)} image(s) enregistrée(s)." if created else ""
     if days > 1:
         flash(f"✅ {len(new_cards)} carte(s) ajoutée(s), étalées sur {days} jours "
-              f"(max {per_day}/jour, à partir de demain).", "success")
+              f"(max {per_day}/jour, à partir de demain).{img_note}", "success")
     else:
-        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !", "success")
+        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !{img_note}", "success")
+    if skipped:
+        flash(f"⚠️ {len(skipped)} fichier(s) ignoré(s) (format non supporté).", "warning")
     return redirect(url_for("create_bulk"))
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
