@@ -4,7 +4,10 @@ Flask webapp mobile-first, remplacement de l'app Streamlit.
 Templates dans le dossier templates/.
 """
 
-import fcntl
+try:
+    import fcntl  # Unix
+except ImportError:
+    fcntl = None  # Windows : pas de verrou fichier (voir locked_flashcards)
 import json
 import os
 import uuid
@@ -177,13 +180,15 @@ def locked_flashcards():
     Cards are saved automatically on exit (unless an exception occurs).
     """
     with open(LOCK_FILE, "w") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(lf, fcntl.LOCK_EX)
         try:
             cards = load_flashcards()
             yield cards
             save_flashcards(cards)
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(lf, fcntl.LOCK_UN)
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
