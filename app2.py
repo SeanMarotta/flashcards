@@ -1271,6 +1271,16 @@ def chords_app():
     # Served raw (not via Jinja) so its CSS/JS braces aren't parsed as template syntax.
     return send_from_directory("templates", "chord_spark.html")
 
+@app.route("/transpose")
+@login_required
+def transpose():
+    return render_template("transpose.html", title="Transposeur",
+                           active="transpose", body_class="")
+
+@app.route("/transpose/app")
+@login_required
+def transpose_app():
+    return send_from_directory("templates", "transposeur.html")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
