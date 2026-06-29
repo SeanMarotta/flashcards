@@ -1,50 +1,71 @@
 #!/bin/bash
 set -euo pipefail
 #
-# data_backup.sh — Sauvegarde HORS-GIT des données du projet flashcards.
+# data_backup.sh — Sauvegarde des données vers un CLOUD via rclone.
 #
-# Remplace le rôle de sauvegarde que jouait GitHub (git_sync.sh) une fois
-# que images/, audios/ et flashcards.json ne sont plus versionnés par git.
+# Remplace le rôle de sauvegarde hors-machine que jouait GitHub, sans avoir
+# besoin d'un NAS ou d'un disque externe.
 #
 # À lancer quotidiennement par cron (voir la ligne tout en bas).
+#
+#   ┌─────────────────────────────────────────────────────────────────────┐
+#   │ PRÉ-REQUIS (à faire UNE FOIS) :                                      │
+#   │                                                                     │
+#   │ 1. Installer rclone :                                                │
+#   │      sudo apt install rclone        (ou : curl https://rclone.org/  │
+#   │                                       install.sh | sudo bash)        │
+#   │                                                                     │
+#   │ 2. Configurer un "remote" cloud :                                   │
+#   │      rclone config                                                  │
+#   │                                                                     │
+#   │    • Backblaze B2 (le PLUS SIMPLE sur un serveur sans écran : juste │
+#   │      un keyID + applicationKey, pas d'OAuth navigateur). 10 Go      │
+#   │      gratuits.                                                       │
+#   │    • Google Drive (15 Go) : sur un serveur sans navigateur, lance   │
+#   │      `rclone authorize "drive"` depuis ton PC, puis colle le token. │
+#   │                                                                     │
+#   │ 3. Note le nom que tu donnes au remote et reporte-le dans REMOTE    │
+#   │    ci-dessous (ex. si tu l'as nommé "gdrive", mets "gdrive:...").    │
+#   │                                                                     │
+#   │ 4. Teste : ./data_backup.sh                                         │
+#   └─────────────────────────────────────────────────────────────────────┘
 # ---------------------------------------------------------------------------
 
 # Dossier du dépôt = dossier où se trouve ce script.
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# >>> ADAPTE CETTE DESTINATION <<<
-# Idéalement un AUTRE disque / un point de montage NAS / un disque externe.
-# (sur le même disque que le serveur, ça protège des erreurs mais pas d'une
-#  panne disque — pour une vraie sécurité, vise un stockage distinct.)
-DEST="/mnt/backup/flashcards-data"
+# >>> ADAPTE : nom_du_remote:chemin_de_destination <<<
+REMOTE="gdrive:flashcards-backup"
 
-mkdir -p "$DEST"
+# Options rclone communes (silencieux mais journalisable, reprend les erreurs).
+RCLONE_OPTS=(--fast-list --transfers=8 --retries=3 --stats-one-line --stats=0)
 
-# Miroir incrémental. PAS de --delete : on n'efface jamais dans la sauvegarde,
-# même si un fichier disparaît de la source (un backup ne doit pas propager
-# une suppression accidentelle). Quitte à accumuler quelques orphelins.
-rsync -a \
-  "$REPO_DIR/flashcards.json" \
-  "$REPO_DIR/images" \
-  "$REPO_DIR/audios" \
-  "$REPO_DIR/backups" \
-  "$DEST/"
+echo "$(date '+%F %T') >> Sauvegarde vers $REMOTE"
 
-# Snapshot daté du JSON (minuscule) pour pouvoir remonter dans le temps.
-mkdir -p "$DEST/json-history"
-cp -a "$REPO_DIR/flashcards.json" \
-      "$DEST/json-history/flashcards_$(date +%Y%m%d_%H%M%S).json"
+# On utilise `copy` (jamais `sync`) : il AJOUTE et MET À JOUR, mais ne SUPPRIME
+# jamais côté cloud. Une suppression accidentelle en local ne détruit donc pas
+# la copie de sauvegarde.
+rclone copy "$REPO_DIR/images"          "$REMOTE/images"  "${RCLONE_OPTS[@]}"
+rclone copy "$REPO_DIR/audios"          "$REMOTE/audios"  "${RCLONE_OPTS[@]}"
 
-# Purge des snapshots JSON de plus de 60 jours (garde l'historique léger).
-find "$DEST/json-history" -name 'flashcards_*.json' -mtime +60 -delete 2>/dev/null || true
+# Le JSON courant (écrasé à chaque fois = toujours la dernière version).
+rclone copy "$REPO_DIR/flashcards.json" "$REMOTE/"        "${RCLONE_OPTS[@]}"
 
-echo "$(date '+%F %T') backup OK -> $DEST"
+# Les snapshots datés que l'app génère elle-même dans backups/ : ça nous donne
+# tout l'historique du JSON dans le cloud, sans effort.
+rclone copy "$REPO_DIR/backups"         "$REMOTE/backups" "${RCLONE_OPTS[@]}"
+
+echo "$(date '+%F %T') >> Sauvegarde terminée."
 
 # ---------------------------------------------------------------------------
-# Installation du cron (en tant que l'utilisateur qui possède le dépôt) :
+# Installation du cron (utilisateur propriétaire du dépôt) :
 #
 #   chmod +x data_backup.sh
 #   crontab -e
-#   # puis ajouter (sauvegarde tous les jours à 2h30, avant le sync git de 3h) :
+#   # tous les jours à 2h30, avant le sync git de 3h :
 #   30 2 * * * /root/flashcards/data_backup.sh >> /var/log/flashcards-backup.log 2>&1
+#
+# Vérifier de temps en temps que ça tourne :
+#   tail /var/log/flashcards-backup.log
+#   rclone size gdrive:flashcards-backup      # taille stockée côté cloud
 # ---------------------------------------------------------------------------
