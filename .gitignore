@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+venv/
+backups/
+review_sessions/
+images/
+audios/
+flashcards.json
+flashcards.json.lock

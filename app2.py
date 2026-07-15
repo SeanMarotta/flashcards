@@ -1,0 +1,1288 @@
+"""
+Flashcards — Révision Espacée
+Flask webapp mobile-first, remplacement de l'app Streamlit.
+Templates dans le dossier templates/.
+"""
+
+try:
+    import fcntl  # Unix
+except ImportError:
+    fcntl = None  # Windows : pas de verrou fichier (voir locked_flashcards)
+import json
+import os
+import uuid
+import random
+from contextlib import contextmanager
+from datetime import datetime, timedelta
+from functools import wraps
+
+from flask import (
+    Flask, render_template, request, redirect,
+    url_for, session, flash, jsonify, send_from_directory
+)
+from werkzeug.utils import secure_filename
+
+# ─── Configuration ───────────────────────────────────────────────────────────
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "Kiwy")
+
+CARDS_FILE = "flashcards.json"
+IMAGE_DIR = "images"
+AUDIO_DIR = "audios"
+REVIEW_DIR = "review_sessions"
+BACKUP_DIR = "backups"
+MAX_BACKUPS = 20
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_AUDIO = {"mp3", "wav", "ogg", "m4a", "aac"}
+
+os.makedirs(IMAGE_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(REVIEW_DIR, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+# ─── Server-side review session storage (avoids cookie size limits) ──────────
+
+def _review_path():
+    sid = session.get("_review_sid")
+    if not sid:
+        sid = str(uuid.uuid4())
+        session["_review_sid"] = sid
+    return os.path.join(REVIEW_DIR, f"{sid}.json")
+
+def save_review_state(cards, index, show_answer, **extra):
+    p = _review_path()
+    existing = {}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    data = {
+        "cards": cards,
+        "index": index,
+        "show_answer": show_answer,
+        "correct": extra.get("correct", existing.get("correct", 0)),
+        "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
+        "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
+        "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+        # last_action: snapshot for the undo feature. None = nothing to undo.
+        "last_action": extra["last_action"] if "last_action" in extra else existing.get("last_action"),
+    }
+    with open(_review_path(), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+def load_review_state():
+    p = _review_path()
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data.setdefault("correct", 0)
+        data.setdefault("incorrect", 0)
+        data.setdefault("pass_count", 0)
+        data.setdefault("start_time", datetime.now().isoformat())
+        data.setdefault("last_action", None)
+        return data
+    return {"cards": [], "index": 0, "show_answer": False,
+            "correct": 0, "incorrect": 0, "pass_count": 0,
+            "start_time": datetime.now().isoformat(),
+            "last_action": None}
+
+def clear_review_state():
+    p = _review_path()
+    if os.path.exists(p):
+        os.remove(p)
+
+def cleanup_stale_sessions(max_age_hours=24):
+    """Remove review session files older than max_age_hours."""
+    now = datetime.now().timestamp()
+    for fname in os.listdir(REVIEW_DIR):
+        if not fname.endswith(".json"):
+            continue
+        path = os.path.join(REVIEW_DIR, fname)
+        try:
+            age_hours = (now - os.path.getmtime(path)) / 3600
+            if age_hours > max_age_hours:
+                os.remove(path)
+        except OSError:
+            pass
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def create_backup():
+    """Snapshot the current flashcards.json into backups/ before any write."""
+    if not os.path.exists(CARDS_FILE):
+        return
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dest = os.path.join(BACKUP_DIR, f"flashcards_{ts}.json")
+    try:
+        import shutil
+        shutil.copy2(CARDS_FILE, dest)
+        # Keep only the MAX_BACKUPS most recent files
+        backups = sorted(
+            [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")],
+            reverse=True
+        )
+        for old in backups[MAX_BACKUPS:]:
+            os.remove(os.path.join(BACKUP_DIR, old))
+    except Exception:
+        pass
+
+def list_backups():
+    """Return backup metadata sorted newest first."""
+    files = sorted(
+        [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")],
+        reverse=True
+    )
+    result = []
+    for fname in files:
+        path = os.path.join(BACKUP_DIR, fname)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            count = len(data) if isinstance(data, list) else 0
+        except Exception:
+            count = "?"
+        size_kb = round(os.path.getsize(path) / 1024, 1)
+        # Parse timestamp from filename: flashcards_YYYYMMDD_HHMMSS.json
+        try:
+            ts_str = fname.replace("flashcards_", "").replace(".json", "")
+            dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+            label = dt.strftime("%d/%m/%Y à %H:%M:%S")
+        except Exception:
+            label = fname
+        result.append({"filename": fname, "label": label, "count": count, "size_kb": size_kb})
+    return result
+
+LOCK_FILE = CARDS_FILE + ".lock"
+
+def load_flashcards():
+    if not os.path.exists(CARDS_FILE):
+        return []
+    try:
+        with open(CARDS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+def save_flashcards(cards):
+    create_backup()
+    with open(CARDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(cards, f, indent=4, ensure_ascii=False, sort_keys=True)
+
+@contextmanager
+def locked_flashcards():
+    """Load, yield, and save flashcards with an exclusive file lock.
+    Usage:
+        with locked_flashcards() as cards:
+            # modify cards in place
+    Cards are saved automatically on exit (unless an exception occurs).
+    """
+    with open(LOCK_FILE, "w") as lf:
+        if fcntl is not None:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            cards = load_flashcards()
+            yield cards
+            save_flashcards(cards)
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_uploaded_image(file_storage):
+    if file_storage and allowed_file(file_storage.filename):
+        ext = file_storage.filename.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid.uuid4()}.{ext}"
+        path = os.path.join(IMAGE_DIR, unique_name)
+        file_storage.save(path)
+        return path
+    return None
+
+def _safe_image_basename(filename):
+    """Reduce an uploaded filename to a safe basename to store in IMAGE_DIR.
+    Unlike save_uploaded_image() (which assigns a UUID), the bulk importer keeps
+    the *original* name so a JSON path like "images/chat.png" or "chat.png" still
+    resolves to it. We strip any directory part (handles folder uploads whose
+    filename is "images/chat.png"), reject empty / "." / ".." and disallowed
+    extensions, but preserve accents and spaces so the name matches the JSON.
+    Returns the safe basename, or None if the file should be skipped."""
+    if not filename:
+        return None
+    name = os.path.basename(filename.replace("\\", "/")).strip()
+    if not name or name in (".", "..") or not allowed_file(name):
+        return None
+    return name
+
+def save_bulk_images(file_list):
+    """Save uploaded image files into IMAGE_DIR under their original basename.
+    Returns (created, skipped): `created` is the list of paths that did not exist
+    before (safe to delete on a rollback), `skipped` the filenames we refused
+    (bad extension / name). Pre-existing same-named files are overwritten and are
+    NOT reported as created, so a rollback never deletes images already on disk."""
+    created, skipped = [], []
+    for fs in file_list:
+        if not fs or not fs.filename:
+            continue
+        name = _safe_image_basename(fs.filename)
+        if not name:
+            skipped.append(fs.filename)
+            continue
+        dest = os.path.join(IMAGE_DIR, name)
+        existed = os.path.exists(dest)
+        try:
+            fs.save(dest)
+        except OSError:
+            skipped.append(fs.filename)
+            continue
+        if not existed:
+            created.append(dest)
+    return created, skipped
+
+def delete_image_file(path):
+    """Remove a local image file, but ONLY if it resolves inside IMAGE_DIR.
+    Remote URLs (http/https) and any path that escapes IMAGE_DIR (e.g. a hostile
+    or malformed card path like "flashcards.json" or "../secret") are ignored, so
+    deleting a card can never remove arbitrary files on disk."""
+    if not path or path.startswith("http"):
+        return
+    try:
+        base = os.path.realpath(IMAGE_DIR)
+        target = os.path.realpath(path)
+        if target == base or not target.startswith(base + os.sep):
+            return
+        if os.path.exists(target):
+            os.remove(target)
+    except OSError:
+        pass
+
+def allowed_audio_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_AUDIO
+
+def save_uploaded_audio(file_storage):
+    if file_storage and allowed_audio_file(file_storage.filename):
+        ext = file_storage.filename.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid.uuid4()}.{ext}"
+        path = os.path.join(AUDIO_DIR, unique_name)
+        file_storage.save(path)
+        return unique_name  # store only filename, served via /audios/
+    return None
+
+def index_by_id(cards):
+    """Build a dict {card_id: (index, card)} for O(1) lookup."""
+    return {c["id"]: (i, c) for i, c in enumerate(cards)}
+
+def get_daily_review_cards():
+    today = datetime.now().strftime("%Y-%m-%d")
+    return [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
+
+def get_marked_cards():
+    return [c for c in load_flashcards() if c.get("marked", False)]
+
+# ─── Auth ────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        if request.form.get("password") == APP_PASSWORD:
+            session["logged_in"] = True
+            cleanup_stale_sessions()
+            return redirect(url_for("index"))
+        flash("Mot de passe incorrect.", "error")
+    return render_template("login.html", title="Connexion", body_class="", active="")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+# ─── Serve local images ─────────────────────────────────────────────────────
+
+@app.route("/images/<path:filename>")
+@login_required
+def serve_image(filename):
+    return send_from_directory(IMAGE_DIR, filename)
+
+@app.route("/audios/<path:filename>")
+@login_required
+def serve_audio(filename):
+    return send_from_directory(AUDIO_DIR, filename)
+
+# ─── Pages ───────────────────────────────────────────────────────────────────
+
+@app.route("/")
+@login_required
+def index():
+    daily = get_daily_review_cards()
+    marked = get_marked_cards()
+    return render_template("index.html", title="Réviser", active="review", body_class="",
+                           daily_count=len(daily), marked_count=len(marked))
+
+# ── Review session ───────────────────────────────────────────────────────────
+
+@app.route("/review/start/<mode>")
+@login_required
+def review_start(mode):
+    cleanup_stale_sessions()
+    if mode == "daily":
+        cards = get_daily_review_cards()
+    elif mode == "marked":
+        cards = get_marked_cards()
+    else:
+        cards = []
+    random.shuffle(cards)
+    if not cards:
+        flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
+        return redirect(url_for("index"))
+    save_review_state(cards, 0, False,
+                      correct=0, incorrect=0, pass_count=0,
+                      start_time=datetime.now().isoformat())
+    return redirect(url_for("review_card"))
+
+@app.route("/review")
+@login_required
+def review_card():
+    state = load_review_state()
+    cards = state["cards"]
+    idx = state["index"]
+    if not cards or idx >= len(cards):
+        # Compute duration
+        try:
+            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
+            elapsed = int((datetime.now() - start_dt).total_seconds())
+        except Exception:
+            elapsed = 0
+        minutes, seconds = divmod(elapsed, 60)
+        duration = f"{minutes}m {seconds:02d}s"
+        summary = {
+            "correct": state.get("correct", 0),
+            "incorrect": state.get("incorrect", 0),
+            "pass_count": state.get("pass_count", 0),
+            "total": len(cards),
+            "duration": duration,
+        }
+        clear_review_state()
+        return render_template("review_done.html", title="Terminé !", active="review", body_class="", **summary)
+    card = cards[idx]
+    show_answer = state["show_answer"]
+    is_recto = card.get("current_face", "recto") == "recto"
+    question = card.get("recto_path") or card.get("recto_text") if is_recto else card.get("verso_path") or card.get("verso_text")
+    answer = card.get("verso_path") or card.get("verso_text") if is_recto else card.get("recto_path") or card.get("recto_text")
+    return render_template(
+        "review.html", title="Révision", active="review", body_class="review-mode",
+        card=card, question=question, answer=answer,
+        show_answer=show_answer, idx=idx, total=len(cards),
+        last_action=state.get("last_action")
+    )
+
+@app.route("/review/show")
+@login_required
+def review_show():
+    state = load_review_state()
+    save_review_state(state["cards"], state["index"], True)
+    return ("", 204)  # Called via fetch from JS fade animation
+
+@app.route("/review/answer/<result>")
+@login_required
+def review_answer(result):
+    state = load_review_state()
+    cards = state["cards"]
+    idx = state["index"]
+    correct = state.get("correct", 0)
+    incorrect = state.get("incorrect", 0)
+    pass_count = state.get("pass_count", 0)
+
+    # Snapshot for undo: capture counters BEFORE incrementing
+    last_action = None
+
+    if result == "correct":
+        correct += 1
+    elif result == "incorrect":
+        incorrect += 1
+    else:
+        pass_count += 1
+    if idx < len(cards):
+        card = cards[idx]
+        with locked_flashcards() as all_cards:
+            card_index = index_by_id(all_cards)
+            if card["id"] in card_index:
+                i, c = card_index[card["id"]]
+                # Capture FULL previous state of this card for undo
+                last_action = {
+                    "card_id": c["id"],
+                    "result": result,
+                    "previous_box": c["box"],
+                    "previous_last_reviewed_date": c.get("last_reviewed_date"),
+                    "previous_next_review_date": c.get("next_review_date"),
+                    "previous_current_face": c.get("current_face", "recto"),
+                    "previous_correct": state.get("correct", 0),
+                    "previous_incorrect": state.get("incorrect", 0),
+                    "previous_pass_count": state.get("pass_count", 0),
+                    "previous_index": idx,
+                }
+                now = datetime.now()
+                if result == "correct":
+                    all_cards[i]["box"] = min(60, c["box"] + 1)
+                elif result == "incorrect":
+                    all_cards[i]["box"] = max(1, c["box"] - 1)
+                # pass → no change
+                if result != "pass":
+                    all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
+                    all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                    all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
+    save_review_state(cards, idx + 1, False,
+                      correct=correct, incorrect=incorrect, pass_count=pass_count,
+                      last_action=last_action)
+    return redirect(url_for("review_card"))
+
+
+# ── Undo last answer ────────────────────────────────────────────────────────
+
+@app.route("/review/undo", methods=["POST", "GET"])
+@login_required
+def review_undo():
+    state = load_review_state()
+    last = state.get("last_action")
+    if not last:
+        # Nothing to undo (race condition: button clicked twice, expired toast, etc.)
+        return redirect(url_for("review_card"))
+
+    # Restore the card's previous state in flashcards.json
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if last["card_id"] in card_index:
+            i, _ = card_index[last["card_id"]]
+            all_cards[i]["box"] = last["previous_box"]
+            # Use direct assignment (None values are valid: never reviewed)
+            all_cards[i]["last_reviewed_date"] = last["previous_last_reviewed_date"]
+            all_cards[i]["next_review_date"]   = last["previous_next_review_date"]
+            all_cards[i]["current_face"]       = last["previous_current_face"]
+
+    # Restore session counters and rewind index by 1
+    save_review_state(
+        state["cards"],
+        last["previous_index"],
+        False,
+        correct=last["previous_correct"],
+        incorrect=last["previous_incorrect"],
+        pass_count=last["previous_pass_count"],
+        last_action=None,  # Clear: no double-undo
+    )
+    return redirect(url_for("review_card"))
+
+# ── Toggle mark from review ─────────────────────────────────────────────────
+
+@app.route("/review/toggle_mark/<card_id>", methods=["POST"])
+@login_required
+def review_toggle_mark(card_id):
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id in card_index:
+            i, c = card_index[card_id]
+            all_cards[i]["marked"] = not c.get("marked", False)
+            # Also update server-side review session
+            state = load_review_state()
+            session_index = index_by_id(state["cards"])
+            if card_id in session_index:
+                ri, _ = session_index[card_id]
+                state["cards"][ri]["marked"] = all_cards[i]["marked"]
+            save_review_state(state["cards"], state["index"], state["show_answer"])
+    return redirect(url_for("review_card"))
+
+# ── Delete from review ───────────────────────────────────────────────────────
+
+@app.route("/review/delete/<card_id>", methods=["POST"])
+@login_required
+def review_delete(card_id):
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        _, card = card_index.get(card_id, (None, None))
+        if card:
+            delete_image_file(card.get("recto_path"))
+            delete_image_file(card.get("verso_path"))
+            all_cards[:] = [c for c in all_cards if c["id"] != card_id]
+    # Remove from server-side review session
+    state = load_review_state()
+    new_cards = [c for c in state["cards"] if c["id"] != card_id]
+    save_review_state(new_cards, state["index"], state["show_answer"])
+    return redirect(url_for("review_card"))
+
+# ── Quit review session ──────────────────────────────────────────────────────
+
+@app.route("/review/quit", methods=["POST"])
+@login_required
+def review_quit():
+    clear_review_state()
+    return redirect(url_for("index"))
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  MODE GRILLE — révision multi-cartes (notation en lot)
+#  ───────────────────────────────────────────────────────────────────────────────
+#  À COLLER dans app2.py, par exemple juste APRÈS la route `/review/quit`
+#  (la fonction review_quit), et AVANT la section "Manage cards".
+#
+#  ✅ Bloc 100 % additif : n'édite aucune fonction existante.
+#  ✅ Réutilise tes helpers existants : get_daily_review_cards, get_marked_cards,
+#     locked_flashcards, index_by_id, cleanup_stale_sessions, REVIEW_DIR, etc.
+#  ✅ Utilise un fichier d'état séparé ({sid}_grid.json) pour ne pas interférer
+#     avec la session de révision carte-par-carte.
+#  ✅ Logique Leitner identique à /review/answer (boîte ±1, flip de current_face,
+#     recalcul de next_review_date).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+GRID_DEFAULT_BATCH = 10         # nombre de cartes par fournée (modifiable via ?size=)
+
+
+def _grid_path():
+    sid = session.get("_review_sid")
+    if not sid:
+        sid = str(uuid.uuid4())
+        session["_review_sid"] = sid
+    return os.path.join(REVIEW_DIR, f"{sid}_grid.json")
+
+
+def save_grid_state(cards, index, batch, **extra):
+    p = _grid_path()
+    existing = {}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+    data = {
+        "cards": cards,
+        "index": index,
+        "batch": batch,
+        "correct": extra.get("correct", existing.get("correct", 0)),
+        "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
+        "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
+        "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+    }
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def load_grid_state():
+    p = _grid_path()
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"cards": [], "index": 0, "batch": GRID_DEFAULT_BATCH,
+            "correct": 0, "incorrect": 0, "pass_count": 0,
+            "start_time": datetime.now().isoformat()}
+
+
+def clear_grid_state():
+    p = _grid_path()
+    if os.path.exists(p):
+        os.remove(p)
+
+
+def _card_faces(card):
+    """Retourne les faces question/réponse en respectant current_face
+    (exactement la même logique que la route /review)."""
+    is_recto = card.get("current_face", "recto") == "recto"
+    if is_recto:
+        q_path, q_text, q_audio = card.get("recto_path"), card.get("recto_text"), card.get("recto_audio")
+        a_path, a_text, a_audio = card.get("verso_path"), card.get("verso_text"), card.get("verso_audio")
+    else:
+        q_path, q_text, q_audio = card.get("verso_path"), card.get("verso_text"), card.get("verso_audio")
+        a_path, a_text, a_audio = card.get("recto_path"), card.get("recto_text"), card.get("recto_audio")
+    return {
+        "id": card["id"], "box": card.get("box"), "marked": card.get("marked", False),
+        "q_path": q_path, "q_text": q_text, "q_audio": q_audio,
+        "a_path": a_path, "a_text": a_text, "a_audio": a_audio,
+    }
+
+
+@app.route("/review/grid/start/<mode>")
+@login_required
+def review_grid_start(mode):
+    cleanup_stale_sessions()
+    batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
+    batch = max(2, min(24, batch))
+    if mode == "daily":
+        cards = get_daily_review_cards()
+    elif mode == "marked":
+        cards = get_marked_cards()
+    else:
+        cards = []
+    random.shuffle(cards)
+    if not cards:
+        flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
+        return redirect(url_for("index"))
+    save_grid_state(cards, 0, batch, correct=0, incorrect=0, pass_count=0,
+                    start_time=datetime.now().isoformat())
+    return redirect(url_for("review_grid"))
+
+
+@app.route("/review/grid")
+@login_required
+def review_grid():
+    state = load_grid_state()
+    cards = state["cards"]
+    idx = state["index"]
+    batch = state.get("batch", GRID_DEFAULT_BATCH)
+
+    # Fin de session → écran de bilan (réutilise review_done.html)
+    if not cards or idx >= len(cards):
+        try:
+            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
+            elapsed = int((datetime.now() - start_dt).total_seconds())
+        except Exception:
+            elapsed = 0
+        minutes, seconds = divmod(elapsed, 60)
+        summary = {
+            "correct": state.get("correct", 0),
+            "incorrect": state.get("incorrect", 0),
+            "pass_count": state.get("pass_count", 0),
+            "total": len(cards),
+            "duration": f"{minutes}m {seconds:02d}s",
+        }
+        clear_grid_state()
+        return render_template("review_done.html", title="Terminé !", active="review",
+                               body_class="", **summary)
+
+    batch_cards = [_card_faces(c) for c in cards[idx: idx + batch]]
+    cur_batch = idx // batch + 1
+    total_batches = (len(cards) + batch - 1) // batch
+    return render_template(
+        "review_grid.html", title="Révision — Grille", active="review",
+        body_class="review-mode", cards=batch_cards,
+        idx=idx, total=len(cards), batch=batch,
+        cur_batch=cur_batch, total_batches=total_batches,
+    )
+
+
+@app.route("/review/grid/answer", methods=["POST"])
+@login_required
+def review_grid_answer():
+    state = load_grid_state()
+    cards = state["cards"]
+    idx = state["index"]
+    batch = state.get("batch", GRID_DEFAULT_BATCH)
+    correct = state.get("correct", 0)
+    incorrect = state.get("incorrect", 0)
+    pass_count = state.get("pass_count", 0)
+
+    batch_ids = [c["id"] for c in cards[idx: idx + batch]]
+    # Champs du formulaire : grade_<id> = "ok" | "no" | "" (vide → passée)
+    grades = {cid: request.form.get(f"grade_{cid}", "") for cid in batch_ids}
+
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        now = datetime.now()
+        for cid, g in grades.items():
+            if g == "ok":
+                correct += 1
+            elif g == "no":
+                incorrect += 1
+            else:
+                pass_count += 1           # non notée = passée (aucun changement de boîte)
+            if g in ("ok", "no") and cid in card_index:
+                i, c = card_index[cid]
+                if g == "ok":
+                    all_cards[i]["box"] = min(60, c["box"] + 1)
+                else:
+                    all_cards[i]["box"] = max(1, c["box"] - 1)
+                all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
+                all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
+
+    save_grid_state(cards, idx + batch, batch,
+                    correct=correct, incorrect=incorrect, pass_count=pass_count)
+    return redirect(url_for("review_grid"))
+
+
+@app.route("/review/grid/quit", methods=["POST", "GET"])
+@login_required
+def review_grid_quit():
+    clear_grid_state()
+    return redirect(url_for("index"))
+
+
+# ── Manage cards ─────────────────────────────────────────────────────────────
+
+@app.route("/manage")
+@login_required
+def manage():
+    all_cards = load_flashcards()
+    boxes = sorted(set(c["box"] for c in all_cards))
+    selected_box = request.args.get("box", type=int)
+    filter_mode = request.args.get("filter", "")
+
+    if filter_mode == "never_reviewed":
+        cards_in_box = [c for c in all_cards if not c.get("last_reviewed_date")]
+    elif selected_box is not None:
+        cards_in_box = [c for c in all_cards if c["box"] == selected_box]
+    else:
+        cards_in_box = []
+
+    never_count = sum(1 for c in all_cards if not c.get("last_reviewed_date"))
+    return render_template("manage.html", title="Gérer", active="manage", body_class="",
+                           boxes=boxes, selected_box=selected_box,
+                           cards=cards_in_box, filter_mode=filter_mode, never_count=never_count)
+
+@app.route("/card/<card_id>")
+@login_required
+def card_detail(card_id):
+    all_cards = load_flashcards()
+    _, card = index_by_id(all_cards).get(card_id, (None, None))
+    if not card:
+        flash("Carte introuvable.", "error")
+        return redirect(url_for("manage"))
+    return render_template("card_detail.html", title="Détails", active="manage", body_class="", card=card)
+
+@app.route("/card/<card_id>/delete", methods=["POST"])
+@login_required
+def card_delete(card_id):
+    with locked_flashcards() as all_cards:
+        _, card = index_by_id(all_cards).get(card_id, (None, None))
+        if card:
+            delete_image_file(card.get("recto_path"))
+            delete_image_file(card.get("verso_path"))
+            all_cards[:] = [c for c in all_cards if c["id"] != card_id]
+            flash("Carte supprimée.", "success")
+    return redirect(url_for("manage"))
+
+@app.route("/card/<card_id>/toggle_mark", methods=["POST"])
+@login_required
+def card_toggle_mark(card_id):
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id in card_index:
+            i, c = card_index[card_id]
+            all_cards[i]["marked"] = not c.get("marked", False)
+    return redirect(request.referrer or url_for("manage"))
+
+@app.route("/card/<card_id>/edit", methods=["GET", "POST"])
+@login_required
+def card_edit(card_id):
+    if request.method == "GET":
+        all_cards = load_flashcards()
+        _, card = index_by_id(all_cards).get(card_id, (None, None))
+        if not card:
+            flash("Carte introuvable.", "error")
+            return redirect(url_for("manage"))
+        from_review = request.args.get("from_review", "")
+        return render_template("edit.html", title="Modifier", active="manage", body_class="",
+                               card=card, from_review=from_review)
+
+    # POST — lock for read-modify-write
+    with locked_flashcards() as all_cards:
+        card_index = index_by_id(all_cards)
+        if card_id not in card_index:
+            flash("Carte introuvable.", "error")
+            return redirect(url_for("manage"))
+        idx, card = card_index[card_id]
+
+        new_box = int(request.form.get("box", card["box"]))
+        # On ne recalcule next_review_date que si la boîte a effectivement changé,
+        # afin de préserver le calendrier de révision lors d'une simple correction
+        # de contenu (texte, image, audio).
+        if new_box != all_cards[idx]["box"]:
+            all_cards[idx]["box"] = new_box
+            base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
+            base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
+            all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
+
+        # Recto
+        recto_upload = request.files.get("recto_upload")
+        recto_url = request.form.get("recto_url", "").strip()
+        recto_text = request.form.get("recto_text", "").strip()
+        recto_audio_upload = request.files.get("recto_audio_upload")
+        if recto_upload and recto_upload.filename:
+            delete_image_file(all_cards[idx].get("recto_path"))
+            all_cards[idx]["recto_path"] = save_uploaded_image(recto_upload)
+            all_cards[idx]["recto_text"] = None
+        elif recto_url:
+            delete_image_file(all_cards[idx].get("recto_path"))
+            all_cards[idx]["recto_path"] = recto_url
+            all_cards[idx]["recto_text"] = None
+        else:
+            delete_image_file(all_cards[idx].get("recto_path"))
+            all_cards[idx]["recto_path"] = None
+            all_cards[idx]["recto_text"] = recto_text or None
+        if recto_audio_upload and recto_audio_upload.filename:
+            all_cards[idx]["recto_audio"] = save_uploaded_audio(recto_audio_upload)
+
+        # Verso
+        verso_upload = request.files.get("verso_upload")
+        verso_url = request.form.get("verso_url", "").strip()
+        verso_text = request.form.get("verso_text", "").strip()
+        verso_audio_upload = request.files.get("verso_audio_upload")
+        if verso_upload and verso_upload.filename:
+            delete_image_file(all_cards[idx].get("verso_path"))
+            all_cards[idx]["verso_path"] = save_uploaded_image(verso_upload)
+            all_cards[idx]["verso_text"] = None
+        elif verso_url:
+            delete_image_file(all_cards[idx].get("verso_path"))
+            all_cards[idx]["verso_path"] = verso_url
+            all_cards[idx]["verso_text"] = None
+        else:
+            delete_image_file(all_cards[idx].get("verso_path"))
+            all_cards[idx]["verso_path"] = None
+            all_cards[idx]["verso_text"] = verso_text or None
+        if verso_audio_upload and verso_audio_upload.filename:
+            all_cards[idx]["verso_audio"] = save_uploaded_audio(verso_audio_upload)
+
+    flash("Carte modifiée !", "success")
+
+    # If editing from review, go back to review
+    if request.form.get("from_review"):
+        # Update server-side review session
+        state = load_review_state()
+        session_index = index_by_id(state["cards"])
+        if card_id in session_index:
+            ri, _ = session_index[card_id]
+            state["cards"][ri] = all_cards[idx]
+        save_review_state(state["cards"], state["index"], state["show_answer"])
+        return redirect(url_for("review_card"))
+    return redirect(url_for("card_detail", card_id=card_id))
+
+# ── Create card ──────────────────────────────────────────────────────────────
+
+@app.route("/create", methods=["GET", "POST"])
+@login_required
+def create():
+    if request.method == "POST":
+        recto_upload = request.files.get("recto_upload")
+        recto_url = request.form.get("recto_url", "").strip()
+        recto_text = request.form.get("recto_text", "").strip()
+
+        verso_upload = request.files.get("verso_upload")
+        verso_url = request.form.get("verso_url", "").strip()
+        verso_text = request.form.get("verso_text", "").strip()
+        recto_audio_upload = request.files.get("recto_audio_upload")
+        verso_audio_upload = request.files.get("verso_audio_upload")
+
+        recto_path = recto_text_val = verso_path = verso_text_val = None
+        recto_audio = verso_audio = None
+
+        if recto_upload and recto_upload.filename:
+            recto_path = save_uploaded_image(recto_upload)
+        elif recto_url:
+            recto_path = recto_url
+        else:
+            recto_text_val = recto_text
+
+        if verso_upload and verso_upload.filename:
+            verso_path = save_uploaded_image(verso_upload)
+        elif verso_url:
+            verso_path = verso_url
+        else:
+            verso_text_val = verso_text
+
+        if recto_audio_upload and recto_audio_upload.filename:
+            recto_audio = save_uploaded_audio(recto_audio_upload)
+        if verso_audio_upload and verso_audio_upload.filename:
+            verso_audio = save_uploaded_audio(verso_audio_upload)
+
+        if (recto_path or recto_text_val or recto_audio) and (verso_path or verso_text_val or verso_audio):
+            with locked_flashcards() as all_cards:
+                now = datetime.now()
+                new_card = {
+                    "box": 1,
+                    "creation_date": now.strftime("%Y-%m-%d"),
+                    "current_face": "recto",
+                    "id": str(uuid.uuid4()),
+                    "last_reviewed_date": None,
+                    "marked": False,
+                    "next_review_date": (now + timedelta(days=1)).strftime("%Y-%m-%d"),
+                    "recto_path": recto_path,
+                    "recto_text": recto_text_val,
+                    "recto_audio": recto_audio,
+                    "verso_path": verso_path,
+                    "verso_text": verso_text_val,
+                    "verso_audio": verso_audio,
+                }
+                all_cards.append(new_card)
+            flash("Carte ajoutée !", "success")
+            return redirect(url_for("create"))
+        else:
+            flash("Le recto et le verso doivent avoir un contenu.", "error")
+
+    return render_template("create.html", title="Créer", active="create", body_class="")
+
+# ── Bulk create cards (paste JSON) ───────────────────────────────────────────
+
+def _text_field(entry, key):
+    """Validate + strip a text face value. Must be a string (or absent).
+    Returns the stripped string, None if empty/absent. Raises ValueError on a
+    non-string value so the all-or-nothing import reports it instead of silently
+    coercing e.g. {"a": 1} into the literal text "{'a': 1}"."""
+    val = entry.get(key)
+    if val is None:
+        return None
+    if not isinstance(val, str):
+        raise ValueError(f"{key} doit être une chaîne de caractères.")
+    return val.strip() or None
+
+def _local_image_path(key, raw):
+    """Resolve a user-supplied local image path to a stored "images/…" value.
+    Accepts both "images/foo.png" and a bare "foo.png"; rejects anything that
+    escapes IMAGE_DIR (absolute paths, "..", a path pointing elsewhere) so a
+    hostile path can never be stored and later handed to delete_image_file().
+    Requires an allowed image extension and that the file actually exists in the
+    folder. Raises ValueError on any problem; otherwise returns the normalised
+    "images/…" path."""
+    rel = raw.replace("\\", "/").strip().lstrip("/")
+    # Tolerate an explicit "<folder>/" prefix (the folder NAME, e.g. "images/")
+    # as well as a bare filename. Match on the basename so it still works if
+    # IMAGE_DIR is configured to an absolute or nested path.
+    folder = os.path.basename(os.path.normpath(IMAGE_DIR)) or IMAGE_DIR
+    if rel.lower().startswith(folder.lower() + "/"):
+        rel = rel[len(folder) + 1:]
+    if not rel:
+        raise ValueError(f"{key} : chemin d'image vide.")
+    ext = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
+        raise ValueError(f"{key} doit être une URL http(s) ou une image ({allowed}).")
+    base = os.path.realpath(IMAGE_DIR)
+    target = os.path.realpath(os.path.join(IMAGE_DIR, rel))
+    if target == base or not target.startswith(base + os.sep):
+        raise ValueError(f"{key} doit pointer vers le dossier « {IMAGE_DIR} ».")
+    if not os.path.isfile(target):
+        raise ValueError(f"{key} : fichier introuvable dans « {IMAGE_DIR} » ({rel}).")
+    # Store the same forward-slash "images/…" form that create() produces.
+    return f"{IMAGE_DIR}/{rel}"
+
+def _image_path_field(entry, *keys):
+    """Validate + strip an image-face value across alias keys.
+    Accepts either an http(s) URL or a local path inside IMAGE_DIR (e.g.
+    "images/foo.png" or "foo.png") — together these are the value domain the
+    single-card create() route produces (a remote URL, or an uploaded file
+    stored under IMAGE_DIR). Restricting to those two forms keeps a hostile or
+    relative path (e.g. "flashcards.json" or "../secret") from ever being stored
+    and later handed to delete_image_file(). Returns the first non-empty value
+    (local paths normalised to "images/…"), or None."""
+    for key in keys:
+        val = entry.get(key)
+        if val is None:
+            continue
+        if not isinstance(val, str):
+            raise ValueError(f"{key} doit être une URL ou un chemin (chaîne de caractères).")
+        s = val.strip()
+        if not s:
+            continue
+        if s.lower().startswith(("http://", "https://")):
+            return s
+        return _local_image_path(key, s)
+    return None
+
+def _build_card(entry, creation_date, next_review_date):
+    """Turn one import entry (dict) into a full card, or raise ValueError.
+
+    Accepts recto_text/verso_text and, optionally, recto_path/verso_path
+    (image URLs — recto_url/verso_url are accepted as aliases). When a face has
+    both a path and text, the path wins and the text is dropped (mirrors create()).
+    """
+    if not isinstance(entry, dict):
+        raise ValueError("ce n'est pas un objet JSON.")
+    recto_text = _text_field(entry, "recto_text")
+    verso_text = _text_field(entry, "verso_text")
+    recto_path = _image_path_field(entry, "recto_path", "recto_url")
+    verso_path = _image_path_field(entry, "verso_path", "verso_url")
+    if recto_path:
+        recto_text = None
+    if verso_path:
+        verso_text = None
+    if not (recto_text or recto_path):
+        raise ValueError("recto vide (recto_text ou recto_path requis).")
+    if not (verso_text or verso_path):
+        raise ValueError("verso vide (verso_text ou verso_path requis).")
+    return {
+        "box": 1,
+        "creation_date": creation_date,
+        "current_face": "recto",
+        "id": str(uuid.uuid4()),
+        "last_reviewed_date": None,
+        "marked": False,
+        "next_review_date": next_review_date,
+        "recto_path": recto_path,
+        "recto_text": recto_text,
+        "recto_audio": None,
+        "verso_path": verso_path,
+        "verso_text": verso_text,
+        "verso_audio": None,
+    }
+
+BULK_MAX_PER_DAY = 20   # cartes importées planifiées par jour (étalement du next_review_date)
+
+@app.route("/create/bulk", methods=["GET", "POST"])
+@login_required
+def create_bulk():
+    # Per-day spread cap (configurable via the form/query; falsy or <1 → default).
+    per_day = request.values.get("max_per_day", BULK_MAX_PER_DAY, type=int) or BULK_MAX_PER_DAY
+    per_day = max(1, per_day)
+
+    def render(payload="", errors=None):
+        return render_template("create_bulk.html", title="Import en masse",
+                               active="create", body_class="",
+                               payload=payload, errors=errors, max_per_day=per_day)
+
+    if request.method == "GET":
+        return render()
+
+    # Strip surrounding whitespace and a UTF-8 BOM (str.strip() doesn't treat
+    # as whitespace) so a .json saved by a Windows editor still parses instead of
+    # failing json.loads. The extra .strip() handles a BOM-then-whitespace order.
+    raw = request.form.get("payload", "").strip().lstrip("﻿").strip()
+    if not raw:
+        flash("Le champ est vide — collez votre JSON.", "error")
+        return render(payload=raw)
+
+    # Parse JSON, tolerating a double-encoded payload ("[ ... ]" pasted as a string).
+    try:
+        data = json.loads(raw)
+        if isinstance(data, str):
+            data = json.loads(data)
+    except json.JSONDecodeError as e:
+        flash(f"JSON invalide : {e}", "error")
+        return render(payload=raw)
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        flash("Le JSON doit être une liste d'objets (ou un objet unique).", "error")
+        return render(payload=raw)
+    if not data:
+        flash("La liste est vide — aucune carte à importer.", "error")
+        return render(payload=raw)
+
+    # Save any dropped images first, under their original name, so local JSON
+    # paths ("images/chat.png" or "chat.png") resolve during validation below.
+    # `created` tracks files new to this request so a failed (all-or-nothing)
+    # import can roll them back without touching images already on disk.
+    created, skipped = save_bulk_images(request.files.getlist("images"))
+
+    # All-or-nothing: validate everything first so nothing is silently dropped.
+    now = datetime.now()
+    creation_date = now.strftime("%Y-%m-%d")
+    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    new_cards = []
+    errors = []
+    for i, entry in enumerate(data, start=1):
+        try:
+            new_cards.append(_build_card(entry, creation_date, tomorrow))
+        except ValueError as e:
+            errors.append(f"Entrée {i} : {e}")
+
+    if errors:
+        # Roll back images this request created so a rejected import leaves no trace.
+        for p in created:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+        flash(f"❌ Aucune carte importée — {len(errors)} entrée(s) invalide(s). Corrigez puis réessayez.", "error")
+        if skipped:
+            flash(f"⚠️ {len(skipped)} fichier(s) ignoré(s) (format non supporté).", "warning")
+        return render(payload=raw, errors=errors)
+
+    # Spread the first review: at most `per_day` imported cards land on the same
+    # day, starting tomorrow, keeping the pasted order. Avoids dumping a whole
+    # batch onto a single review day.
+    for idx, card in enumerate(new_cards):
+        day_offset = 1 + idx // per_day
+        card["next_review_date"] = (now + timedelta(days=day_offset)).strftime("%Y-%m-%d")
+
+    with locked_flashcards() as all_cards:
+        all_cards.extend(new_cards)
+
+    days = (len(new_cards) - 1) // per_day + 1
+    img_note = f" {len(created)} image(s) enregistrée(s)." if created else ""
+    if days > 1:
+        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s), étalées sur {days} jours "
+              f"(max {per_day}/jour, à partir de demain).{img_note}", "success")
+    else:
+        flash(f"✅ {len(new_cards)} carte(s) ajoutée(s) !{img_note}", "success")
+    if skipped:
+        flash(f"⚠️ {len(skipped)} fichier(s) ignoré(s) (format non supporté).", "warning")
+    return redirect(url_for("create_bulk"))
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    cards = load_flashcards()
+    total = len(cards)
+    if total == 0:
+        return render_template("dashboard.html", title="Dashboard", active="dashboard", body_class="",
+                               total=0, mastery=0, long_term_ratio=0,
+                               box_data=[], timeline_data=[], workload_data=[],
+                               activity_data=[], stage_data=[],
+                               creation_heatmap=[])
+
+    box_sum = sum(c["box"] for c in cards)
+    mastery = (box_sum / (total * 60)) * 100
+    long_term = sum(1 for c in cards if c["box"] >= 20)
+    long_term_ratio = (long_term / total) * 100
+
+    # Box distribution
+    from collections import Counter
+    box_counts = Counter(c["box"] for c in cards)
+    box_data = sorted(box_counts.items())
+
+    # Timeline (cumulative cards by creation date)
+    dates = sorted(c["creation_date"] for c in cards if c.get("creation_date"))
+    date_counts = Counter(dates)
+    cumulative = []
+    running = 0
+    for d in sorted(date_counts):
+        running += date_counts[d]
+        cumulative.append({"date": d, "count": running})
+
+    # Future workload
+    review_dates = [c["next_review_date"] for c in cards if c.get("next_review_date")]
+    review_counts = Counter(review_dates)
+    workload = [{"date": d, "count": n} for d, n in sorted(review_counts.items()) if d is not None][:30]
+
+    today = datetime.now().date()
+
+    # ── NEW: Creation heatmap (full year) ─────────────────────────────────────
+    creation_counts = Counter(c["creation_date"] for c in cards if c.get("creation_date"))
+    # Build a full 52-week grid ending today
+    heatmap_end = today
+    heatmap_start = heatmap_end - timedelta(days=364)
+    heatmap_data = {}
+    d = heatmap_start
+    while d <= heatmap_end:
+        ds = d.strftime("%Y-%m-%d")
+        heatmap_data[ds] = creation_counts.get(ds, 0)
+        d += timedelta(days=1)
+    creation_heatmap = [{"date": ds, "count": v} for ds, v in sorted(heatmap_data.items())]
+
+    # ── NEW: Daily review activity (last 30 days) ──────────────────────────────
+    last_30 = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
+    reviewed_dates = [c["last_reviewed_date"] for c in cards if c.get("last_reviewed_date")]
+    reviewed_counts = Counter(reviewed_dates)
+    activity_data = [{"date": d, "count": reviewed_counts.get(d, 0)} for d in last_30]
+
+    # ── NEW: Stage distribution (Donut) ───────────────────────────────────────
+    stage_data = {
+        "Débutant (1–5)":       sum(1 for c in cards if 1 <= c["box"] <= 5),
+        "Intermédiaire (6–19)": sum(1 for c in cards if 6 <= c["box"] <= 19),
+        "Avancé (20–59)":       sum(1 for c in cards if 20 <= c["box"] <= 59),
+        "Maîtrisé (60)":        sum(1 for c in cards if c["box"] >= 60),
+    }
+
+    return render_template(
+        "dashboard.html", title="Dashboard", active="dashboard", body_class="",
+        total=total, mastery=mastery, long_term_ratio=long_term_ratio,
+        box_data=box_data, timeline_data=cumulative, workload_data=workload,
+        activity_data=activity_data, stage_data=stage_data,
+        creation_heatmap=creation_heatmap
+    )
+
+# ── API for search / filter (AJAX) ──────────────────────────────────────────
+
+@app.route("/api/cards")
+@login_required
+def api_cards():
+    q = request.args.get("q", "").lower()
+    box = request.args.get("box", type=int)
+    cards = load_flashcards()
+    if box is not None:
+        cards = [c for c in cards if c["box"] == box]
+    if q:
+        cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
+    truncated = len(cards) > 100
+    return jsonify({"cards": cards[:100], "truncated": truncated, "total": len(cards)})
+
+# ── Backups ──────────────────────────────────────────────────────────────────
+
+@app.route("/backups")
+@login_required
+def backups():
+    return render_template("backups.html", title="Sauvegardes", active="backups", body_class="",
+                           backups=list_backups(), max_backups=MAX_BACKUPS)
+
+@app.route("/backups/restore/<filename>", methods=["POST"])
+@login_required
+def backup_restore(filename):
+    # Security: only allow filenames that match our pattern
+    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+        flash("Fichier invalide.", "error")
+        return redirect(url_for("backups"))
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        flash("Sauvegarde introuvable.", "error")
+        return redirect(url_for("backups"))
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            restored = json.load(f)
+        with locked_flashcards() as cards:
+            cards[:] = restored
+        flash(f"✅ Restauration réussie — {len(restored)} cartes rechargées.", "success")
+    except Exception as e:
+        flash(f"Erreur lors de la restauration : {e}", "error")
+    return redirect(url_for("backups"))
+
+@app.route("/backups/preview/<filename>")
+@login_required
+def backup_preview(filename):
+    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+        return jsonify({"error": "Fichier invalide"}), 400
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        return jsonify({"error": "Introuvable"}), 404
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cards = json.load(f)
+        sample = [{"recto": c.get("recto_text", "🖼️ Image"), "verso": c.get("verso_text", "🖼️ Image"), "box": c.get("box")} for c in cards[:5]]
+        return jsonify({"count": len(cards), "sample": sample})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Mindfulness / Zen ───────────────────────────────────────────────────────
+
+@app.route("/zen")
+@login_required
+def zen():
+    return render_template("zen.html", title="Zen", active="zen", body_class="")
+
+# ─── Chord Spark — générateur de progressions d'accords ─────────────────────
+
+@app.route("/chords")
+@login_required
+def chords():
+    return render_template("chords.html", title="Accords", active="chords", body_class="")
+
+@app.route("/chords/app")
+@login_required
+def chords_app():
+    # Standalone Chord Spark page, embedded via <iframe> in chords.html.
+    # Served raw (not via Jinja) so its CSS/JS braces aren't parsed as template syntax.
+    return send_from_directory("templates", "chord_spark.html")
+
+@app.route("/transpose")
+@login_required
+def transpose():
+    return render_template("transpose.html", title="Transposeur",
+                           active="transpose", body_class="")
+
+@app.route("/transpose/app")
+@login_required
+def transpose_app():
+    return send_from_directory("templates", "transposeur.html")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

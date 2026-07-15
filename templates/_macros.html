@@ -1,0 +1,16 @@
+{% macro render_content(path, text, audio=None) %}
+{% if path and path.startswith('http') %}
+    <img src="{{ path }}" alt="card image" loading="lazy">
+{% elif path %}
+    <img src="/{{ path }}" alt="card image" loading="lazy">
+{% elif text %}
+    <div>{{ text }}</div>
+{% else %}
+    <span style="color:var(--text2)">—</span>
+{% endif %}
+{% if audio %}
+    <audio controls style="width:100%;margin-top:12px;border-radius:8px;">
+        <source src="/audios/{{ audio }}">
+    </audio>
+{% endif %}
+{% endmacro %}

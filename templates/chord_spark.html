@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Chord Spark — Générateur de progressions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+<style>
+:root {
+  --bg: #0d0a08;
+  --surface: #161210;
+  --surface-elev: #211b16;
+  --surface-warm: #1f1813;
+  --border: #2c2620;
+  --border-soft: rgba(212, 151, 89, 0.12);
+  --text: #f4ebd9;
+  --text-mid: #b8a995;
+  --text-dim: #8a7c6c;
+  --accent: #d49759;
+  --accent-bright: #e8a865;
+  --accent-deep: #b07a3e;
+  --accent-glow: rgba(212, 151, 89, 0.25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Manrope', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Atmospheric background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 90% 50% at 50% -10%, rgba(212, 151, 89, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 90% 100%, rgba(120, 60, 80, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 0% 80%, rgba(60, 70, 110, 0.04) 0%, transparent 60%);
+}
+
+/* Film grain */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.app {
+  position: relative;
+  z-index: 2;
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 4rem;
+  animation: app-enter 0.8s ease-out both;
+}
+
+@keyframes app-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== HEADER ==================== */
+header {
+  text-align: center;
+  margin-bottom: 3rem;
+  position: relative;
+}
+
+.spark-mark {
+  display: inline-block;
+  font-family: 'Fraunces', serif;
+  font-size: 1.5rem;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+  animation: spark-pulse 4s ease-in-out infinite;
+}
+
+@keyframes spark-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+  font-variation-settings: "opsz" 144;
+}
+
+h1 .italic {
+  font-style: italic;
+  font-weight: 600;
+  color: var(--accent);
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+}
+
+.tagline {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* ==================== CONTROLS ==================== */
+.controls {
+  background: linear-gradient(180deg, var(--surface-warm) 0%, var(--surface) 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.75rem 1.75rem 1.5rem;
+  margin-bottom: 2.5rem;
+  position: relative;
+  box-shadow: 0 1px 0 rgba(212, 151, 89, 0.04) inset, 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.controls::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 12%; right: 12%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-soft), transparent);
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.control-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 1.25rem;
+}
+
+.control-label {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text-mid);
+  font-weight: 500;
+}
+
+select {
+  width: 100%;
+  background: var(--surface-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23d49759' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2rem;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+select:hover { border-color: var(--accent-deep); }
+select:focus { outline: none; border-color: var(--accent); }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  height: 22px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--border));
+  border-radius: 2px;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--border));
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -7px;
+  box-shadow: 0 0 0 4px transparent, 0 2px 8px rgba(0,0,0,0.4);
+  transition: box-shadow 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 6px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.slider-value {
+  font-family: 'Fraunces', serif;
+  font-feature-settings: "tnum";
+  font-weight: 500;
+  color: var(--accent);
+  min-width: 80px;
+  text-align: right;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.toggle {
+  display: inline-flex;
+  background: var(--surface-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.toggle button {
+  background: transparent;
+  color: var(--text-dim);
+  border: none;
+  padding: 0.5rem 1.1rem;
+  border-radius: 6px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  letter-spacing: 0.01em;
+}
+
+.toggle button:hover { color: var(--text-mid); }
+
+.toggle button.active {
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #1a0f06;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  font-weight: 600;
+}
+
+.btn-generate {
+  margin-top: 1.25rem;
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #1a0f06;
+  border: none;
+  border-radius: 10px;
+  padding: 1.05rem 1.5rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-style: italic;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  letter-spacing: 0.005em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-generate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.btn-generate:hover::before { transform: translateX(100%); }
+
+.btn-generate:hover {
+  box-shadow: 0 0 0 1px var(--accent-bright), 0 12px 32px var(--accent-glow), 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.btn-generate:active { transform: translateY(1px); }
+
+/* ==================== PROGRESSION ==================== */
+.progression-section {
+  margin-bottom: 2rem;
+  min-height: 200px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim);
+}
+
+.empty-state .glyph {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 3.5rem;
+  color: var(--accent-deep);
+  opacity: 0.5;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.empty-state p {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 1rem;
+}
+
+.key-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+.key-display .key-text { white-space: nowrap; }
+
+.key-display .key-name {
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.key-display .separator {
+  display: inline-block;
+  margin: 0 0.4rem;
+  opacity: 0.4;
+}
+
+.btn-transpose {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-feature-settings: "tnum";
+  line-height: 1;
+}
+
+.btn-transpose:hover {
+  border-color: var(--accent-deep);
+  color: var(--accent-bright);
+  background: rgba(212, 151, 89, 0.06);
+  transform: scale(1.06);
+}
+
+.btn-transpose:active { transform: scale(0.95); }
+
+.chord-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.85rem;
+}
+
+.chord-card {
+  position: relative;
+  background: linear-gradient(160deg, var(--surface-warm) 0%, var(--surface) 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.6rem 1rem 1.4rem;
+  text-align: center;
+  cursor: default;
+  overflow: hidden;
+  animation: card-deal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s, background 0.3s;
+}
+
+.chord-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 8%; right: 8%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-soft), transparent);
+}
+
+@keyframes card-deal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) rotate(-1deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+}
+
+.chord-card.locked {
+  border-color: rgba(212, 151, 89, 0.35);
+  background: linear-gradient(160deg, rgba(212, 151, 89, 0.07) 0%, var(--surface) 100%);
+}
+
+.chord-card.playing {
+  border-color: var(--accent-bright);
+  background: linear-gradient(160deg, rgba(212, 151, 89, 0.15) 0%, var(--surface-warm) 100%);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 35px var(--accent-glow),
+    0 8px 24px rgba(0,0,0,0.3);
+  transform: translateY(-3px);
+}
+
+.chord-degree {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.55rem;
+  text-transform: lowercase;
+  font-variation-settings: "opsz" 9;
+}
+
+.chord-card.playing .chord-degree { color: var(--accent-bright); }
+
+.chord-name {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: clamp(1.6rem, 5.5vw, 2.05rem);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.015em;
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+}
+
+.chord-card.locked .chord-name { color: var(--accent-bright); }
+
+.chord-lock {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  opacity: 0.5;
+}
+
+.chord-lock:hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  opacity: 1;
+}
+
+.chord-card.locked .chord-lock {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.chord-lock svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ==================== PLAYBACK ==================== */
+.playback {
+  background: linear-gradient(180deg, var(--surface-warm) 0%, var(--surface) 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  animation: card-deal 0.5s 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.btn-play {
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+  color: #1a0f06;
+  border: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.1s, box-shadow 0.3s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn-play:hover {
+  box-shadow: 0 0 0 4px var(--accent-glow), 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn-play:active { transform: scale(0.94); }
+
+.btn-play svg {
+  width: 16px;
+  height: 16px;
+  margin-left: 2px; /* visual centering for play triangle */
+}
+
+.btn-play.playing svg { margin-left: 0; }
+
+.tempo-control {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tempo-label {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+
+.regenerate-row {
+  text-align: center;
+  animation: card-deal 0.5s 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.btn-regenerate {
+  background: transparent;
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 1.4rem;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.btn-regenerate:hover {
+  border-color: var(--accent-deep);
+  color: var(--accent-bright);
+  background: rgba(212, 151, 89, 0.04);
+}
+
+.btn-regenerate svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.4s;
+}
+
+.btn-regenerate:hover svg { transform: rotate(180deg); }
+
+/* ==================== FOOTER ==================== */
+footer {
+  text-align: center;
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+footer p {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+}
+
+footer .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0.4rem;
+}
+
+footer .hint svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.6;
+}
+
+footer kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  margin: 0 0.05rem;
+  background: var(--surface-elev);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Manrope', sans-serif;
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--text-mid);
+  font-feature-settings: "tnum";
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 520px) {
+  .app { padding: 2rem 1rem 3rem; }
+
+  .control-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    padding: 0.6rem 0;
+  }
+
+  .control-label { margin-bottom: 0.1rem; }
+
+  .controls { padding: 1.25rem; }
+
+  .chord-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+
+  .chord-card { padding: 1.4rem 0.75rem 1.2rem; }
+
+  .playback { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <span class="spark-mark">✦</span>
+    <h1>Chord <span class="italic">Spark</span></h1>
+    <p class="tagline">générateur de progressions pour la composition</p>
+  </header>
+
+  <section class="controls">
+    <div class="control-row">
+      <label class="control-label" for="key-select">Tonalité</label>
+      <select id="key-select"></select>
+    </div>
+
+    <div class="control-row">
+      <label class="control-label" for="length">Longueur</label>
+      <div class="slider-row">
+        <input type="range" id="length" min="4" max="8" value="4">
+        <span class="slider-value" id="length-value">4 mesures</span>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <label class="control-label">Style</label>
+      <div class="toggle" id="style-toggle">
+        <button class="active" data-style="triads">Triades</button>
+        <button data-style="sevenths">Septièmes</button>
+      </div>
+    </div>
+
+    <button class="btn-generate" id="generate-btn">
+      <span style="font-style:normal">✦</span> Générer une progression
+    </button>
+  </section>
+
+  <section class="progression-section" id="progression">
+    <div class="empty-state" id="empty-state">
+      <span class="glyph">♫</span>
+      <p>L'inspiration commence ici</p>
+    </div>
+  </section>
+
+  <section class="playback" id="playback" style="display:none">
+    <button class="btn-play" id="play-btn" aria-label="Lecture">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 1.5v13L14 8z"/>
+      </svg>
+    </button>
+    <div class="tempo-control">
+      <span class="tempo-label">Tempo</span>
+      <input type="range" id="tempo" min="60" max="140" value="80">
+      <span class="slider-value" id="tempo-value">80 BPM</span>
+    </div>
+  </section>
+
+  <div class="regenerate-row" id="regenerate-row" style="display:none">
+    <button class="btn-regenerate" id="regenerate-btn">
+      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M12 5a5 5 0 1 0 0.5 4.5"/>
+        <path d="M12 1.5V5h-3.5"/>
+      </svg>
+      Régénérer
+    </button>
+  </div>
+
+  <footer>
+    <p>
+      <span class="hint">
+        <svg viewBox="0 0 14 14" fill="currentColor"><path d="M5 6V4a2 2 0 0 1 4 0v2h.5A1.5 1.5 0 0 1 11 7.5v4A1.5 1.5 0 0 1 9.5 13h-5A1.5 1.5 0 0 1 3 11.5v-4A1.5 1.5 0 0 1 4.5 6H5zm1 0h2V4a1 1 0 0 0-2 0v2z"/></svg>
+        verrouille un accord pour le conserver
+      </span>
+    </p>
+    <p style="margin-top:0.5rem; font-size:0.78rem; opacity:0.75;">
+      raccourcis : <kbd>espace</kbd> lecture &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> transposer
+    </p>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+
+// ============================================================================
+// LAYER 1 — MUSIC THEORY
+// ============================================================================
+
+const KEYS = {
+  // ---------- Major keys ----------
+  'C':  { mode: 'major', label: 'Do majeur',   roots: ['C','D','E','F','G','A','B'] },
+  'Db': { mode: 'major', label: 'Réb majeur',  roots: ['Db','Eb','F','Gb','Ab','Bb','C'] },
+  'D':  { mode: 'major', label: 'Ré majeur',   roots: ['D','E','F#','G','A','B','C#'] },
+  'Eb': { mode: 'major', label: 'Mib majeur',  roots: ['Eb','F','G','Ab','Bb','C','D'] },
+  'E':  { mode: 'major', label: 'Mi majeur',   roots: ['E','F#','G#','A','B','C#','D#'] },
+  'F':  { mode: 'major', label: 'Fa majeur',   roots: ['F','G','A','Bb','C','D','E'] },
+  'F#': { mode: 'major', label: 'Fa# majeur',  roots: ['F#','G#','A#','B','C#','D#','E#'] },
+  'G':  { mode: 'major', label: 'Sol majeur',  roots: ['G','A','B','C','D','E','F#'] },
+  'Ab': { mode: 'major', label: 'Lab majeur',  roots: ['Ab','Bb','C','Db','Eb','F','G'] },
+  'A':  { mode: 'major', label: 'La majeur',   roots: ['A','B','C#','D','E','F#','G#'] },
+  'Bb': { mode: 'major', label: 'Sib majeur',  roots: ['Bb','C','D','Eb','F','G','A'] },
+  'B':  { mode: 'major', label: 'Si majeur',   roots: ['B','C#','D#','E','F#','G#','A#'] },
+
+  // ---------- Minor keys (natural minor with major V from harmonic minor) ----------
+  'Am':  { mode: 'minor', label: 'La mineur',   roots: ['A','B','C','D','E','F','G'] },
+  'Bbm': { mode: 'minor', label: 'Sib mineur',  roots: ['Bb','C','Db','Eb','F','Gb','Ab'] },
+  'Bm':  { mode: 'minor', label: 'Si mineur',   roots: ['B','C#','D','E','F#','G','A'] },
+  'Cm':  { mode: 'minor', label: 'Do mineur',   roots: ['C','D','Eb','F','G','Ab','Bb'] },
+  'C#m': { mode: 'minor', label: 'Do# mineur',  roots: ['C#','D#','E','F#','G#','A','B'] },
+  'Dm':  { mode: 'minor', label: 'Ré mineur',   roots: ['D','E','F','G','A','Bb','C'] },
+  'Ebm': { mode: 'minor', label: 'Mib mineur',  roots: ['Eb','F','Gb','Ab','Bb','Cb','Db'] },
+  'Em':  { mode: 'minor', label: 'Mi mineur',   roots: ['E','F#','G','A','B','C','D'] },
+  'Fm':  { mode: 'minor', label: 'Fa mineur',   roots: ['F','G','Ab','Bb','C','Db','Eb'] },
+  'F#m': { mode: 'minor', label: 'Fa# mineur',  roots: ['F#','G#','A','B','C#','D','E'] },
+  'Gm':  { mode: 'minor', label: 'Sol mineur',  roots: ['G','A','Bb','C','D','Eb','F'] },
+  'G#m': { mode: 'minor', label: 'Sol# mineur', roots: ['G#','A#','B','C#','D#','E','F#'] },
+};
+
+// Chromatic order (each step = one semitone). Used for transposition.
+const MAJOR_KEYS_ORDERED = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+const MINOR_KEYS_ORDERED = ['Am','Bbm','Bm','Cm','C#m','Dm','Ebm','Em','Fm','F#m','Gm','G#m'];
+
+// Chord qualities by scale degree (0–6)
+// In minor we override degree 4 (V) to major/dominant for stronger resolution
+const TRIAD_QUALITY = {
+  major: ['',   'm',   'm', '',     '',  'm',   'dim'],
+  minor: ['m',  'dim', '',  'm',    '',  '',    ''   ],
+};
+
+const SEVENTH_QUALITY = {
+  major: ['maj7','m7',  'm7',  'maj7','7', 'm7',  'm7♭5'],
+  minor: ['m7',  'm7♭5','maj7','m7',  '7', 'maj7','7'   ],
+};
+
+const ROMAN = {
+  major: ['I',  'ii',  'iii', 'IV', 'V', 'vi', 'vii°'],
+  minor: ['i',  'ii°', 'III', 'iv', 'V', 'VI', 'VII' ],
+};
+
+// Note name → pitch class (handles enharmonic spellings)
+const PC = {
+  'C':0,'B#':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'Fb':4,
+  'E#':5,'F':5,'F#':6,'Gb':6,'G':7,'G#':8,'Ab':8,'A':9,'A#':10,
+  'Bb':10,'B':11,'Cb':11,
+};
+
+// Pitch class → playable name (sharps only — Tone.js requires this)
+const PC_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const INTERVALS = {
+  '':       [0, 4, 7],
+  'm':      [0, 3, 7],
+  'dim':    [0, 3, 6],
+  'maj7':   [0, 4, 7, 11],
+  'm7':     [0, 3, 7, 10],
+  '7':      [0, 4, 7, 10],
+  'm7♭5':   [0, 3, 6, 10],
+};
+
+// Render chord name with prettier flat/sharp glyphs
+function prettyName(root, quality) {
+  const r = root.replace('b', '\u266D').replace('#', '\u266F');
+  return r + quality;
+}
+
+// Build a chord object for a given key + scale degree
+function buildChord(keyId, degree, useSevenths) {
+  const key = KEYS[keyId];
+  const root = key.roots[degree];
+  const quality = useSevenths
+    ? SEVENTH_QUALITY[key.mode][degree]
+    : TRIAD_QUALITY[key.mode][degree];
+
+  const intervals = INTERVALS[quality];
+  const rootPc = PC[root];
+  const baseOct = 4;
+
+  // Compute playable note names. We voice the chord starting at octave 4,
+  // with notes naturally rising into octave 5 if intervals wrap past B.
+  const notes = intervals.map(i => {
+    const totalSemis = rootPc + i;
+    const pc = totalSemis % 12;
+    const oct = baseOct + Math.floor(totalSemis / 12);
+    return PC_NAMES[pc] + oct;
+  });
+
+  // Add a bass note one octave below the root for body
+  const bass = PC_NAMES[rootPc] + (baseOct - 1);
+
+  return {
+    degree,
+    root,
+    quality,
+    name: prettyName(root, quality),
+    roman: ROMAN[key.mode][degree],
+    notes: [bass, ...notes],
+  };
+}
+
+// ============================================================================
+// LAYER 2 — GENERATOR
+// ============================================================================
+
+// Functional transition matrix. Rows = current degree, columns = next degree.
+// Higher weight = more probable. Diagonal is 0 (no immediate repeats).
+const TRANSITIONS = {
+  major: [
+    //  I   ii  iii  IV   V   vi  vii°
+    [   0,  2,   1,  3,   3,  2,   1 ],  // from I
+    [   1,  0,   1,  1,   4,  1,   1 ],  // from ii   → V strong
+    [   1,  1,   0,  2,   1,  3,   1 ],  // from iii  → vi/IV
+    [   3,  2,   1,  0,   3,  1,   1 ],  // from IV   → V/I
+    [   4,  1,   1,  1,   0,  2,   1 ],  // from V    → I (deceptive vi)
+    [   1,  3,   1,  3,   2,  0,   1 ],  // from vi   → ii/IV
+    [   4,  1,   1,  1,   1,  1,   0 ],  // from vii° → I
+  ],
+  minor: [
+    //  i  ii°  III  iv   V   VI  VII
+    [   0,  1,   2,  3,   3,  2,   2 ],  // from i
+    [   1,  0,   1,  1,   3,  1,   1 ],  // from ii°  → V
+    [   1,  1,   0,  2,   1,  3,   1 ],  // from III  → VI
+    [   3,  1,   1,  0,   3,  1,   1 ],  // from iv   → V/i
+    [   4,  1,   1,  1,   0,  2,   1 ],  // from V    → i
+    [   1,  2,   2,  2,   2,  0,   1 ],  // from VI
+    [   3,  1,   2,  1,   1,  1,   0 ],  // from VII  → i/III
+  ],
+};
+
+const STARTS = {
+  major: [5, 1, 1, 3, 2, 3, 0],   // I, IV, vi most common openers
+  minor: [5, 0, 2, 2, 1, 3, 2],   // i, VI, III, VII
+};
+
+function weightedPick(weights) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (total <= 0) return 0;
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.length - 1;
+}
+
+// Generate a list of chord objects.
+// `existing` (optional): array of length `length` with either null or { locked: true, degree }
+function generateProgression(keyId, length, useSevenths, existing) {
+  const key = KEYS[keyId];
+  const matrix = TRANSITIONS[key.mode];
+  const startWeights = STARTS[key.mode];
+
+  // Place locked degrees first
+  const degrees = new Array(length).fill(null);
+  if (existing) {
+    for (let i = 0; i < length; i++) {
+      if (existing[i] && existing[i].locked) degrees[i] = existing[i].degree;
+    }
+  }
+
+  // Fill open positions left-to-right, biasing toward upcoming locked chord if any
+  for (let i = 0; i < length; i++) {
+    if (degrees[i] !== null) continue;
+
+    let weights;
+    if (i === 0) {
+      weights = [...startWeights];
+    } else {
+      const prev = degrees[i - 1];
+      weights = [...matrix[prev]];
+    }
+
+    // Lookahead: bias toward chords that lead well to the next locked degree
+    if (i + 1 < length && degrees[i + 1] !== null) {
+      const next = degrees[i + 1];
+      for (let j = 0; j < 7; j++) {
+        weights[j] = weights[j] * (matrix[j][next] + 1);
+      }
+    }
+
+    degrees[i] = weightedPick(weights);
+  }
+
+  return degrees.map((d, i) => {
+    const c = buildChord(keyId, d, useSevenths);
+    c.locked = !!(existing && existing[i] && existing[i].locked);
+    return c;
+  });
+}
+
+function pickRandomKey() {
+  const ids = Object.keys(KEYS);
+  return ids[Math.floor(Math.random() * ids.length)];
+}
+
+// ============================================================================
+// LAYER 3 — PLAYBACK (Tone.js)
+// ============================================================================
+
+let synth = null;
+let isPlaying = false;
+let cancelToken = null;
+
+async function ensureSynth() {
+  if (synth) return synth;
+  await Tone.start();
+  try {
+    synth = new Tone.Sampler({
+      urls: {
+        A1:'A1.mp3', A2:'A2.mp3', A3:'A3.mp3', A4:'A4.mp3', A5:'A5.mp3',
+        C2:'C2.mp3', C3:'C3.mp3', C4:'C4.mp3', C5:'C5.mp3',
+        'D#2':'Ds2.mp3','D#3':'Ds3.mp3','D#4':'Ds4.mp3','D#5':'Ds5.mp3',
+        'F#2':'Fs2.mp3','F#3':'Fs3.mp3','F#4':'Fs4.mp3','F#5':'Fs5.mp3',
+      },
+      release: 1.4,
+      baseUrl: 'https://tonejs.github.io/audio/salamander/',
+    }).toDestination();
+    await Tone.loaded();
+  } catch (err) {
+    console.warn('Sampler failed, falling back to PolySynth:', err);
+    synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 1.5 },
+    }).toDestination();
+  }
+  return synth;
+}
+
+async function playProgression(chords, tempo, onTick) {
+  if (isPlaying) return;
+  await ensureSynth();
+  isPlaying = true;
+  cancelToken = { cancelled: false };
+  const myToken = cancelToken;
+
+  const beatSec = 60 / tempo;
+  const barSec = beatSec * 4;
+
+  for (let i = 0; i < chords.length; i++) {
+    if (myToken.cancelled) break;
+    onTick(i);
+    synth.triggerAttackRelease(chords[i].notes, barSec * 0.95);
+    await new Promise(res => setTimeout(res, barSec * 1000));
+  }
+
+  isPlaying = false;
+  if (!myToken.cancelled) onTick(-1);
+}
+
+function stopPlayback() {
+  if (cancelToken) cancelToken.cancelled = true;
+  isPlaying = false;
+  if (synth && synth.releaseAll) synth.releaseAll();
+}
+
+// ============================================================================
+// LAYER 4 — UI
+// ============================================================================
+
+const state = {
+  keySelection: 'random',   // 'random' or a key id
+  resolvedKey: null,         // actual key id used after resolving 'random'
+  length: 4,
+  useSevenths: false,
+  chords: [],
+};
+
+const els = {
+  keySelect: document.getElementById('key-select'),
+  length: document.getElementById('length'),
+  lengthValue: document.getElementById('length-value'),
+  styleToggle: document.getElementById('style-toggle'),
+  generateBtn: document.getElementById('generate-btn'),
+  progression: document.getElementById('progression'),
+  emptyState: document.getElementById('empty-state'),
+  playback: document.getElementById('playback'),
+  playBtn: document.getElementById('play-btn'),
+  tempo: document.getElementById('tempo'),
+  tempoValue: document.getElementById('tempo-value'),
+  regenerateRow: document.getElementById('regenerate-row'),
+  regenerateBtn: document.getElementById('regenerate-btn'),
+};
+
+const ICON_LOCKED = `<svg viewBox="0 0 14 14" fill="currentColor"><path d="M5 6V4a2 2 0 0 1 4 0v2h.5A1.5 1.5 0 0 1 11 7.5v4A1.5 1.5 0 0 1 9.5 13h-5A1.5 1.5 0 0 1 3 11.5v-4A1.5 1.5 0 0 1 4.5 6H5zm1 0h2V4a1 1 0 0 0-2 0v2z"/></svg>`;
+const ICON_UNLOCKED = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="6.5" width="8" height="6" rx="1"/><path d="M5 6.5V4a2 2 0 0 1 3.85-.7"/></svg>`;
+const ICON_PLAY = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.5v13L14 8z"/></svg>`;
+const ICON_STOP = `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>`;
+
+function populateKeySelect() {
+  const ids = Object.keys(KEYS);
+  const majors = ids.filter(k => KEYS[k].mode === 'major');
+  const minors = ids.filter(k => KEYS[k].mode === 'minor');
+  let html = '<option value="random">⚄ Aléatoire</option>';
+  html += '<optgroup label="Tonalités majeures">';
+  majors.forEach(k => html += `<option value="${k}">${KEYS[k].label}</option>`);
+  html += '</optgroup><optgroup label="Tonalités mineures">';
+  minors.forEach(k => html += `<option value="${k}">${KEYS[k].label}</option>`);
+  html += '</optgroup>';
+  els.keySelect.innerHTML = html;
+}
+
+function render() {
+  if (state.chords.length === 0) {
+    els.progression.innerHTML = '';
+    els.progression.appendChild(els.emptyState);
+    els.playback.style.display = 'none';
+    els.regenerateRow.style.display = 'none';
+    return;
+  }
+
+  els.playback.style.display = 'flex';
+  els.regenerateRow.style.display = 'block';
+
+  const keyLabel = KEYS[state.resolvedKey].label;
+
+  let html = `
+    <div class="key-display">
+      <button class="btn-transpose" data-dir="-1" title="Descendre d'un demi-ton (←)">−½</button>
+      <span class="key-text">Tonalité <span class="separator">·</span> <span class="key-name">${keyLabel}</span></span>
+      <button class="btn-transpose" data-dir="1" title="Monter d'un demi-ton (→)">+½</button>
+    </div>
+    <div class="chord-grid">
+  `;
+
+  state.chords.forEach((c, i) => {
+    html += `
+      <div class="chord-card${c.locked ? ' locked' : ''}" data-idx="${i}" style="animation-delay:${i * 0.07}s">
+        <button class="chord-lock" data-idx="${i}" title="${c.locked ? 'Déverrouiller' : 'Verrouiller'}">
+          ${c.locked ? ICON_LOCKED : ICON_UNLOCKED}
+        </button>
+        <div class="chord-degree">${c.roman}</div>
+        <div class="chord-name">${c.name}</div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  els.progression.innerHTML = html;
+
+  // Wire lock buttons
+  els.progression.querySelectorAll('.chord-lock').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = +btn.dataset.idx;
+      state.chords[idx].locked = !state.chords[idx].locked;
+      render();
+    });
+  });
+
+  // Wire transpose buttons
+  els.progression.querySelectorAll('.btn-transpose').forEach(btn => {
+    btn.addEventListener('click', () => {
+      transpose(+btn.dataset.dir);
+      btn.blur();
+    });
+  });
+}
+
+function highlightPlaying(idx) {
+  document.querySelectorAll('.chord-card').forEach((card, i) => {
+    card.classList.toggle('playing', i === idx);
+  });
+}
+
+// Reapply current degrees with a different chord style (triads ↔ sevenths)
+function restyleProgression() {
+  state.chords = state.chords.map(c => {
+    const updated = buildChord(state.resolvedKey, c.degree, state.useSevenths);
+    updated.locked = c.locked;
+    return updated;
+  });
+  render();
+}
+
+// "Generate" → fresh start: resolve random key, drop locks
+function generate() {
+  stopPlayback();
+  setPlayButtonIcon(false);
+  highlightPlaying(-1);
+
+  state.resolvedKey = state.keySelection === 'random'
+    ? pickRandomKey()
+    : state.keySelection;
+
+  state.chords = generateProgression(state.resolvedKey, state.length, state.useSevenths, null);
+  render();
+}
+
+// "Regenerate" → keep key, preserve locks, re-roll the rest
+function regenerate() {
+  stopPlayback();
+  setPlayButtonIcon(false);
+  highlightPlaying(-1);
+
+  if (!state.resolvedKey) { generate(); return; }
+
+  const existing = new Array(state.length).fill(null);
+  for (let i = 0; i < Math.min(state.length, state.chords.length); i++) {
+    if (state.chords[i].locked) {
+      existing[i] = { locked: true, degree: state.chords[i].degree };
+    }
+  }
+  state.chords = generateProgression(state.resolvedKey, state.length, state.useSevenths, existing);
+  render();
+}
+
+function setPlayButtonIcon(playing) {
+  els.playBtn.innerHTML = playing ? ICON_STOP : ICON_PLAY;
+  els.playBtn.classList.toggle('playing', playing);
+}
+
+// Transpose the current progression by N semitones (positive = up, negative = down).
+// Preserves degrees, locks, and chord style — only the tonal center moves.
+function transpose(direction) {
+  if (!state.resolvedKey || state.chords.length === 0) return;
+
+  stopPlayback();
+  setPlayButtonIcon(false);
+  highlightPlaying(-1);
+
+  const mode = KEYS[state.resolvedKey].mode;
+  const list = mode === 'major' ? MAJOR_KEYS_ORDERED : MINOR_KEYS_ORDERED;
+  const currentIdx = list.indexOf(state.resolvedKey);
+  const newIdx = (currentIdx + direction + list.length) % list.length;
+  const newKey = list[newIdx];
+
+  state.resolvedKey = newKey;
+  state.keySelection = newKey;
+  els.keySelect.value = newKey;
+
+  state.chords = state.chords.map(c => {
+    const updated = buildChord(newKey, c.degree, state.useSevenths);
+    updated.locked = c.locked;
+    return updated;
+  });
+
+  render();
+}
+
+// ---- Wire up controls ----
+
+els.keySelect.addEventListener('change', e => {
+  state.keySelection = e.target.value;
+});
+
+els.length.addEventListener('input', e => {
+  state.length = +e.target.value;
+  els.lengthValue.textContent = `${state.length} mesures`;
+});
+
+els.styleToggle.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    els.styleToggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.useSevenths = btn.dataset.style === 'sevenths';
+    if (state.chords.length > 0) restyleProgression();
+  });
+});
+
+els.generateBtn.addEventListener('click', generate);
+els.regenerateBtn.addEventListener('click', regenerate);
+
+els.tempo.addEventListener('input', e => {
+  els.tempoValue.textContent = `${e.target.value} BPM`;
+});
+
+els.playBtn.addEventListener('click', async () => {
+  if (isPlaying) {
+    stopPlayback();
+    setPlayButtonIcon(false);
+    highlightPlaying(-1);
+    return;
+  }
+  if (state.chords.length === 0) return;
+  setPlayButtonIcon(true);
+  const tempo = +els.tempo.value;
+  await playProgression(state.chords, tempo, idx => {
+    highlightPlaying(idx);
+    if (idx === -1) setPlayButtonIcon(false);
+  });
+  setPlayButtonIcon(false);
+});
+
+// ---- Keyboard shortcuts ----
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement.tagName;
+  const inFormControl = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+
+  if (e.key === 'ArrowLeft' && !inFormControl) {
+    e.preventDefault();
+    transpose(-1);
+  } else if (e.key === 'ArrowRight' && !inFormControl) {
+    e.preventDefault();
+    transpose(1);
+  } else if (e.code === 'Space' && !inFormControl && state.chords.length > 0) {
+    e.preventDefault();
+    els.playBtn.click();
+  }
+});
+
+// Blur major buttons after click so Space doesn't re-trigger them
+[els.generateBtn, els.regenerateBtn].forEach(b => {
+  b.addEventListener('click', () => b.blur());
+});
+
+// ---- Init ----
+populateKeySelect();
+els.lengthValue.textContent = `${state.length} mesures`;
+
+</script>
+</body>
+</html>
