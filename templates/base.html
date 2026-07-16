@@ -58,32 +58,6 @@ a:hover { color: #a78bfa; }
     padding: 0 20px 100px 20px;
 }
 
-/* ── Top bar ─────────────────── */
-.topbar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(9,9,11,.8);
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.topbar h1 {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: -0.3px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-.topbar-actions { display: flex; gap: 6px; }
-
 /* ── Fixed review action bar ── */
 .review-action-bar {
     position: fixed;
@@ -123,6 +97,8 @@ body.review-mode .container { padding-bottom: 120px; }
     padding: 6px 0 max(6px, env(safe-area-inset-bottom));
 }
 .bottomnav a {
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -130,10 +106,11 @@ body.review-mode .container { padding-bottom: 120px; }
     color: var(--text2);
     font-size: 0.65rem;
     font-weight: 500;
-    padding: 8px 14px;
+    padding: 8px 4px;
     border-radius: 12px;
     transition: all var(--transition);
     position: relative;
+    white-space: nowrap;
 }
 .bottomnav a.active {
     color: var(--accent);
@@ -576,19 +553,7 @@ body.review-mode .container { padding-bottom: 120px; }
 </head>
 <body class="{{ body_class }}">
 {% block body %}
-<div class="topbar">
-    <h1>Flashcards</h1>
-    <div class="topbar-actions">
-        {% if body_class == "review-mode" %}
-        <form method="POST" action="/review/quit" style="display:inline;">
-            <button type="submit" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.72rem;">Menu</button>
-        </form>
-        {% endif %}
-        <a href="/logout" class="btn btn-ghost btn-sm" style="width:auto;padding:8px 14px;font-size:.72rem;">Sortir</a>
-    </div>
-</div>
-
-<div class="container" style="padding-top:20px;">
+<div class="container" style="padding-top:max(20px, env(safe-area-inset-top));">
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         {% for category, message in messages %}
@@ -615,6 +580,9 @@ body.review-mode .container { padding-bottom: 120px; }
     </a>
     <a href="/backups" class="{% if active == 'backups' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12a10 10 0 0 1-10 10"/></svg><span>Backups</span>
+    </a>
+    <a href="/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sortir</span>
     </a>
 </nav>
 {% endblock %}

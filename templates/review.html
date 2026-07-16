@@ -12,15 +12,27 @@
 <style>
 /* ── Mise en page sans-scroll (n'affecte que la page de révision) ── */
 body.review-mode{ overflow:hidden; }
-body.review-mode .topbar{ position:static; }
 body.review-mode{ display:flex; flex-direction:column; height:100dvh; }
 body.review-mode .container{
     flex:1; min-height:0;
     display:flex; flex-direction:column;
-    padding-top:14px;
+    padding-top:max(10px, env(safe-area-inset-top));
     padding-bottom:104px;            /* place pour la barre d'action fixe */
 }
 .progress-label{ flex-shrink:0; }
+
+/* ── Ligne d'en-tête : progression + minuteur à gauche, Menu / Sortir à droite ── */
+.review-topline{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.review-topline .rt-left{ display:inline-flex; align-items:center; }
+.review-topline .rt-right{ display:inline-flex; align-items:center; gap:6px; }
+.rt-btn{
+    font-family:'DM Sans',sans-serif; font-size:.72rem; font-weight:600;
+    color:var(--text2); background:transparent;
+    border:1px solid var(--border); border-radius:99px;
+    padding:5px 12px; cursor:pointer; text-decoration:none;
+    transition:all var(--transition);
+}
+.rt-btn:hover{ color:var(--text); background:var(--surface2); border-color:var(--border-hover); }
 .review-meta{ flex-shrink:0; }
 .review-tools{ flex-shrink:0; }
 
@@ -67,9 +79,17 @@ body.review-mode .container{
 .review-tools{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
 </style>
 
-<div class="progress-label">
-    {{ idx+1 }}/{{ total }}
-    <span id="timer" style="margin-left:12px;color:var(--text2);font-size:0.85rem;">00:00</span>
+<div class="progress-label review-topline">
+    <span class="rt-left">
+        {{ idx+1 }}/{{ total }}
+        <span id="timer" style="margin-left:12px;color:var(--text2);font-size:0.85rem;">00:00</span>
+    </span>
+    <span class="rt-right">
+        <form method="POST" action="/review/quit" style="display:inline;">
+            <button type="submit" class="rt-btn" title="Revenir au menu">Menu</button>
+        </form>
+        <a href="/logout" class="rt-btn" title="Se déconnecter">Sortir</a>
+    </span>
 </div>
 
 <div class="card {% if show_answer %}revealed{% endif %}" id="swipeCard">

@@ -17,6 +17,16 @@
 .grid-progresslabel{ font-family:'Space Mono',monospace; font-size:.78rem; color:var(--text2); }
 .grid-progresslabel b{ color:var(--text); }
 
+/* ── Boutons compacts Menu / Sortir (en-tête) ── */
+.rt-btn{
+    font-family:'DM Sans',sans-serif; font-size:.72rem; font-weight:600;
+    color:var(--text2); background:transparent;
+    border:1px solid var(--border); border-radius:99px;
+    padding:5px 12px; cursor:pointer; text-decoration:none;
+    transition:all var(--transition);
+}
+.rt-btn:hover{ color:var(--text); background:var(--surface2); border-color:var(--border-hover); }
+
 .gcards{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
@@ -98,7 +108,6 @@
    portrait, ni sur ordinateur (hauteur > 540px).
    ════════════════════════════════════════════════════════════════════ */
 @media (orientation:landscape) and (max-height:540px){
-    .topbar{ display:none; }                /* libère la hauteur (page grille uniquement) */
     .grid-topline{ display:none; }          /* Fournée/notées/Tout révéler retirés du haut */
 
     body.review-mode .container{
@@ -134,6 +143,8 @@
     <span class="spacer"></span>
     <span class="grid-progresslabel"><b id="gradedCount">0</b>/<b id="batchTotal">{{ cards|length }}</b> notées</span>
     <button type="button" class="btn btn-ghost btn-sm" style="width:auto;padding:7px 13px;" onclick="revealAll()">Tout révéler</button>
+    <button type="button" class="rt-btn" onclick="quitGrid()" title="Revenir au menu">Menu</button>
+    <a href="/logout" class="rt-btn" title="Se déconnecter">Sortir</a>
 </div>
 
 <form method="POST" action="/review/grid/answer" id="gridForm">
@@ -192,6 +203,7 @@
     <div class="grid-actionrow">
         <button type="button" class="btn btn-ghost btn-sm grid-ls-only" style="width:auto;"
                 onclick="quitGrid()">Menu</button>
+        <a href="/logout" class="btn btn-ghost btn-sm grid-ls-only" style="width:auto;">Sortir</a>
         <span class="badge badge-accent grid-ls-only">Fournée {{ cur_batch }}/{{ total_batches }}</span>
         <button type="submit" form="gridForm" class="btn btn-primary" id="submitBtn">
             Valider la fournée →
