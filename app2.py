@@ -1250,38 +1250,6 @@ def backup_preview(filename):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ── Mindfulness / Zen ───────────────────────────────────────────────────────
-
-@app.route("/zen")
-@login_required
-def zen():
-    return render_template("zen.html", title="Zen", active="zen", body_class="")
-
-# ─── Chord Spark — générateur de progressions d'accords ─────────────────────
-
-@app.route("/chords")
-@login_required
-def chords():
-    return render_template("chords.html", title="Accords", active="chords", body_class="")
-
-@app.route("/chords/app")
-@login_required
-def chords_app():
-    # Standalone Chord Spark page, embedded via <iframe> in chords.html.
-    # Served raw (not via Jinja) so its CSS/JS braces aren't parsed as template syntax.
-    return send_from_directory("templates", "chord_spark.html")
-
-@app.route("/transpose")
-@login_required
-def transpose():
-    return render_template("transpose.html", title="Transposeur",
-                           active="transpose", body_class="")
-
-@app.route("/transpose/app")
-@login_required
-def transpose_app():
-    return send_from_directory("templates", "transposeur.html")
-
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
