@@ -77,15 +77,9 @@
 </style>
 
 <div class="home">
-    <div class="home-hero">
-        <div class="eyebrow">Révision espacée · Système Leitner</div>
-        <h1>Prêt à réviser ?</h1>
-    </div>
-
     {# ── Révision du jour ── #}
     <div class="deck">
         <div class="deck-head">
-            <span class="deck-ic">😃</span>
             <div class="deck-meta">
                 <div class="deck-name">Révision du jour</div>
                 <div class="deck-sub"><b>{{ daily_count }}</b> cartes dues</div>
@@ -106,7 +100,6 @@
     {# ── Cartes marquées ── #}
     <div class="deck">
         <div class="deck-head">
-            <span class="deck-ic">🔖</span>
             <div class="deck-meta">
                 <div class="deck-name">Cartes marquées</div>
                 <div class="deck-sub"><b>{{ marked_count }}</b> à revoir</div>
@@ -123,7 +116,5 @@
             </a>
         </div>
     </div>
-
-    <div class="home-foot">↑ annuler · espace révéler · ←/→ noter</div>
 </div>
 {% endblock %}
