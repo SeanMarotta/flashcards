@@ -155,6 +155,8 @@ body.review-mode .container { padding-bottom: 120px; }
     text-align: center;
     padding: 20px 0;
 }
+/* Keeps typed line breaks visible on the card (single-line text is unaffected) */
+.card-text { white-space: pre-wrap; }
 .card-content img {
     max-width: 100%;
     max-height: 50vh;
@@ -349,9 +351,119 @@ body.review-mode .container { padding-bottom: 120px; }
 }
 .form-group textarea { min-height: 80px; resize: vertical; }
 .form-group input[type="file"] {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
     color: var(--text2);
     font-size: 0.82rem;
 }
+.form-group input[type="file"]::file-selector-button {
+    margin-right: 10px;
+    padding: 7px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.form-group input[type="file"]::file-selector-button:hover {
+    background: var(--surface3);
+    border-color: var(--border-hover);
+}
+
+/* Compact file pickers — always two per row, even on a narrow phone */
+.upload-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.upload-slot {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+}
+.upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.upload-btn:hover { border-color: var(--border-hover); color: var(--text); }
+.upload-btn .ico { flex-shrink: 0; line-height: 1; }
+.upload-btn .txt {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Kept focusable (not display:none) so the keyboard can still reach it */
+.upload-btn input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.upload-slot:focus-within .upload-btn {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.upload-slot.has-file .upload-btn {
+    padding-right: 32px;
+    background: var(--accent2-glow);
+    border-color: var(--accent2);
+    color: var(--text);
+}
+.upload-clear {
+    display: none;
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    color: var(--text2);
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.upload-slot.has-file .upload-clear { display: block; }
+.upload-clear:hover { background: rgba(255,255,255,.08); color: var(--danger); }
+
+/* Recto / verso panels — colour-codes which face you are filling in */
+.face-panel {
+    padding: 16px 16px 0;
+    margin-bottom: 18px;
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+    border-radius: var(--radius);
+}
+.face-panel .section-title { margin: 0 0 14px; }
+.face-recto {
+    background: rgba(139,92,246,.06);
+    border-left-color: var(--accent);
+}
+.face-recto .section-title { color: var(--accent); }
+.face-verso {
+    background: rgba(52,211,153,.06);
+    border-left-color: var(--accent2);
+}
+.face-verso .section-title { color: var(--accent2); }
 
 /* ── Flash messages ──────────── */
 .flash {

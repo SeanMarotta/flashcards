@@ -4,7 +4,7 @@
 {% elif path %}
     <img src="/{{ path }}" alt="card image" loading="lazy">
 {% elif text %}
-    <div>{{ text }}</div>
+    <div class="card-text">{{ text }}</div>
 {% else %}
     <span style="color:var(--text2)">—</span>
 {% endif %}

@@ -6,42 +6,80 @@
 </div>
 
 <form method="POST" enctype="multipart/form-data">
-    <p class="section-title">Recto</p>
-    <div class="form-group">
-        <label>Texte</label>
-        <input type="text" name="recto_text" placeholder="Question ou mot...">
-    </div>
-    <div class="form-group">
-        <label>URL image</label>
-        <input type="text" name="recto_url" placeholder="https://...">
-    </div>
-    <div class="form-group">
-        <label>Upload image</label>
-        <input type="file" name="recto_upload" accept="image/*">
-    </div>
-    <div class="form-group">
-        <label>🎵 Audio (mp3, wav, ogg…)</label>
-        <input type="file" name="recto_audio_upload" accept="audio/*">
+    <div class="face-panel face-recto">
+        <p class="section-title">Recto</p>
+        <div class="form-group">
+            <label>Texte</label>
+            <textarea name="recto_text" rows="3" placeholder="Question ou mot..."></textarea>
+        </div>
+        <div class="upload-row">
+            <div class="upload-slot">
+                <label class="upload-btn">
+                    <input type="file" name="recto_upload" accept="image/*" aria-label="Image du recto">
+                    <span class="ico">🖼️</span>
+                    <span class="txt">Image</span>
+                </label>
+                <button type="button" class="upload-clear" aria-label="Retirer l'image du recto">✕</button>
+            </div>
+            <div class="upload-slot">
+                <label class="upload-btn">
+                    <input type="file" name="recto_audio_upload" accept="audio/*" aria-label="Audio du recto">
+                    <span class="ico">🎵</span>
+                    <span class="txt">Audio</span>
+                </label>
+                <button type="button" class="upload-clear" aria-label="Retirer l'audio du recto">✕</button>
+            </div>
+        </div>
     </div>
 
-    <p class="section-title">Verso</p>
-    <div class="form-group">
-        <label>Texte</label>
-        <input type="text" name="verso_text" placeholder="Réponse...">
-    </div>
-    <div class="form-group">
-        <label>URL image</label>
-        <input type="text" name="verso_url" placeholder="https://...">
-    </div>
-    <div class="form-group">
-        <label>Upload image</label>
-        <input type="file" name="verso_upload" accept="image/*">
-    </div>
-    <div class="form-group">
-        <label>🎵 Audio (mp3, wav, ogg…)</label>
-        <input type="file" name="verso_audio_upload" accept="audio/*">
+    <div class="face-panel face-verso">
+        <p class="section-title">Verso</p>
+        <div class="form-group">
+            <label>Texte</label>
+            <textarea name="verso_text" rows="3" placeholder="Réponse..."></textarea>
+        </div>
+        <div class="upload-row">
+            <div class="upload-slot">
+                <label class="upload-btn">
+                    <input type="file" name="verso_upload" accept="image/*" aria-label="Image du verso">
+                    <span class="ico">🖼️</span>
+                    <span class="txt">Image</span>
+                </label>
+                <button type="button" class="upload-clear" aria-label="Retirer l'image du verso">✕</button>
+            </div>
+            <div class="upload-slot">
+                <label class="upload-btn">
+                    <input type="file" name="verso_audio_upload" accept="audio/*" aria-label="Audio du verso">
+                    <span class="ico">🎵</span>
+                    <span class="txt">Audio</span>
+                </label>
+                <button type="button" class="upload-clear" aria-label="Retirer l'audio du verso">✕</button>
+            </div>
+        </div>
     </div>
 
     <button type="submit" class="btn btn-primary">Ajouter la carte</button>
 </form>
+
+<script>
+document.querySelectorAll('.upload-slot').forEach(function (slot) {
+    var input = slot.querySelector('input[type="file"]');
+    var txt = slot.querySelector('.txt');
+    var placeholder = txt.textContent;
+
+    function refresh() {
+        var file = input.files && input.files[0];
+        slot.classList.toggle('has-file', !!file);
+        txt.textContent = file ? file.name : placeholder;
+        slot.title = file ? file.name : '';
+    }
+
+    input.addEventListener('change', refresh);
+    slot.querySelector('.upload-clear').addEventListener('click', function () {
+        input.value = '';
+        refresh();
+    });
+    refresh();  // the browser can restore a picked file on back/reload
+});
+</script>
 {% endblock %}

@@ -271,6 +271,12 @@ def save_uploaded_audio(file_storage):
         return unique_name  # store only filename, served via /audios/
     return None
 
+def form_text(field):
+    """Read a multi-line form field. Browsers submit textarea newlines as CRLF;
+    normalise to LF so the stored JSON stays clean and renders identically."""
+    value = request.form.get(field, "")
+    return value.replace("\r\n", "\n").replace("\r", "\n").strip()
+
 def index_by_id(cards):
     """Build a dict {card_id: (index, card)} for O(1) lookup."""
     return {c["id"]: (i, c) for i, c in enumerate(cards)}
@@ -801,7 +807,7 @@ def card_edit(card_id):
         # Recto
         recto_upload = request.files.get("recto_upload")
         recto_url = request.form.get("recto_url", "").strip()
-        recto_text = request.form.get("recto_text", "").strip()
+        recto_text = form_text("recto_text")
         recto_audio_upload = request.files.get("recto_audio_upload")
         if recto_upload and recto_upload.filename:
             delete_image_file(all_cards[idx].get("recto_path"))
@@ -821,7 +827,7 @@ def card_edit(card_id):
         # Verso
         verso_upload = request.files.get("verso_upload")
         verso_url = request.form.get("verso_url", "").strip()
-        verso_text = request.form.get("verso_text", "").strip()
+        verso_text = form_text("verso_text")
         verso_audio_upload = request.files.get("verso_audio_upload")
         if verso_upload and verso_upload.filename:
             delete_image_file(all_cards[idx].get("verso_path"))
@@ -859,12 +865,10 @@ def card_edit(card_id):
 def create():
     if request.method == "POST":
         recto_upload = request.files.get("recto_upload")
-        recto_url = request.form.get("recto_url", "").strip()
-        recto_text = request.form.get("recto_text", "").strip()
+        recto_text = form_text("recto_text")
 
         verso_upload = request.files.get("verso_upload")
-        verso_url = request.form.get("verso_url", "").strip()
-        verso_text = request.form.get("verso_text", "").strip()
+        verso_text = form_text("verso_text")
         recto_audio_upload = request.files.get("recto_audio_upload")
         verso_audio_upload = request.files.get("verso_audio_upload")
 
@@ -873,15 +877,11 @@ def create():
 
         if recto_upload and recto_upload.filename:
             recto_path = save_uploaded_image(recto_upload)
-        elif recto_url:
-            recto_path = recto_url
         else:
             recto_text_val = recto_text
 
         if verso_upload and verso_upload.filename:
             verso_path = save_uploaded_image(verso_upload)
-        elif verso_url:
-            verso_path = verso_url
         else:
             verso_text_val = verso_text
 
