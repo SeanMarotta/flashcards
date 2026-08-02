@@ -2,6 +2,22 @@
 {% block content %}
 {% from '_macros.html' import render_content %}
 
+{% macro image_field(face, path) %}
+    {% if path %}
+    <div class="form-group">
+        <label>Image actuelle — conservée si vous n'y touchez pas</label>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);">
+            <img src="{{ path if path.startswith('http') else '/' + path }}" alt=""
+                 style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;">
+            <label style="display:flex;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:normal;font-size:0.9rem;color:var(--text);cursor:pointer;">
+                <input type="checkbox" name="{{ face }}_remove_image" value="1" style="width:auto;margin:0;">
+                🗑️ Supprimer l'image (pour la remplacer par du texte)
+            </label>
+        </div>
+    </div>
+    {% endif %}
+{% endmacro %}
+
 <h2 style="font-size:1.2rem;margin-bottom:16px;">✏️ Modifier la carte</h2>
 
 <div class="detail-face">
@@ -22,8 +38,9 @@
     </div>
 
     <p class="section-title">Recto</p>
+    {{ image_field('recto', card.recto_path) }}
     <div class="form-group">
-        <label>Texte</label>
+        <label>Texte{% if card.recto_path %} — affiché seulement sans image{% endif %}</label>
         <textarea name="recto_text">{{ card.recto_text or '' }}</textarea>
     </div>
     <div class="form-group">
@@ -40,8 +57,9 @@
     </div>
 
     <p class="section-title">Verso</p>
+    {{ image_field('verso', card.verso_path) }}
     <div class="form-group">
-        <label>Texte</label>
+        <label>Texte{% if card.verso_path %} — affiché seulement sans image{% endif %}</label>
         <textarea name="verso_text">{{ card.verso_text or '' }}</textarea>
     </div>
     <div class="form-group">

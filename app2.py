@@ -773,6 +773,31 @@ def card_toggle_mark(card_id):
             all_cards[i]["marked"] = not c.get("marked", False)
     return redirect(request.referrer or url_for("manage"))
 
+def _resolve_face_image(current, upload, url, remove):
+    """Résout la nouvelle image d'une face lors d'une modification de carte.
+
+    L'image doit survivre à une modification qui ne la concerne pas (corriger le
+    texte de l'autre face, changer la boîte…), exactement comme le texte et
+    l'audio. Elle ne change donc que sur un geste explicite : un nouvel upload,
+    une URL différente, la case « supprimer », ou — pour une image distante,
+    dont le formulaire affiche l'URL — le vidage du champ URL.
+    Renvoie le nouveau chemin, après suppression du fichier local remplacé."""
+    if upload and upload.filename:
+        delete_image_file(current)
+        return save_uploaded_image(upload)
+    if remove:
+        delete_image_file(current)
+        return None
+    if url:
+        if url != current:
+            delete_image_file(current)  # no-op si l'ancienne valeur est une URL
+        return url
+    if current and current.startswith("http"):
+        # Le champ URL était pré-rempli avec cette valeur : le vider est le
+        # geste de suppression d'une image distante.
+        return None
+    return current  # image locale : conservée telle quelle
+
 @app.route("/card/<card_id>/edit", methods=["GET", "POST"])
 @login_required
 def card_edit(card_id):
@@ -804,45 +829,25 @@ def card_edit(card_id):
             base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
             all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
 
-        # Recto
-        recto_upload = request.files.get("recto_upload")
-        recto_url = request.form.get("recto_url", "").strip()
-        recto_text = form_text("recto_text")
-        recto_audio_upload = request.files.get("recto_audio_upload")
-        if recto_upload and recto_upload.filename:
-            delete_image_file(all_cards[idx].get("recto_path"))
-            all_cards[idx]["recto_path"] = save_uploaded_image(recto_upload)
-            all_cards[idx]["recto_text"] = None
-        elif recto_url:
-            delete_image_file(all_cards[idx].get("recto_path"))
-            all_cards[idx]["recto_path"] = recto_url
-            all_cards[idx]["recto_text"] = None
-        else:
-            delete_image_file(all_cards[idx].get("recto_path"))
-            all_cards[idx]["recto_path"] = None
-            all_cards[idx]["recto_text"] = recto_text or None
-        if recto_audio_upload and recto_audio_upload.filename:
-            all_cards[idx]["recto_audio"] = save_uploaded_audio(recto_audio_upload)
+        # Recto / Verso — une image n'est touchée que sur un geste explicite ;
+        # une nouvelle image (upload ou URL) remplace le texte de sa face.
+        for face in ("recto", "verso"):
+            old_path = all_cards[idx].get(f"{face}_path")
+            new_path = _resolve_face_image(
+                old_path,
+                request.files.get(f"{face}_upload"),
+                request.form.get(f"{face}_url", "").strip(),
+                request.form.get(f"{face}_remove_image"),
+            )
+            all_cards[idx][f"{face}_path"] = new_path
+            if new_path and new_path != old_path:
+                all_cards[idx][f"{face}_text"] = None
+            else:
+                all_cards[idx][f"{face}_text"] = form_text(f"{face}_text") or None
 
-        # Verso
-        verso_upload = request.files.get("verso_upload")
-        verso_url = request.form.get("verso_url", "").strip()
-        verso_text = form_text("verso_text")
-        verso_audio_upload = request.files.get("verso_audio_upload")
-        if verso_upload and verso_upload.filename:
-            delete_image_file(all_cards[idx].get("verso_path"))
-            all_cards[idx]["verso_path"] = save_uploaded_image(verso_upload)
-            all_cards[idx]["verso_text"] = None
-        elif verso_url:
-            delete_image_file(all_cards[idx].get("verso_path"))
-            all_cards[idx]["verso_path"] = verso_url
-            all_cards[idx]["verso_text"] = None
-        else:
-            delete_image_file(all_cards[idx].get("verso_path"))
-            all_cards[idx]["verso_path"] = None
-            all_cards[idx]["verso_text"] = verso_text or None
-        if verso_audio_upload and verso_audio_upload.filename:
-            all_cards[idx]["verso_audio"] = save_uploaded_audio(verso_audio_upload)
+            audio_upload = request.files.get(f"{face}_audio_upload")
+            if audio_upload and audio_upload.filename:
+                all_cards[idx][f"{face}_audio"] = save_uploaded_audio(audio_upload)
 
     flash("Carte modifiée !", "success")
 
