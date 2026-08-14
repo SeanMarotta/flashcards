@@ -281,12 +281,52 @@ def index_by_id(cards):
     """Build a dict {card_id: (index, card)} for O(1) lookup."""
     return {c["id"]: (i, c) for i, c in enumerate(cards)}
 
-def get_daily_review_cards():
+def get_daily_review_cards(cards=None):
     today = datetime.now().strftime("%Y-%m-%d")
-    return [c for c in load_flashcards() if c.get("next_review_date", "") <= today]
+    return [c for c in (load_flashcards() if cards is None else cards)
+            if c.get("next_review_date", "") <= today]
 
-def get_marked_cards():
-    return [c for c in load_flashcards() if c.get("marked", False)]
+def get_marked_cards(cards=None):
+    return [c for c in (load_flashcards() if cards is None else cards) if c.get("marked", False)]
+
+# ─── Révision anticipée ──────────────────────────────────────────────────────
+#  Permet de réviser aujourd'hui des cartes dues plus tard, avant une période
+#  où l'on sait qu'on ne pourra pas réviser (vacances…). Restreint aux boîtes
+#  élevées : une carte à intervalle long ne perd presque rien à être avancée
+#  d'un ou deux jours, contrairement à une carte encore en apprentissage actif.
+
+ADVANCE_DEFAULT_DAYS = 1        # horizon par défaut : demain
+ADVANCE_DEFAULT_MIN_BOX = 9     # « au-delà de la boîte 8 »
+ADVANCE_MAX_DAYS = 14
+
+def get_advance_review_cards(days, min_box, cards=None):
+    """Cartes pas encore dues, à échéance dans les `days` prochains jours et en
+    boîte >= min_box. Exclut les cartes déjà dues : celles-là sont du ressort de
+    la révision du jour."""
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    horizon = (now + timedelta(days=days)).strftime("%Y-%m-%d")
+    return [c for c in (load_flashcards() if cards is None else cards)
+            if c.get("box", 1) >= min_box
+            and today < c.get("next_review_date", "") <= horizon]
+
+def advance_params():
+    """Lit et borne les réglages d'anticipation passés en query string."""
+    days = request.args.get("days", ADVANCE_DEFAULT_DAYS, type=int)
+    min_box = request.args.get("min_box", ADVANCE_DEFAULT_MIN_BOX, type=int)
+    return max(1, min(ADVANCE_MAX_DAYS, days)), max(1, min(60, min_box))
+
+def cards_for_mode(mode):
+    """Résout un mode de révision en (cartes, message si la liste est vide)."""
+    if mode == "daily":
+        return get_daily_review_cards(), "Aucune carte à réviser !"
+    if mode == "marked":
+        return get_marked_cards(), "Aucune carte marquée."
+    if mode == "advance":
+        days, min_box = advance_params()
+        return (get_advance_review_cards(days, min_box),
+                "Aucune carte à anticiper avec ces réglages.")
+    return [], "Aucune carte à réviser !"
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -330,10 +370,16 @@ def serve_audio(filename):
 @app.route("/")
 @login_required
 def index():
-    daily = get_daily_review_cards()
-    marked = get_marked_cards()
+    all_cards = load_flashcards()   # chargé une fois, partagé par les 3 compteurs
+    daily = get_daily_review_cards(all_cards)
+    marked = get_marked_cards(all_cards)
+    advance = get_advance_review_cards(ADVANCE_DEFAULT_DAYS, ADVANCE_DEFAULT_MIN_BOX, all_cards)
     return render_template("index.html", title="Réviser", active="review", body_class="",
-                           daily_count=len(daily), marked_count=len(marked))
+                           daily_count=len(daily), marked_count=len(marked),
+                           advance_count=len(advance),
+                           advance_days=ADVANCE_DEFAULT_DAYS,
+                           advance_min_box=ADVANCE_DEFAULT_MIN_BOX,
+                           advance_max_days=ADVANCE_MAX_DAYS)
 
 # ── Review session ───────────────────────────────────────────────────────────
 
@@ -341,15 +387,10 @@ def index():
 @login_required
 def review_start(mode):
     cleanup_stale_sessions()
-    if mode == "daily":
-        cards = get_daily_review_cards()
-    elif mode == "marked":
-        cards = get_marked_cards()
-    else:
-        cards = []
+    cards, empty_message = cards_for_mode(mode)
     random.shuffle(cards)
     if not cards:
-        flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
+        flash(empty_message, "info")
         return redirect(url_for("index"))
     save_review_state(cards, 0, False,
                       correct=0, incorrect=0, pass_count=0,
@@ -619,15 +660,10 @@ def review_grid_start(mode):
     cleanup_stale_sessions()
     batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
     batch = max(2, min(24, batch))
-    if mode == "daily":
-        cards = get_daily_review_cards()
-    elif mode == "marked":
-        cards = get_marked_cards()
-    else:
-        cards = []
+    cards, empty_message = cards_for_mode(mode)
     random.shuffle(cards)
     if not cards:
-        flash("Aucune carte à réviser !" if mode == "daily" else "Aucune carte marquée.", "info")
+        flash(empty_message, "info")
         return redirect(url_for("index"))
     save_grid_state(cards, 0, batch, correct=0, incorrect=0, pass_count=0,
                     start_time=datetime.now().isoformat())
@@ -1209,6 +1245,21 @@ def api_cards():
         cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
     truncated = len(cards) > 100
     return jsonify({"cards": cards[:100], "truncated": truncated, "total": len(cards)})
+
+@app.route("/api/advance_count")
+@login_required
+def api_advance_count():
+    """Compteur live pour les réglages d'anticipation de la page d'accueil.
+    `upcoming` = tout ce qui arrive à échéance dans la fenêtre, toutes boîtes
+    confondues, pour montrer ce que le filtre laisse de côté."""
+    days, min_box = advance_params()
+    all_cards = load_flashcards()
+    return jsonify({
+        "count": len(get_advance_review_cards(days, min_box, all_cards)),
+        "upcoming": len(get_advance_review_cards(days, 1, all_cards)),
+        "days": days,
+        "min_box": min_box,
+    })
 
 # ── Backups ──────────────────────────────────────────────────────────────────
 

@@ -73,6 +73,29 @@
     font-family:'Space Mono',monospace; font-size:.72rem; color:var(--text2);
     opacity:.8; letter-spacing:.04em;
 }
+
+/* ── Réglages de la révision anticipée ── */
+.adv-controls{ display:flex; gap:10px; margin-bottom:10px; position:relative; }
+.adv-field{
+    flex:1; min-width:0; display:flex; align-items:center; gap:8px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:11px; padding:9px 12px;
+    transition:border-color var(--transition);
+}
+.adv-field:focus-within{ border-color:var(--accent); }
+.adv-field > span{ font-size:.78rem; color:var(--text2); white-space:nowrap; }
+.adv-field select, .adv-field input{
+    flex:1; min-width:0; width:100%;
+    background:transparent; border:0; outline:none; padding:0;
+    color:var(--text); font-family:'Space Mono',monospace; font-size:.88rem;
+}
+.adv-field select option{ background:var(--surface); color:var(--text); }
+.adv-note{
+    font-size:.76rem; color:var(--text2); line-height:1.4;
+    margin:0 0 12px; position:relative;
+}
+.mbtn.is-off{ opacity:.35; pointer-events:none; }
+
 @media (max-width:380px){ .deck-actions{ grid-template-columns:1fr; } }
 </style>
 
@@ -118,5 +141,86 @@
             </a>
         </div>
     </div>
+
+    {# ── Prendre de l'avance (cartes à échéance future, boîtes hautes) ── #}
+    <div class="deck">
+        <div class="deck-head">
+            <span class="deck-ic">⏩</span>
+            <div class="deck-meta">
+                <div class="deck-name">Prendre de l'avance</div>
+                <div class="deck-sub"><b id="adv-count">{{ advance_count }}</b> cartes anticipables</div>
+            </div>
+        </div>
+        <div class="adv-controls">
+            <label class="adv-field">
+                <span>Jusqu'à</span>
+                <select id="adv-days">
+                    {% for d in range(1, advance_max_days + 1) %}
+                    <option value="{{ d }}" {% if d == advance_days %}selected{% endif %}>
+                        {{ "demain" if d == 1 else "J+%d" % d }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="adv-field">
+                <span>Boîte ≥</span>
+                <input type="number" id="adv-box" min="1" max="60" step="1" value="{{ advance_min_box }}">
+            </label>
+        </div>
+        <p class="adv-note" id="adv-note"></p>
+        <div class="deck-actions">
+            <a href="/review/start/advance" id="adv-focus" class="mbtn">
+                <span class="mi">◎</span>
+                <span><b>Focus</b><i>une carte à la fois</i></span>
+            </a>
+            <a href="/review/grid/start/advance" id="adv-grid" class="mbtn">
+                <span class="mi">▦</span>
+                <span><b>Grille</b><i>plusieurs cartes</i></span>
+            </a>
+        </div>
+    </div>
 </div>
+
+<script>
+/* Compteur live + liens des boutons, pilotés par les deux réglages.
+   Le serveur reste la source de vérité : il reborne days/min_box de son côté. */
+(function () {
+    const daysEl  = document.getElementById('adv-days');
+    const boxEl   = document.getElementById('adv-box');
+    const countEl = document.getElementById('adv-count');
+    const noteEl  = document.getElementById('adv-note');
+    const focusEl = document.getElementById('adv-focus');
+    const gridEl  = document.getElementById('adv-grid');
+    let timer = null;
+
+    function query() {
+        const box = Math.max(1, Math.min(60, parseInt(boxEl.value, 10) || 1));
+        return 'days=' + encodeURIComponent(daysEl.value) + '&min_box=' + box;
+    }
+
+    function refresh() {
+        const q = query();
+        focusEl.href = '/review/start/advance?' + q;
+        gridEl.href  = '/review/grid/start/advance?' + q;
+        fetch('/api/advance_count?' + q)
+            .then(r => r.json())
+            .then(d => {
+                countEl.textContent = d.count;
+                const left = d.upcoming - d.count;
+                noteEl.textContent = left > 0
+                    ? left + ' autre' + (left > 1 ? 's' : '') + ' en boîte basse : laissée'
+                      + (left > 1 ? 's' : '') + ' pour le jour J.'
+                    : '';
+                focusEl.classList.toggle('is-off', d.count === 0);
+                gridEl.classList.toggle('is-off', d.count === 0);
+            })
+            .catch(() => {});
+    }
+
+    function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 200); }
+    daysEl.addEventListener('change', schedule);
+    boxEl.addEventListener('input', schedule);
+    refresh();
+})();
+</script>
 {% endblock %}
