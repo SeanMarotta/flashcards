@@ -23,7 +23,7 @@ body.review-mode .container{
 
 /* ── Ligne d'en-tête : progression + minuteur à gauche, Menu / Sortir à droite ── */
 .review-topline{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.review-topline .rt-left{ display:inline-flex; align-items:center; }
+.review-topline .rt-left{ display:inline-flex; align-items:center; gap:10px; }
 .review-topline .rt-right{ display:inline-flex; align-items:center; gap:6px; }
 .rt-btn{
     font-family:'DM Sans',sans-serif; font-size:.72rem; font-weight:600;
@@ -82,7 +82,7 @@ body.review-mode .container{
 <div class="progress-label review-topline">
     <span class="rt-left">
         {{ idx+1 }}/{{ total }}
-        <span id="timer" style="margin-left:12px;color:var(--text2);font-size:0.85rem;">00:00</span>
+        <span class="session-timer" data-elapsed="{{ elapsed }}" title="Durée de la session">00:00</span>
     </span>
     <span class="rt-right">
         <form method="POST" action="/review/quit" style="display:inline;">
@@ -434,22 +434,6 @@ document.addEventListener('keydown', function(e) {
 
     card.addEventListener('touchend', endSwipe, { passive: true });
     card.addEventListener('touchcancel', endSwipe, { passive: true });
-})();
-
-// ── Minuteur de session ──────────────────────────────────────────────────────
-(function() {
-    const KEY = 'reviewSessionStart';
-    if ({{ idx }} === 0) sessionStorage.setItem(KEY, Date.now());
-    const start = parseInt(sessionStorage.getItem(KEY)) || Date.now();
-    const timerEl = document.getElementById('timer');
-    function update() {
-        const elapsed = Math.floor((Date.now() - start) / 1000);
-        const m = Math.floor(elapsed / 60);
-        const s = elapsed % 60;
-        timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-    }
-    update();
-    setInterval(update, 1000);
 })();
 
 // ── Indice de swipe ──────────────────────────────────────────────────────────

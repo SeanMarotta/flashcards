@@ -656,6 +656,47 @@ body.review-mode .container { padding-bottom: 120px; }
     to { opacity:1; transform:scale(1); }
 }
 
+/* ── Minuteur de session (révision) : discret et moderne ──────────────────── */
+.session-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 99px;
+    background: rgba(255,255,255,.035);
+    color: var(--text2);
+    font-family: 'Space Mono', monospace;
+    font-size: .68rem;
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+    user-select: none;
+    opacity: .7;
+    transition: all var(--transition);
+}
+.session-timer:hover {
+    opacity: 1;
+    color: var(--text);
+    background: var(--surface2);
+}
+.session-timer::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--accent2);
+    animation: timerPulse 2.4s ease-in-out infinite;
+}
+@keyframes timerPulse {
+    0%, 100% { opacity: .3;  transform: scale(.8); }
+    50%      { opacity: 1;   transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .session-timer::before { animation: none; opacity: .75; }
+}
+
 /* ── Selection ───────────────── */
 ::selection {
     background: var(--accent-glow);
@@ -698,5 +739,25 @@ body.review-mode .container { padding-bottom: 120px; }
     </a>
 </nav>
 {% endblock %}
+
+<script>
+/* ── Minuteur de session : démarre depuis l'écoulé fourni par le serveur, ────
+   il survit donc aux rechargements de page entre deux cartes / fournées. ──── */
+(function () {
+    var els = document.querySelectorAll('.session-timer[data-elapsed]');
+    if (!els.length) return;
+    var base = parseInt(els[0].dataset.elapsed, 10) || 0;
+    var t0 = Date.now();
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    function tick() {
+        var s = base + Math.floor((Date.now() - t0) / 1000);
+        var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+        var txt = (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(sec);
+        els.forEach(function (el) { el.textContent = txt; });
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
 </body>
 </html>

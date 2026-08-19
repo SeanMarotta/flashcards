@@ -14,8 +14,6 @@
     margin-bottom:12px; flex-wrap:wrap;
 }
 .grid-topline .spacer{ flex:1; }
-.grid-progresslabel{ font-family:'Space Mono',monospace; font-size:.78rem; color:var(--text2); }
-.grid-progresslabel b{ color:var(--text); }
 
 /* ── Boutons compacts Menu / Sortir (en-tête) ── */
 .rt-btn{
@@ -140,8 +138,8 @@
 
 <div class="grid-topline">
     <span class="badge badge-accent">Fournée {{ cur_batch }}/{{ total_batches }}</span>
+    <span class="session-timer" data-elapsed="{{ elapsed }}" title="Durée de la session">00:00</span>
     <span class="spacer"></span>
-    <span class="grid-progresslabel"><b id="gradedCount">0</b>/<b id="batchTotal">{{ cards|length }}</b> notées</span>
     <button type="button" class="btn btn-ghost btn-sm" style="width:auto;padding:7px 13px;" onclick="revealAll()">Tout révéler</button>
     <button type="button" class="rt-btn" onclick="quitGrid()" title="Revenir au menu">Menu</button>
     <a href="/logout" class="rt-btn" title="Se déconnecter">Sortir</a>
@@ -205,6 +203,7 @@
                 onclick="quitGrid()">Menu</button>
         <a href="/logout" class="btn btn-ghost btn-sm grid-ls-only" style="width:auto;">Sortir</a>
         <span class="badge badge-accent grid-ls-only">Fournée {{ cur_batch }}/{{ total_batches }}</span>
+        <span class="session-timer grid-ls-only" data-elapsed="{{ elapsed }}" title="Durée de la session">00:00</span>
         <button type="submit" form="gridForm" class="btn btn-primary" id="submitBtn">
             Valider la fournée →
         </button>
@@ -232,17 +231,14 @@ function deleteCard(btn){
             if (!r.ok) throw new Error('HTTP ' + r.status);
             card.remove();                       // retire la carte de la fournée
             TOTAL_IN_BATCH--;                    // la note n'est plus attendue
-            document.getElementById('batchTotal').textContent = TOTAL_IN_BATCH;
             updateCount();
         })
         .catch(() => { btn.disabled = false; alert('Échec de la suppression. Réessaie.'); });
 }
 
-// ── Quitter la session (bouton Menu de la barre du bas, visible en paysage) ──
+// ── Quitter la session (bouton Menu) — retour direct, sans confirmation ─────
 function quitGrid(){
-    if (confirm('Quitter la session ? Les cartes non validées de cette fournée ne seront pas notées.')){
-        window.location.href = '/review/grid/quit';
-    }
+    window.location.href = '/review/grid/quit';
 }
 
 let TOTAL_IN_BATCH = {{ cards|length }};
@@ -285,7 +281,6 @@ function updateCount(){
     document.querySelectorAll('.gcard').forEach(c => {
         if (document.getElementById('grade_' + c.dataset.id).value) n++;
     });
-    document.getElementById('gradedCount').textContent = n;
     const btn = document.getElementById('submitBtn');
     if (n < TOTAL_IN_BATCH){
         btn.textContent = 'Valider — ' + (TOTAL_IN_BATCH - n) + ' non notées passeront';

@@ -94,6 +94,14 @@ def clear_review_state():
     if os.path.exists(p):
         os.remove(p)
 
+def elapsed_seconds(state):
+    """Secondes écoulées depuis le début de la session (0 si indisponible)."""
+    try:
+        start_dt = datetime.fromisoformat(state.get("start_time"))
+    except Exception:
+        return 0
+    return max(0, int((datetime.now() - start_dt).total_seconds()))
+
 def cleanup_stale_sessions(max_age_hours=24):
     """Remove review session files older than max_age_hours."""
     now = datetime.now().timestamp()
@@ -430,7 +438,8 @@ def review_card():
         "review.html", title="Révision", active="review", body_class="review-mode",
         card=card, question=question, answer=answer,
         show_answer=show_answer, idx=idx, total=len(cards),
-        last_action=state.get("last_action")
+        last_action=state.get("last_action"),
+        elapsed=elapsed_seconds(state)
     )
 
 @app.route("/review/show")
@@ -705,6 +714,7 @@ def review_grid():
         body_class="review-mode", cards=batch_cards,
         idx=idx, total=len(cards), batch=batch,
         cur_batch=cur_batch, total_batches=total_batches,
+        elapsed=elapsed_seconds(state),
     )
 
 
