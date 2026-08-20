@@ -445,6 +445,45 @@ body.review-mode .container { padding-bottom: 120px; }
 .upload-slot.has-file .upload-clear { display: block; }
 .upload-clear:hover { background: rgba(255,255,255,.08); color: var(--danger); }
 
+/* Emoji prefixes — one tap drops a marker in front of the face's text */
+.emoji-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+.emoji-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.1;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.emoji-chip .lbl {
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+.emoji-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.emoji-chip.active {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--text);
+}
+.face-verso .emoji-chip.active {
+    background: var(--accent2-glow);
+    border-color: var(--accent2);
+}
+
 /* Recto / verso panels — colour-codes which face you are filling in */
 .face-panel {
     padding: 16px 16px 0;
@@ -757,6 +796,50 @@ body.review-mode .container { padding-bottom: 120px; }
     }
     tick();
     setInterval(tick, 1000);
+})();
+
+/* ── Préfixes emoji : un clic pose (ou retire) le marqueur en tête du texte ──
+   Un seul préfixe de la palette à la fois : cliquer un autre drapeau remplace
+   celui qui est déjà là, recliquer le même l'enlève. ───────────────────────── */
+(function () {
+    document.querySelectorAll('.emoji-row[data-target]').forEach(function (row) {
+        var ta = document.querySelector('textarea[name="' + row.dataset.target + '"]');
+        if (!ta) return;
+        var chips = Array.prototype.slice.call(row.querySelectorAll('.emoji-chip'));
+        var palette = chips.map(function (c) { return c.dataset.emoji; });
+
+        /* Sépare "🇬🇧 texte" en son préfixe et le reste. */
+        function split() {
+            for (var i = 0; i < palette.length; i++) {
+                if (ta.value.indexOf(palette[i]) === 0) {
+                    return { prefix: palette[i], rest: ta.value.slice(palette[i].length).replace(/^[ \t]+/, '') };
+                }
+            }
+            return { prefix: '', rest: ta.value };
+        }
+
+        function refresh() {
+            var cur = split().prefix;
+            chips.forEach(function (c) { c.classList.toggle('active', c.dataset.emoji === cur); });
+        }
+
+        chips.forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var parts = split();
+                var before = ta.value.length;
+                var caret = ta.selectionStart;
+                ta.value = (parts.prefix === chip.dataset.emoji ? '' : chip.dataset.emoji + ' ') + parts.rest;
+                refresh();
+                ta.focus();
+                /* Le texte ne bouge qu'en tête : on décale le curseur d'autant. */
+                var pos = Math.min(Math.max(caret + ta.value.length - before, 0), ta.value.length);
+                ta.setSelectionRange(pos, pos);
+            });
+        });
+
+        ta.addEventListener('input', refresh);
+        refresh();
+    });
 })();
 </script>
 </body>

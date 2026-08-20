@@ -14,3 +14,26 @@
     </audio>
 {% endif %}
 {% endmacro %}
+
+{# Palette des préfixes emoji — pour en ajouter/retirer un, éditez cette liste.
+   Format : (emoji, libellé court affiché, nom complet pour l'infobulle). #}
+{% set emoji_prefixes = [
+    ('🇬🇧', 'EN',      'Anglais'),
+    ('🇫🇷', 'FR',      'Français'),
+    ('📖', 'DÉF',     'Définition'),
+    ('📜', 'HIST',    'Histoire'),
+    ('🗺️', 'GÉO',     'Géographie'),
+    ('💡', 'CONCEPT', 'Concept'),
+] %}
+
+{# Rangée de pastilles cliquables qui préfixent le textarea nommé `target`. #}
+{% macro emoji_prefix_row(target) %}
+<div class="emoji-row" data-target="{{ target }}">
+    {% for emoji, label, name in emoji_prefixes %}
+    <button type="button" class="emoji-chip" data-emoji="{{ emoji }}"
+            title="Préfixer le texte par {{ emoji }} ({{ name }})">
+        <span class="emo">{{ emoji }}</span><span class="lbl">{{ label }}</span>
+    </button>
+    {% endfor %}
+</div>
+{% endmacro %}

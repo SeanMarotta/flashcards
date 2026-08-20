@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% from '_macros.html' import render_content %}
+{% from '_macros.html' import render_content, emoji_prefix_row %}
 
 {% macro image_field(face, path) %}
     {% if path %}
@@ -42,6 +42,7 @@
     <div class="form-group">
         <label>Texte{% if card.recto_path %} — affiché seulement sans image{% endif %}</label>
         <textarea name="recto_text">{{ card.recto_text or '' }}</textarea>
+        {{ emoji_prefix_row("recto_text") }}
     </div>
     <div class="form-group">
         <label>URL image</label>
@@ -61,6 +62,7 @@
     <div class="form-group">
         <label>Texte{% if card.verso_path %} — affiché seulement sans image{% endif %}</label>
         <textarea name="verso_text">{{ card.verso_text or '' }}</textarea>
+        {{ emoji_prefix_row("verso_text") }}
     </div>
     <div class="form-group">
         <label>URL image</label>

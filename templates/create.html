@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% from '_macros.html' import emoji_prefix_row %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;">
     <h2 style="font-size:1.2rem;">➕ Nouvelle carte</h2>
     <a href="/create/bulk" class="btn btn-ghost btn-sm" style="width:auto;">📋 Import en masse</a>
@@ -11,6 +12,7 @@
         <div class="form-group">
             <label>Texte</label>
             <textarea name="recto_text" rows="3" placeholder="Question ou mot..."></textarea>
+            {{ emoji_prefix_row("recto_text") }}
         </div>
         <div class="upload-row">
             <div class="upload-slot">
@@ -37,6 +39,7 @@
         <div class="form-group">
             <label>Texte</label>
             <textarea name="verso_text" rows="3" placeholder="Réponse..."></textarea>
+            {{ emoji_prefix_row("verso_text") }}
         </div>
         <div class="upload-row">
             <div class="upload-slot">
