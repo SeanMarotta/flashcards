@@ -67,6 +67,9 @@ def save_review_state(cards, index, show_answer, **extra):
         "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
         "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
         "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+        # Minuteur : secondes déjà passées en pause, et début de la pause en cours (None = actif).
+        "paused_total": extra.get("paused_total", existing.get("paused_total", 0)),
+        "paused_at": extra["paused_at"] if "paused_at" in extra else existing.get("paused_at"),
         # last_action: snapshot for the undo feature. None = nothing to undo.
         "last_action": extra["last_action"] if "last_action" in extra else existing.get("last_action"),
     }
@@ -82,11 +85,14 @@ def load_review_state():
         data.setdefault("incorrect", 0)
         data.setdefault("pass_count", 0)
         data.setdefault("start_time", datetime.now().isoformat())
+        data.setdefault("paused_total", 0)
+        data.setdefault("paused_at", None)
         data.setdefault("last_action", None)
         return data
     return {"cards": [], "index": 0, "show_answer": False,
             "correct": 0, "incorrect": 0, "pass_count": 0,
             "start_time": datetime.now().isoformat(),
+            "paused_total": 0, "paused_at": None,
             "last_action": None}
 
 def clear_review_state():
@@ -95,12 +101,22 @@ def clear_review_state():
         os.remove(p)
 
 def elapsed_seconds(state):
-    """Secondes écoulées depuis le début de la session (0 si indisponible)."""
+    """Secondes écoulées depuis le début de la session, pauses déduites.
+
+    Si une pause est en cours, le chrono est figé à l'instant où elle a
+    commencé. 0 si l'horodatage de départ est absent ou illisible."""
     try:
         start_dt = datetime.fromisoformat(state.get("start_time"))
     except Exception:
         return 0
-    return max(0, int((datetime.now() - start_dt).total_seconds()))
+    now = datetime.now()
+    if state.get("paused_at"):
+        try:
+            now = min(now, datetime.fromisoformat(state["paused_at"]))
+        except Exception:
+            pass
+    running = (now - start_dt).total_seconds() - (state.get("paused_total") or 0)
+    return max(0, int(running))
 
 def cleanup_stale_sessions(max_age_hours=24):
     """Remove review session files older than max_age_hours."""
@@ -413,12 +429,7 @@ def review_card():
     idx = state["index"]
     if not cards or idx >= len(cards):
         # Compute duration
-        try:
-            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
-            elapsed = int((datetime.now() - start_dt).total_seconds())
-        except Exception:
-            elapsed = 0
-        minutes, seconds = divmod(elapsed, 60)
+        minutes, seconds = divmod(elapsed_seconds(state), 60)
         duration = f"{minutes}m {seconds:02d}s"
         summary = {
             "correct": state.get("correct", 0),
@@ -439,7 +450,7 @@ def review_card():
         card=card, question=question, answer=answer,
         show_answer=show_answer, idx=idx, total=len(cards),
         last_action=state.get("last_action"),
-        elapsed=elapsed_seconds(state)
+        elapsed=elapsed_seconds(state), paused=bool(state.get("paused_at"))
     )
 
 @app.route("/review/show")
@@ -582,6 +593,45 @@ def review_quit():
     clear_review_state()
     return redirect(url_for("index"))
 
+
+# ── Minuteur : pause / reprise ───────────────────────────────────────────────
+
+@app.route("/review/timer/<mode>/<action>", methods=["POST"])
+@login_required
+def review_timer(mode, action):
+    """Met le minuteur en pause ou le relance, pour les deux modes de révision.
+
+    L'état vit côté serveur : la pause survit donc aux rechargements de page
+    entre deux cartes (mode focus) ou deux fournées (mode grille)."""
+    if mode not in ("focus", "grid") or action not in ("pause", "resume"):
+        return jsonify(error="requête invalide"), 400
+
+    state = load_grid_state() if mode == "grid" else load_review_state()
+    if not state.get("cards"):
+        return jsonify(error="aucune session en cours"), 404
+
+    now = datetime.now()
+    paused_at = state.get("paused_at")
+    if action == "pause":
+        if not paused_at:                     # déjà en pause → sans effet
+            state["paused_at"] = now.isoformat()
+    elif paused_at:                           # déjà actif → sans effet
+        try:
+            gap = (now - datetime.fromisoformat(paused_at)).total_seconds()
+        except Exception:
+            gap = 0
+        state["paused_total"] = (state.get("paused_total") or 0) + max(0, gap)
+        state["paused_at"] = None
+
+    if mode == "grid":
+        save_grid_state(state["cards"], state["index"],
+                        state.get("batch", GRID_DEFAULT_BATCH),
+                        paused_total=state["paused_total"], paused_at=state["paused_at"])
+    else:
+        save_review_state(state["cards"], state["index"], state["show_answer"],
+                          paused_total=state["paused_total"], paused_at=state["paused_at"])
+    return jsonify(elapsed=elapsed_seconds(state), paused=bool(state["paused_at"]))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  MODE GRILLE — révision multi-cartes (notation en lot)
 #  ───────────────────────────────────────────────────────────────────────────────
@@ -625,6 +675,9 @@ def save_grid_state(cards, index, batch, **extra):
         "incorrect": extra.get("incorrect", existing.get("incorrect", 0)),
         "pass_count": extra.get("pass_count", existing.get("pass_count", 0)),
         "start_time": extra.get("start_time", existing.get("start_time", datetime.now().isoformat())),
+        # Minuteur : secondes déjà passées en pause, et début de la pause en cours (None = actif).
+        "paused_total": extra.get("paused_total", existing.get("paused_total", 0)),
+        "paused_at": extra["paused_at"] if "paused_at" in extra else existing.get("paused_at"),
     }
     with open(p, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
@@ -634,10 +687,14 @@ def load_grid_state():
     p = _grid_path()
     if os.path.exists(p):
         with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        data.setdefault("paused_total", 0)
+        data.setdefault("paused_at", None)
+        return data
     return {"cards": [], "index": 0, "batch": GRID_DEFAULT_BATCH,
             "correct": 0, "incorrect": 0, "pass_count": 0,
-            "start_time": datetime.now().isoformat()}
+            "start_time": datetime.now().isoformat(),
+            "paused_total": 0, "paused_at": None}
 
 
 def clear_grid_state():
@@ -689,12 +746,7 @@ def review_grid():
 
     # Fin de session → écran de bilan (réutilise review_done.html)
     if not cards or idx >= len(cards):
-        try:
-            start_dt = datetime.fromisoformat(state.get("start_time", datetime.now().isoformat()))
-            elapsed = int((datetime.now() - start_dt).total_seconds())
-        except Exception:
-            elapsed = 0
-        minutes, seconds = divmod(elapsed, 60)
+        minutes, seconds = divmod(elapsed_seconds(state), 60)
         summary = {
             "correct": state.get("correct", 0),
             "incorrect": state.get("incorrect", 0),
@@ -714,7 +766,7 @@ def review_grid():
         body_class="review-mode", cards=batch_cards,
         idx=idx, total=len(cards), batch=batch,
         cur_batch=cur_batch, total_batches=total_batches,
-        elapsed=elapsed_seconds(state),
+        elapsed=elapsed_seconds(state), paused=bool(state.get("paused_at")),
     )
 
 

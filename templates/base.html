@@ -701,9 +701,11 @@ body.review-mode .container { padding-bottom: 120px; }
     align-items: center;
     gap: 6px;
     padding: 4px 10px 4px 8px;
+    border: none;
     border-radius: 99px;
     background: rgba(255,255,255,.035);
     color: var(--text2);
+    cursor: pointer;
     font-family: 'Space Mono', monospace;
     font-size: .68rem;
     letter-spacing: .04em;
@@ -734,6 +736,21 @@ body.review-mode .container { padding-bottom: 120px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .session-timer::before { animation: none; opacity: .75; }
+}
+/* En pause : le point qui pulse devient une icône « pause » ambre (deux barres,
+   la seconde dessinée par le box-shadow), et les chiffres se figent. */
+.session-timer.is-paused {
+    color: var(--warning);
+    opacity: .85;
+}
+.session-timer.is-paused::before {
+    animation: none;
+    width: 3px;
+    height: 8px;
+    border-radius: 1px;
+    margin-right: 5px;          /* place pour la 2e barre du box-shadow */
+    background: var(--warning);
+    box-shadow: 5px 0 0 var(--warning);
 }
 
 /* ── Selection ───────────────── */
@@ -780,22 +797,68 @@ body.review-mode .container { padding-bottom: 120px; }
 {% endblock %}
 
 <script>
-/* ── Minuteur de session : démarre depuis l'écoulé fourni par le serveur, ────
-   il survit donc aux rechargements de page entre deux cartes / fournées. ──── */
+/* ── Minuteur de session ─────────────────────────────────────────────────────
+   Repart de l'écoulé fourni par le serveur : il survit donc aux rechargements
+   de page entre deux cartes / fournées, pauses comprises.
+   Un clic sur le minuteur met en pause ; toucher une carte relance. ───────── */
 (function () {
     var els = document.querySelectorAll('.session-timer[data-elapsed]');
     if (!els.length) return;
-    var base = parseInt(els[0].dataset.elapsed, 10) || 0;
-    var t0 = Date.now();
-    var pad = function (n) { return String(n).padStart(2, '0'); };
-    function tick() {
-        var s = base + Math.floor((Date.now() - t0) / 1000);
+
+    var mode   = els[0].dataset.mode || 'focus';
+    var base   = parseInt(els[0].dataset.elapsed, 10) || 0;   // secondes déjà comptées
+    var paused = els[0].dataset.paused === '1';
+    var t0     = Date.now();                                  // repère de la portion en cours
+    var pad    = function (n) { return String(n).padStart(2, '0'); };
+
+    function render() {
+        var s = paused ? base : base + Math.floor((Date.now() - t0) / 1000);
         var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
         var txt = (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(sec);
-        els.forEach(function (el) { el.textContent = txt; });
+        var tip = paused ? 'Minuteur en pause — cliquer pour reprendre'
+                         : 'Durée de la session — cliquer pour mettre en pause';
+        els.forEach(function (el) {
+            el.textContent = txt;
+            el.classList.toggle('is-paused', paused);
+            el.title = tip;
+            el.setAttribute('aria-label', tip);
+        });
     }
-    tick();
-    setInterval(tick, 1000);
+
+    function setPaused(next) {
+        if (next === paused) return;
+        if (next) base = base + Math.floor((Date.now() - t0) / 1000);  // fige la valeur
+        else      t0 = Date.now();                                     // repart de la valeur figée
+        paused = next;
+        render();
+        /* keepalive : la requête aboutit même si un clic sur une carte
+           déclenche aussitôt une navigation. */
+        try {
+            fetch('/review/timer/' + mode + '/' + (next ? 'pause' : 'resume'),
+                  { method: 'POST', keepalive: true }).catch(function () {});
+        } catch (e) {}
+    }
+
+    /* Reprise programmée depuis les pages de révision (clavier, swipe, notation) */
+    window.reviewTimerResume = function () { setPaused(false); };
+
+    els.forEach(function (el) {
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            setPaused(!paused);
+        });
+    });
+
+    /* Reprise automatique au premier contact avec une carte ou la barre d'action */
+    document.addEventListener('pointerdown', function (e) {
+        if (!paused || !e.target || !e.target.closest) return;
+        if (e.target.closest('.session-timer')) return;      // le minuteur garde son propre clic
+        if (e.target.closest('#swipeCard, .gcards, .review-action-bar')) setPaused(false);
+    }, true);
+
+    render();
+    setInterval(render, 1000);
 })();
 
 /* ── Préfixes emoji : un clic pose (ou retire) le marqueur en tête du texte ──
