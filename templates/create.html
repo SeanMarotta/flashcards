@@ -7,12 +7,13 @@
 </div>
 
 <form method="POST" enctype="multipart/form-data">
+    {{ emoji_prefix_row() }}
+
     <div class="face-panel face-recto">
         <p class="section-title">Recto</p>
         <div class="form-group">
             <label>Texte</label>
             <textarea name="recto_text" rows="3" placeholder="Question ou mot..."></textarea>
-            {{ emoji_prefix_row("recto_text") }}
         </div>
         <div class="upload-row">
             <div class="upload-slot">
@@ -39,7 +40,6 @@
         <div class="form-group">
             <label>Texte</label>
             <textarea name="verso_text" rows="3" placeholder="Réponse..."></textarea>
-            {{ emoji_prefix_row("verso_text") }}
         </div>
         <div class="upload-row">
             <div class="upload-slot">

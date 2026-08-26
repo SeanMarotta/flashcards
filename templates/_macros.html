@@ -16,24 +16,33 @@
 {% endmacro %}
 
 {# Palette des préfixes emoji — pour en ajouter/retirer un, éditez cette liste.
-   Format : (emoji, libellé court affiché, nom complet pour l'infobulle). #}
+   Format : (emoji du recto, emoji du verso, libellé court, nom pour l'infobulle).
+   Deux emojis identiques = le même marqueur sur les deux faces. Deux emojis
+   distincts = une pastille à sens : le premier clic pose l'ordre affiché, le
+   deuxième l'inverse, le troisième efface (voir le script dans base.html).
+   Libellé vide = les drapeaux se suffisent à eux-mêmes, seule l'infobulle reste. #}
 {% set emoji_prefixes = [
-    ('🇬🇧', 'EN',      'Anglais'),
-    ('🇫🇷', 'FR',      'Français'),
-    ('📖', 'DÉF',     'Définition'),
-    ('📜', 'HIST',    'Histoire'),
-    ('🗺️', 'GÉO',     'Géographie'),
-    ('💡', 'CONCEPT', 'Concept'),
+    ('🇬🇧', '🇫🇷', '',        'une langue par face — recliquez pour inverser le sens'),
+    ('📖', '📖', 'DÉF',     'Définition'),
+    ('📜', '📜', 'HIST',    'Histoire'),
+    ('🗺️', '🗺️', 'GÉO',     'Géographie'),
+    ('🎨', '🎨', 'TAB',     'Tableau — peinture et son auteur'),
+    ('💡', '💡', 'CONCEPT', 'Concept'),
 ] %}
 
-{# Rangée de pastilles cliquables qui préfixent le textarea nommé `target`. #}
-{% macro emoji_prefix_row(target) %}
-<div class="emoji-row" data-target="{{ target }}">
-    {% for emoji, label, name in emoji_prefixes %}
-    <button type="button" class="emoji-chip" data-emoji="{{ emoji }}"
-            title="Préfixer le texte par {{ emoji }} ({{ name }})">
-        <span class="emo">{{ emoji }}</span><span class="lbl">{{ label }}</span>
-    </button>
-    {% endfor %}
+{# Rangée unique de pastilles : un clic préfixe les DEUX textareas d'un coup. #}
+{% macro emoji_prefix_row(recto_target='recto_text', verso_target='verso_text') %}
+<div class="form-group emoji-field">
+    <div class="emoji-row" data-recto-target="{{ recto_target }}" data-verso-target="{{ verso_target }}">
+        {% for recto_emoji, verso_emoji, short, name in emoji_prefixes %}
+        <button type="button" class="emoji-chip"
+                data-recto="{{ recto_emoji }}" data-verso="{{ verso_emoji }}"
+                title="{% if recto_emoji == verso_emoji %}Préfixer les deux faces par {{ recto_emoji }} ({{ name }}){% else %}Préfixer les faces par {{ recto_emoji }} et {{ verso_emoji }} ({{ name }}){% endif %}">
+            <span class="emo">{{ recto_emoji }}</span>
+            {%- if verso_emoji != recto_emoji %}<span class="sep">→</span><span class="emo">{{ verso_emoji }}</span>{% endif %}
+            {%- if short %}<span class="lbl">{{ short }}</span>{% endif %}
+        </button>
+        {% endfor %}
+    </div>
 </div>
 {% endmacro %}

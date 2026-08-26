@@ -445,13 +445,14 @@ body.review-mode .container { padding-bottom: 120px; }
 .upload-slot.has-file .upload-clear { display: block; }
 .upload-clear:hover { background: rgba(255,255,255,.08); color: var(--danger); }
 
-/* Emoji prefixes — one tap drops a marker in front of the face's text */
+/* Emoji prefixes — one tap marks both faces at once */
 .emoji-row {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
 }
+.emoji-field .emoji-row { margin-top: 0; }
 .emoji-chip {
     display: inline-flex;
     align-items: center;
@@ -473,15 +474,18 @@ body.review-mode .container { padding-bottom: 120px; }
     letter-spacing: 0.6px;
     text-transform: uppercase;
 }
+.emoji-chip .sep { font-size: 0.62rem; color: var(--text2); }
 .emoji-chip:hover { border-color: var(--border-hover); color: var(--text); }
 .emoji-chip.active {
     background: var(--accent-glow);
     border-color: var(--accent);
     color: var(--text);
 }
-.face-verso .emoji-chip.active {
-    background: var(--accent2-glow);
-    border-color: var(--accent2);
+/* Marqueur posé sur une seule des deux faces (carte d'avant, ou texte retouché) */
+.emoji-chip.partial {
+    border-style: dashed;
+    border-color: var(--accent);
+    color: var(--text);
 }
 
 /* Recto / verso panels — colour-codes which face you are filling in */
@@ -861,18 +865,35 @@ body.review-mode .container { padding-bottom: 120px; }
     setInterval(render, 1000);
 })();
 
-/* ── Préfixes emoji : un clic pose (ou retire) le marqueur en tête du texte ──
-   Un seul préfixe de la palette à la fois : cliquer un autre drapeau remplace
-   celui qui est déjà là, recliquer le même l'enlève. ───────────────────────── */
+/* ── Préfixes emoji : un clic pose (ou retire) le marqueur sur les DEUX faces ──
+   Une pastille porte un emoji par face. Identiques (📖 des deux côtés) : elle
+   bascule posé / retiré. Distincts (🇬🇧 → 🇫🇷) : elle a un sens, et les clics
+   font le tour — 🇬🇧/🇫🇷, puis 🇫🇷/🇬🇧, puis rien. Cliquer une autre pastille
+   remplace le marqueur en place. ──────────────────────────────────────────── */
 (function () {
-    document.querySelectorAll('.emoji-row[data-target]').forEach(function (row) {
-        var ta = document.querySelector('textarea[name="' + row.dataset.target + '"]');
-        if (!ta) return;
-        var chips = Array.prototype.slice.call(row.querySelectorAll('.emoji-chip'));
-        var palette = chips.map(function (c) { return c.dataset.emoji; });
+    document.querySelectorAll('.emoji-row[data-recto-target]').forEach(function (row) {
+        var faces = ['recto', 'verso'].map(function (face) {
+            return document.querySelector('textarea[name="' + row.dataset[face + 'Target'] + '"]');
+        });
+        if (!faces[0] || !faces[1]) return;
+
+        var palette = [];   // tous les marqueurs : ceux qu'un clic doit savoir retirer
+        var items = Array.prototype.map.call(row.querySelectorAll('.emoji-chip'), function (chip) {
+            var recto = chip.dataset.recto, verso = chip.dataset.verso;
+            [recto, verso].forEach(function (emoji) {
+                if (palette.indexOf(emoji) === -1) palette.push(emoji);
+            });
+            return {
+                chip: chip,
+                emos: chip.querySelectorAll('.emo'),
+                /* Deux emojis distincts → les deux sens sont proposés tour à tour. */
+                states: recto === verso ? [[recto, verso]] : [[recto, verso], [verso, recto]],
+                next: 0
+            };
+        });
 
         /* Sépare "🇬🇧 texte" en son préfixe et le reste. */
-        function split() {
+        function split(ta) {
             for (var i = 0; i < palette.length; i++) {
                 if (ta.value.indexOf(palette[i]) === 0) {
                     return { prefix: palette[i], rest: ta.value.slice(palette[i].length).replace(/^[ \t]+/, '') };
@@ -881,26 +902,57 @@ body.review-mode .container { padding-bottom: 120px; }
             return { prefix: '', rest: ta.value };
         }
 
-        function refresh() {
-            var cur = split().prefix;
-            chips.forEach(function (c) { c.classList.toggle('active', c.dataset.emoji === cur); });
+        /* Réécrit le préfixe d'une face ; '' l'enlève. Le texte ne bouge qu'en
+           tête, donc on décale le curseur d'autant. */
+        function setPrefix(ta, emoji) {
+            var before = ta.value.length;
+            var caret = ta.selectionStart;
+            var rest = split(ta).rest;
+            ta.value = emoji ? emoji + ' ' + rest : rest;
+            var pos = Math.min(Math.max(caret + ta.value.length - before, 0), ta.value.length);
+            ta.setSelectionRange(pos, pos);
         }
 
-        chips.forEach(function (chip) {
-            chip.addEventListener('click', function () {
-                var parts = split();
-                var before = ta.value.length;
-                var caret = ta.selectionStart;
-                ta.value = (parts.prefix === chip.dataset.emoji ? '' : chip.dataset.emoji + ' ') + parts.rest;
+        function refresh() {
+            var cur = faces.map(function (ta) { return split(ta).prefix; });
+            items.forEach(function (item) {
+                var full = -1, half = -1;
+                item.states.forEach(function (state, i) {
+                    var hits = (cur[0] === state[0] ? 1 : 0) + (cur[1] === state[1] ? 1 : 0);
+                    if (hits === 2) { if (full < 0) full = i; }
+                    else if (hits === 1 && half < 0) half = i;
+                });
+                item.chip.classList.toggle('active', full >= 0);
+                item.chip.classList.toggle('partial', full < 0 && half >= 0);
+                /* Posé : le clic suivant avance dans le tour. Posé à moitié : il
+                   complète le sens déjà là. Absent : il pose le premier sens. */
+                var shown = full >= 0 ? full : (half >= 0 ? half : 0);
+                item.next = full >= 0 ? full + 1 : shown;
+                /* La pastille montre le sens en place, pas celui de la palette. */
+                if (item.emos.length === 2) {
+                    item.emos[0].textContent = item.states[shown][0];
+                    item.emos[1].textContent = item.states[shown][1];
+                }
+            });
+        }
+
+        /* On rend la main au champ que l'utilisateur éditait, pas à la pastille. */
+        var lastFocused = null;
+        faces.forEach(function (ta) {
+            ta.addEventListener('focus', function () { lastFocused = ta; });
+            ta.addEventListener('input', refresh);
+        });
+
+        items.forEach(function (item) {
+            item.chip.addEventListener('click', function () {
+                var state = item.next < item.states.length ? item.states[item.next] : ['', ''];
+                setPrefix(faces[0], state[0]);
+                setPrefix(faces[1], state[1]);
                 refresh();
-                ta.focus();
-                /* Le texte ne bouge qu'en tête : on décale le curseur d'autant. */
-                var pos = Math.min(Math.max(caret + ta.value.length - before, 0), ta.value.length);
-                ta.setSelectionRange(pos, pos);
+                (lastFocused || faces[0]).focus();
             });
         });
 
-        ta.addEventListener('input', refresh);
         refresh();
     });
 })();
