@@ -350,6 +350,17 @@ body.review-mode .container { padding-bottom: 120px; }
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .form-group textarea { min-height: 80px; resize: vertical; }
+/* Face en image : son texte ne compte plus, le champ passe en retrait */
+.form-group textarea.is-locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-style: dashed;
+    background: transparent;
+}
+.form-group textarea.is-locked:focus {
+    border-color: var(--border);
+    box-shadow: none;
+}
 .form-group input[type="file"] {
     width: 100%;
     max-width: 100%;
@@ -453,6 +464,8 @@ body.review-mode .container { padding-bottom: 120px; }
     margin-top: 8px;
 }
 .emoji-field .emoji-row { margin-top: 0; }
+/* Deux faces en image : plus rien à préfixer */
+.emoji-row.is-locked { opacity: 0.35; pointer-events: none; }
 .emoji-chip {
     display: inline-flex;
     align-items: center;
@@ -865,6 +878,85 @@ body.review-mode .container { padding-bottom: 120px; }
     setInterval(render, 1000);
 })();
 
+/* ── Une face en image n'a pas de texte : son champ passe en lecture seule ────
+   Le serveur ignore le texte d'une face qui reçoit une image (création) ou
+   l'efface (modification) : le formulaire le montre au lieu de laisser saisir
+   dans le vide. Lecture seule et non désactivé, pour que la valeur continue
+   d'être postée — un champ désactivé serait lu comme vide, donc effacé. ───── */
+(function () {
+    ['recto', 'verso'].forEach(function (face) {
+        var ta = document.querySelector('textarea[name="' + face + '_text"]');
+        if (!ta) return;
+        var upload = document.querySelector('input[type="file"][name="' + face + '_upload"]');
+        var url = document.querySelector('input[name="' + face + '_url"]');
+        var remove = document.querySelector('input[name="' + face + '_remove_image"]');
+        var stored = ta.dataset.image || '';          // 'local', 'remote', ou aucune image
+        var placeholder = ta.placeholder;
+
+        /* Même arbitrage que _resolve_face_image() côté serveur, dans cet ordre. */
+        function hasImage() {
+            if (upload && upload.files && upload.files.length) return true;
+            if (remove && remove.checked) return false;
+            if (url && url.value.trim()) return true;
+            if (stored === 'remote') return false;    // champ URL vidé = image retirée
+            return stored === 'local';
+        }
+
+        function refresh() {
+            var locked = hasImage();
+            ta.readOnly = locked;
+            ta.classList.toggle('is-locked', locked);
+            ta.placeholder = locked ? "L'image de cette face remplace son texte" : placeholder;
+            /* Les pastilles emoji écoutent : elles ne préfixent pas une face verrouillée. */
+            ta.dispatchEvent(new CustomEvent('facelock', { bubbles: true }));
+        }
+
+        [upload, url, remove].forEach(function (el) {
+            if (!el) return;
+            el.addEventListener('change', refresh);
+            el.addEventListener('input', refresh);
+        });
+        refresh();
+    });
+})();
+
+/* ── Majuscule initiale : "🇬🇧 dog" devient "🇬🇧 Dog" ─────────────────────────
+   Même règle que capitalize_first() dans app2.py, appliquée en quittant le
+   champ pour qu'elle se voie avant la sauvegarde : on saute l'emoji et les
+   espaces, on laisse tranquille un texte qui commence par un chiffre et un mot
+   du genre « iPhone ». ────────────────────────────────────────────────────── */
+(function () {
+    function capitalizeFirst(text) {
+        for (var i = 0; i < text.length; i++) {
+            var char = text[i];
+            if (char >= '0' && char <= '9') return text;
+            /* Ni majuscule ni minuscule : emoji, espace, ponctuation — on passe. */
+            if (char.toLowerCase() === char.toUpperCase()) continue;
+            var next = text[i + 1] || '';
+            var nextIsUpper = next.toLowerCase() !== next.toUpperCase() && next === next.toUpperCase();
+            if (char === char.toLowerCase() && !nextIsUpper) {
+                return text.slice(0, i) + char.toLocaleUpperCase() + text.slice(i + 1);
+            }
+            return text;
+        }
+        return text;
+    }
+
+    ['recto_text', 'verso_text'].forEach(function (name) {
+        var ta = document.querySelector('textarea[name="' + name + '"]');
+        if (!ta) return;
+        ta.addEventListener('blur', function () {
+            if (ta.readOnly) return;
+            var fixed = capitalizeFirst(ta.value);
+            if (fixed === ta.value) return;
+            var caret = ta.selectionStart;
+            ta.value = fixed;                        // longueur inchangée : le curseur reste en place
+            ta.setSelectionRange(caret, caret);
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    });
+})();
+
 /* ── Préfixes emoji : un clic pose (ou retire) le marqueur sur les DEUX faces ──
    Une pastille porte un emoji par face. Identiques (📖 des deux côtés) : elle
    bascule posé / retiré. Distincts (🇬🇧 → 🇫🇷) : elle a un sens, et les clics
@@ -903,8 +995,10 @@ body.review-mode .container { padding-bottom: 120px; }
         }
 
         /* Réécrit le préfixe d'une face ; '' l'enlève. Le texte ne bouge qu'en
-           tête, donc on décale le curseur d'autant. */
+           tête, donc on décale le curseur d'autant. Une face en image n'a pas
+           de texte à marquer : on la laisse tranquille. */
         function setPrefix(ta, emoji) {
+            if (ta.readOnly) return;
             var before = ta.value.length;
             var caret = ta.selectionStart;
             var rest = split(ta).rest;
@@ -915,12 +1009,16 @@ body.review-mode .container { padding-bottom: 120px; }
 
         function refresh() {
             var cur = faces.map(function (ta) { return split(ta).prefix; });
+            /* Seules les faces sans image comptent : une carte image/texte est
+               marquée dès que son unique face de texte porte le marqueur. */
+            var live = [0, 1].filter(function (i) { return !faces[i].readOnly; });
+            row.classList.toggle('is-locked', live.length === 0);
             items.forEach(function (item) {
                 var full = -1, half = -1;
                 item.states.forEach(function (state, i) {
-                    var hits = (cur[0] === state[0] ? 1 : 0) + (cur[1] === state[1] ? 1 : 0);
-                    if (hits === 2) { if (full < 0) full = i; }
-                    else if (hits === 1 && half < 0) half = i;
+                    var hits = live.filter(function (f) { return cur[f] === state[f]; }).length;
+                    if (live.length && hits === live.length) { if (full < 0) full = i; }
+                    else if (hits > 0 && half < 0) half = i;
                 });
                 item.chip.classList.toggle('active', full >= 0);
                 item.chip.classList.toggle('partial', full < 0 && half >= 0);
@@ -941,6 +1039,7 @@ body.review-mode .container { padding-bottom: 120px; }
         faces.forEach(function (ta) {
             ta.addEventListener('focus', function () { lastFocused = ta; });
             ta.addEventListener('input', refresh);
+            ta.addEventListener('facelock', refresh);   // une image vient d'arriver / partir
         });
 
         items.forEach(function (item) {
@@ -949,7 +1048,9 @@ body.review-mode .container { padding-bottom: 120px; }
                 setPrefix(faces[0], state[0]);
                 setPrefix(faces[1], state[1]);
                 refresh();
-                (lastFocused || faces[0]).focus();
+                var back = lastFocused && !lastFocused.readOnly ? lastFocused
+                         : (faces[0].readOnly ? faces[1] : faces[0]);
+                if (!back.readOnly) back.focus();
             });
         });
 

@@ -295,11 +295,33 @@ def save_uploaded_audio(file_storage):
         return unique_name  # store only filename, served via /audios/
     return None
 
+def capitalize_first(text):
+    """Majuscule à la première lettre du texte d'une face, en sautant un
+    éventuel préfixe emoji : "🇬🇧 dog" devient "🇬🇧 Dog".
+
+    Deux garde-fous : un texte qui commence par un chiffre est laissé tel quel
+    ("1er janvier"), et un mot dont la deuxième lettre est déjà une majuscule
+    aussi ("iPhone", "eBay") — sans quoi on le défigurerait.
+    Le formulaire applique la même règle en direct (voir base.html) ; ceci en
+    est le filet, y compris pour l'import en masse."""
+    if not text:
+        return text
+    for i, char in enumerate(text):
+        if char.isdigit():
+            return text
+        if char.isalpha():
+            following = text[i + 1] if i + 1 < len(text) else ""
+            if char.islower() and not following.isupper():
+                return text[:i] + char.upper() + text[i + 1:]
+            return text
+    return text
+
 def form_text(field):
     """Read a multi-line form field. Browsers submit textarea newlines as CRLF;
-    normalise to LF so the stored JSON stays clean and renders identically."""
+    normalise to LF so the stored JSON stays clean and renders identically.
+    La première lettre passe en majuscule, comme dans le formulaire."""
     value = request.form.get(field, "")
-    return value.replace("\r\n", "\n").replace("\r", "\n").strip()
+    return capitalize_first(value.replace("\r\n", "\n").replace("\r", "\n").strip())
 
 def index_by_id(cards):
     """Build a dict {card_id: (index, card)} for O(1) lookup."""
@@ -1031,7 +1053,7 @@ def _text_field(entry, key):
         return None
     if not isinstance(val, str):
         raise ValueError(f"{key} doit être une chaîne de caractères.")
-    return val.strip() or None
+    return capitalize_first(val.strip()) or None
 
 def _local_image_path(key, raw):
     """Resolve a user-supplied local image path to a stored "images/…" value.

@@ -43,7 +43,7 @@
     {{ image_field('recto', card.recto_path) }}
     <div class="form-group">
         <label>Texte{% if card.recto_path %} — affiché seulement sans image{% endif %}</label>
-        <textarea name="recto_text">{{ card.recto_text or '' }}</textarea>
+        <textarea name="recto_text"{% if card.recto_path %} data-image="{{ 'remote' if card.recto_path.startswith('http') else 'local' }}"{% endif %}>{{ card.recto_text or '' }}</textarea>
     </div>
     <div class="form-group">
         <label>URL image</label>
@@ -62,7 +62,7 @@
     {{ image_field('verso', card.verso_path) }}
     <div class="form-group">
         <label>Texte{% if card.verso_path %} — affiché seulement sans image{% endif %}</label>
-        <textarea name="verso_text">{{ card.verso_text or '' }}</textarea>
+        <textarea name="verso_text"{% if card.verso_path %} data-image="{{ 'remote' if card.verso_path.startswith('http') else 'local' }}"{% endif %}>{{ card.verso_text or '' }}</textarea>
     </div>
     <div class="form-group">
         <label>URL image</label>
