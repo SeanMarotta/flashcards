@@ -10,15 +10,17 @@ except ImportError:
     fcntl = None  # Windows : pas de verrou fichier (voir locked_flashcards)
 import json
 import os
+import tempfile
 import uuid
 import random
+import zipfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, session, flash, jsonify, send_from_directory
+    url_for, session, flash, jsonify, send_file, send_from_directory
 )
 from werkzeug.utils import secure_filename
 
@@ -178,6 +180,11 @@ def list_backups():
             label = fname
         result.append({"filename": fname, "label": label, "count": count, "size_kb": size_kb})
     return result
+
+def valid_backup_name(filename):
+    """Un nom de sauvegarde légitime, sans échappement de dossier."""
+    return (filename.startswith("flashcards_") and filename.endswith(".json")
+            and "/" not in filename and ".." not in filename)
 
 LOCK_FILE = CARDS_FILE + ".lock"
 
@@ -1350,14 +1357,120 @@ def api_advance_count():
 @app.route("/backups")
 @login_required
 def backups():
+    current = None
+    if os.path.exists(CARDS_FILE):
+        current = {"count": len(load_flashcards()),
+                   "size_kb": round(os.path.getsize(CARDS_FILE) / 1024, 1)}
     return render_template("backups.html", title="Sauvegardes", active="backups", body_class="",
-                           backups=list_backups(), max_backups=MAX_BACKUPS)
+                           backups=list_backups(), max_backups=MAX_BACKUPS, current=current,
+                           media=media_stats())
+
+MEDIA_DIRS = (IMAGE_DIR, AUDIO_DIR)
+
+def human_size(num_bytes):
+    """Taille lisible : « 812 Ko », « 4,3 Mo »."""
+    if num_bytes >= 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.1f}".replace(".", ",") + " Mo"
+    return f"{max(num_bytes / 1024, 0.1):.1f}".replace(".", ",") + " Ko"
+
+def media_stats():
+    """Nombre de fichiers et octets cumulés dans images/ et audios/."""
+    files = total = 0
+    for folder in MEDIA_DIRS:
+        for root, _dirs, names in os.walk(folder):
+            for name in names:
+                try:
+                    total += os.path.getsize(os.path.join(root, name))
+                except OSError:
+                    continue
+                files += 1
+    return {"files": files, "size_label": human_size(total)}
+
+def add_dir_to_zip(zf, folder):
+    """Ajoute un dossier au ZIP en conservant son nom (« images/photo.png »).
+    Les médias sont déjà compressés (JPEG, PNG, MP3) : on les stocke tels quels
+    plutôt que de payer un deflate qui ne gagnerait presque rien."""
+    if not os.path.isdir(folder):
+        return
+    parent = os.path.dirname(os.path.abspath(folder))
+    for root, _dirs, names in os.walk(folder):
+        for name in sorted(names):
+            full = os.path.join(root, name)
+            arcname = os.path.relpath(full, parent)
+            try:
+                zf.write(full, arcname, compress_type=zipfile.ZIP_STORED)
+            except OSError:
+                continue  # fichier disparu ou illisible entre-temps
+
+def remove_quietly(path):
+    """Supprime un fichier sans lever ; renvoie True si c'est fait."""
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False
+
+@app.route("/export")
+@login_required
+def export_cards():
+    """Télécharge flashcards.json tel quel, sous un nom horodaté."""
+    path = os.path.abspath(CARDS_FILE)
+    if not os.path.exists(path):
+        flash("Aucun fichier de cartes à exporter.", "error")
+        return redirect(url_for("backups"))
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return send_file(path, mimetype="application/json", as_attachment=True,
+                     download_name=f"flashcards_{ts}.json", max_age=0)
+
+@app.route("/export/zip")
+@login_required
+def export_archive():
+    """Archive autonome : les cartes plus toutes les images et tous les audios."""
+    if not os.path.exists(CARDS_FILE):
+        flash("Aucun fichier de cartes à exporter.", "error")
+        return redirect(url_for("backups"))
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Sur disque plutôt qu'en mémoire : l'archive peut peser plusieurs dizaines
+    # de Mo une fois les médias inclus.
+    fd, tmp_path = tempfile.mkstemp(prefix="flashcards_export_", suffix=".zip")
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(os.path.abspath(CARDS_FILE), os.path.basename(CARDS_FILE))
+            for folder in MEDIA_DIRS:
+                add_dir_to_zip(zf, folder)
+        stream = open(tmp_path, "rb")
+    except Exception as e:
+        remove_quietly(tmp_path)
+        flash(f"Erreur lors de la création de l'archive : {e}", "error")
+        return redirect(url_for("backups"))
+    # Délié aussitôt : sous Unix le flux reste lisible et l'espace est rendu à
+    # la fermeture, donc aucune archive orpheline même si la requête échoue en
+    # cours de route. Sous Windows la suppression n'est possible qu'après coup.
+    deleted = remove_quietly(tmp_path)
+    response = send_file(stream, mimetype="application/zip", as_attachment=True,
+                         download_name=f"flashcards_{ts}.zip", max_age=0)
+    if not deleted:
+        response.call_on_close(lambda: remove_quietly(tmp_path))
+    return response
+
+@app.route("/backups/download/<filename>")
+@login_required
+def backup_download(filename):
+    if not valid_backup_name(filename):
+        flash("Fichier invalide.", "error")
+        return redirect(url_for("backups"))
+    path = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(path):
+        flash("Sauvegarde introuvable.", "error")
+        return redirect(url_for("backups"))
+    return send_file(os.path.abspath(path), mimetype="application/json",
+                     as_attachment=True, download_name=filename, max_age=0)
 
 @app.route("/backups/restore/<filename>", methods=["POST"])
 @login_required
 def backup_restore(filename):
-    # Security: only allow filenames that match our pattern
-    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+    if not valid_backup_name(filename):
         flash("Fichier invalide.", "error")
         return redirect(url_for("backups"))
     path = os.path.join(BACKUP_DIR, filename)
@@ -1377,7 +1490,7 @@ def backup_restore(filename):
 @app.route("/backups/preview/<filename>")
 @login_required
 def backup_preview(filename):
-    if not filename.startswith("flashcards_") or not filename.endswith(".json") or "/" in filename or ".." in filename:
+    if not valid_backup_name(filename):
         return jsonify({"error": "Fichier invalide"}), 400
     path = os.path.join(BACKUP_DIR, filename)
     if not os.path.exists(path):

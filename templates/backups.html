@@ -1,5 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
+<h2 style="font-size:1.2rem;margin-bottom:16px;">📥 Exporter</h2>
+<div class="export-section">
+{% if not current %}
+<div class="export-item">
+    <div class="backup-meta">Aucun fichier de cartes pour l'instant.</div>
+</div>
+{% else %}
+<div class="export-item">
+    <div class="backup-info">
+        <div class="backup-label">Archive complète</div>
+        <div class="backup-meta">
+            {% if media.files %}
+                {{ current.count }} cartes + {{ media.files }} fichier{{ 's' if media.files > 1 }} média · {{ media.size_label }}
+                — ZIP autonome, images et audios inclus
+            {% else %}
+                {{ current.count }} cartes · aucun média pour l'instant — ZIP autonome
+            {% endif %}
+        </div>
+    </div>
+    <a href="{{ url_for('export_archive') }}" class="btn btn-primary btn-sm">⬇️ Télécharger le ZIP</a>
+</div>
+
+<div class="export-item">
+    <div class="backup-info">
+        <div class="backup-label">Cartes seules</div>
+        <div class="backup-meta">{{ current.count }} cartes · {{ current.size_kb }} Ko — fichier JSON, sans les médias</div>
+    </div>
+    <a href="{{ url_for('export_cards') }}" class="btn btn-ghost btn-sm">⬇️ Télécharger le JSON</a>
+</div>
+{% endif %}
+</div>
+
 <h2 style="font-size:1.2rem;margin-bottom:4px;">🕐 Sauvegardes automatiques</h2>
 <p style="font-size:0.82rem;color:var(--text2);margin-bottom:20px;">
     Une sauvegarde est créée automatiquement avant chaque modification. Les {{ max_backups }} plus récentes sont conservées.
@@ -20,6 +52,7 @@
     </div>
     <div class="backup-actions">
         <button class="btn btn-ghost btn-sm" onclick="togglePreview('{{ b.filename }}', {{ loop.index }})">👁 Aperçu</button>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('backup_download', filename=b.filename) }}">⬇️ Télécharger</a>
         <button class="btn btn-ghost btn-sm" style="color:var(--warning)"
                 onclick="confirmRestore('{{ b.filename }}', '{{ b.label }}')">↩️ Restaurer</button>
     </div>
@@ -47,6 +80,15 @@
 </div>
 
 <style>
+.export-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.export-section { margin-bottom: 28px; }
+.export-item .btn { width: 100%; }
 .backup-item {
     background: var(--surface);
     border: 1px solid var(--border);
