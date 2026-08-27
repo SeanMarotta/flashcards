@@ -58,21 +58,22 @@ os.makedirs(BACKUP_DIR, exist_ok=True)
 #   340 → 160  rose → violet → bleu → cyan → émeraude   (route longue : teintes
 #              plus froides, chaque boîte un peu plus distincte de sa voisine)
 #
-# Les tons sont calculés ici plutôt qu'en CSS : à clarté HSL égale, un jaune
-# paraît bien plus lumineux qu'un bleu, ce qui ferait ressortir les boîtes du
-# milieu comme une tache claire. On vise donc une luminance perçue (norme sRGB)
-# et on résout la clarté qui l'atteint, teinte par teinte. Le gabarit pose les
-# couleurs en ligne, le CSS ne fait que les consommer.
+# Le ton est calculé ici plutôt qu'en CSS : à clarté HSL égale, un jaune paraît
+# bien plus lumineux qu'un bleu, ce qui ferait ressortir les boîtes du milieu
+# comme une tache claire. On vise donc une luminance perçue (norme sRGB) et on
+# résout la clarté qui l'atteint, teinte par teinte. Le gabarit pose la couleur
+# en ligne, le CSS ne fait que la consommer.
 BOX_MAX = 60
 BOX_HUE_START = 0     # rouge — fragile
 BOX_HUE_END = 140     # vert — acquis
 
 # Pour chaque ton : (saturation boîte 1, saturation boîte 60,
 #                    luminance perçue boîte 1, luminance perçue boîte 60).
-# Monter les luminances éclaircit le ton, monter les saturations le colore.
+# Monter la luminance éclaircit le ton, monter la saturation le colore. Ici la
+# teinte seule varie d'une boîte à l'autre ; le texte de la pastille reste
+# blanc, c'est donc le fond qui porte toute la couleur.
 BOX_TONES = {
-    "chip": (0.34, 0.34, 0.040, 0.040),     # fond de la pastille
-    "ink":  (0.50, 0.50, 0.460, 0.460),     # texte de la pastille
+    "chip": (0.48, 0.48, 0.075, 0.075),     # fond de la pastille
 }
 
 
