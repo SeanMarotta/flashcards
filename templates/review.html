@@ -123,7 +123,8 @@ body.review-mode .container{
 </div>
 
 <div class="review-meta">
-    <span class="badge badge-accent">Boîte {{ card.box }}</span>
+    <span class="badge badge-box"
+          style="{{ card.box|box_style }}">Boîte {{ card.box }}</span>
     {% if card.marked %}<span class="badge badge-warning">🔖 Marquée</span>{% endif %}
 </div>
 

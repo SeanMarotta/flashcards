@@ -269,6 +269,16 @@ body.review-mode .container { padding-bottom: 120px; }
 .badge-warning { background: rgba(245,158,11,.12); color: var(--warning); }
 .badge-danger { background: rgba(244,63,94,.12); color: var(--danger); }
 
+/* Pastille « Boîte n » : sa couleur suit la boîte Leitner de la carte, du rouge
+   (fragile) au vert (acquis). Les deux tons sont calculés par le filtre
+   box_style (voir app2.py) et posés en ligne par le gabarit ; toutes les boîtes
+   visent la même luminance perçue, pour qu'aucune ne ressorte comme une tache
+   claire au milieu du parcours. */
+.badge-box {
+    background: var(--box-chip, var(--surface3));
+    color: var(--box-ink, var(--text));
+}
+
 /* ── Stats grid ──────────────── */
 .stats-grid {
     display: grid;

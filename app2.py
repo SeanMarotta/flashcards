@@ -9,6 +9,7 @@ try:
 except ImportError:
     fcntl = None  # Windows : pas de verrou fichier (voir locked_flashcards)
 import json
+import math
 import os
 import tempfile
 import uuid
@@ -42,6 +43,91 @@ os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
 os.makedirs(REVIEW_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
+
+
+# ─── Couleur de boîte ────────────────────────────────────────────────────────
+# La pastille « Boîte n » d'une carte de révision prend une couleur qui suit sa
+# boîte Leitner : la boîte 1 (encore fragile) porte BOX_HUE_START, la boîte 60
+# (acquis) porte BOX_HUE_END, et la teinte glisse de l'une à l'autre sur une
+# échelle logarithmique — les premières boîtes changent vite de couleur, les
+# dernières se rapprochent doucement de la teinte finale.
+#
+# Deux plages au choix — il suffit d'échanger les deux constantes :
+#   0 → 140    rouge → ocre → mousse → vert   (route courte : rouge = fragile,
+#              vert = acquis, la lecture la plus directe)
+#   340 → 160  rose → violet → bleu → cyan → émeraude   (route longue : teintes
+#              plus froides, chaque boîte un peu plus distincte de sa voisine)
+#
+# Les tons sont calculés ici plutôt qu'en CSS : à clarté HSL égale, un jaune
+# paraît bien plus lumineux qu'un bleu, ce qui ferait ressortir les boîtes du
+# milieu comme une tache claire. On vise donc une luminance perçue (norme sRGB)
+# et on résout la clarté qui l'atteint, teinte par teinte. Le gabarit pose les
+# couleurs en ligne, le CSS ne fait que les consommer.
+BOX_MAX = 60
+BOX_HUE_START = 0     # rouge — fragile
+BOX_HUE_END = 140     # vert — acquis
+
+# Pour chaque ton : (saturation boîte 1, saturation boîte 60,
+#                    luminance perçue boîte 1, luminance perçue boîte 60).
+# Monter les luminances éclaircit le ton, monter les saturations le colore.
+BOX_TONES = {
+    "chip": (0.34, 0.34, 0.040, 0.040),     # fond de la pastille
+    "ink":  (0.50, 0.50, 0.460, 0.460),     # texte de la pastille
+}
+
+
+def _box_progress(box):
+    """Avancement 0 → 1 de la boîte, sur une échelle logarithmique."""
+    try:
+        b = int(box)
+    except (TypeError, ValueError):
+        b = 1
+    b = max(1, min(BOX_MAX, b))
+    return math.log(b) / math.log(BOX_MAX)
+
+
+def _hsl_to_rgb(hue, sat, light):
+    """hue en degrés, sat et light dans 0 → 1 ; renvoie trois canaux 0 → 1."""
+    c = (1 - abs(2 * light - 1)) * sat
+    hp = (hue % 360) / 60.0
+    x = c * (1 - abs(hp % 2 - 1))
+    r, g, b = [(c, x, 0), (x, c, 0), (0, c, x),
+               (0, x, c), (x, 0, c), (c, 0, x)][int(hp) % 6]
+    m = light - c / 2
+    return r + m, g + m, b + m
+
+
+def _luminance(rgb):
+    """Luminance relative sRGB (norme WCAG) d'un triplet 0 → 1."""
+    def channel(v):
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (channel(v) for v in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _tone(hue, sat, target):
+    """Couleur hexadécimale de teinte `hue` et saturation `sat` dont la
+    luminance perçue vaut `target` : on cherche la clarté par dichotomie."""
+    low, high = 0.0, 1.0
+    for _ in range(40):
+        mid = (low + high) / 2
+        if _luminance(_hsl_to_rgb(hue, sat, mid)) < target:
+            low = mid
+        else:
+            high = mid
+    rgb = _hsl_to_rgb(hue, sat, (low + high) / 2)
+    return "#%02x%02x%02x" % tuple(max(0, min(255, round(v * 255))) for v in rgb)
+
+
+@app.template_filter("box_style")
+def box_style(box):
+    """Les couleurs d'une boîte, prêtes à poser dans un attribut style."""
+    p = _box_progress(box)
+    hue = BOX_HUE_START - (BOX_HUE_START - BOX_HUE_END) * p
+    return ";".join(
+        "--box-%s:%s" % (name, _tone(hue, s1 + (s60 - s1) * p, l1 + (l60 - l1) * p))
+        for name, (s1, s60, l1, l60) in BOX_TONES.items()
+    )
 
 # ─── Server-side review session storage (avoids cookie size limits) ──────────
 

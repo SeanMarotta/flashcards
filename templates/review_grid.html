@@ -151,7 +151,8 @@
         {% for c in cards %}
         <div class="gcard" data-id="{{ c.id }}">
             <div class="gcard-head">
-                <span class="badge badge-accent">Boîte {{ c.box }}</span>
+                <span class="badge badge-box"
+                      style="{{ c.box|box_style }}">Boîte {{ c.box }}</span>
                 <span class="gcard-tools">
                     <a class="gcard-tool gcard-edit"
                        href="/card/{{ c.id }}/edit"
