@@ -308,6 +308,140 @@ def locked_flashcards():
             if fcntl is not None:
                 fcntl.flock(lf, fcntl.LOCK_UN)
 
+# ─── Palette des préfixes emoji ──────────────────────────────────────────────
+# Les pastilles proposées au-dessus des champs de création / d'édition. La liste
+# vit dans un fichier à part pour être modifiable depuis l'app (bouton ✏️ de la
+# rangée) sans toucher au code ; si le fichier manque ou devient illisible, on
+# retombe sur DEFAULT_EMOJI_PREFIXES.
+#
+# Une entrée = {recto, verso, short, name} :
+#   recto / verso identiques  → un même marqueur posé sur les deux faces
+#   recto / verso distincts   → une pastille à sens (🇬🇧 → 🇫🇷, puis l'inverse)
+#   short                     → libellé court affiché sur la pastille (peut être vide)
+#   name                      → texte de l'infobulle
+
+EMOJI_FILE = "emoji_prefixes.json"
+EMOJI_LOCK_FILE = EMOJI_FILE + ".lock"
+EMOJI_MAX_PREFIXES = 40   # au-delà, la rangée déborde et ne se lit plus
+EMOJI_MAX_LEN = 16        # un emoji composé (drapeau, famille) tient largement dedans
+EMOJI_SHORT_MAX = 10
+EMOJI_NAME_MAX = 80
+
+DEFAULT_EMOJI_PREFIXES = [
+    {"recto": "🇬🇧", "verso": "🇫🇷", "short": "",        "name": "une langue par face — recliquez pour inverser le sens"},
+    {"recto": "📖", "verso": "📖", "short": "DÉF",     "name": "Définition"},
+    {"recto": "📜", "verso": "📜", "short": "HIST",    "name": "Histoire"},
+    {"recto": "👤", "verso": "👤", "short": "PERSO",   "name": "Personnage — figure historique ou importante"},
+    {"recto": "🗺️", "verso": "🗺️", "short": "GÉO",     "name": "Géographie"},
+    {"recto": "🎨", "verso": "🎨", "short": "TAB",     "name": "Tableau — peinture et son auteur"},
+    {"recto": "💡", "verso": "💡", "short": "CONCEPT", "name": "Concept"},
+]
+
+
+class EmojiPrefixError(ValueError):
+    """Saisie refusée — le message est montré tel quel à l'utilisateur."""
+
+
+def clean_emoji_prefix(raw):
+    """Normalise une entrée saisie (ou relue du fichier) en {recto, verso, short, name}.
+
+    Le marqueur ne doit contenir aucune espace : le script client repère le
+    préfixe en tête de champ puis coupe l'espace qui suit, un marqueur à trou
+    casserait cette lecture.
+    """
+    if not isinstance(raw, dict):
+        raise EmojiPrefixError("Entrée illisible.")
+    recto = (raw.get("recto") or "").strip()
+    verso = (raw.get("verso") or "").strip() or recto   # verso vide = même marqueur des deux côtés
+    short = " ".join((raw.get("short") or "").split())
+    name = " ".join((raw.get("name") or "").split())
+
+    if not recto:
+        raise EmojiPrefixError("Il faut au moins un emoji pour le recto.")
+    for value in (recto, verso):
+        if len(value) > EMOJI_MAX_LEN:
+            raise EmojiPrefixError("Emoji trop long (%d caractères au maximum)." % EMOJI_MAX_LEN)
+        if any(ch.isspace() for ch in value):
+            raise EmojiPrefixError("Un emoji ne peut pas contenir d'espace.")
+    if len(short) > EMOJI_SHORT_MAX:
+        raise EmojiPrefixError("Libellé trop long (%d caractères au maximum)." % EMOJI_SHORT_MAX)
+
+    return {
+        "recto": recto,
+        "verso": verso,
+        "short": short,
+        "name": (name or short or recto)[:EMOJI_NAME_MAX],
+    }
+
+
+def _read_emoji_prefixes():
+    """Liste du fichier, nettoyée ; défauts si le fichier manque ou est cassé."""
+    if not os.path.exists(EMOJI_FILE):
+        return [dict(item) for item in DEFAULT_EMOJI_PREFIXES]
+    try:
+        with open(EMOJI_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return [dict(item) for item in DEFAULT_EMOJI_PREFIXES]
+    if not isinstance(raw, list):
+        return [dict(item) for item in DEFAULT_EMOJI_PREFIXES]
+
+    items, seen = [], set()
+    for entry in raw:
+        try:
+            item = clean_emoji_prefix(entry)
+        except EmojiPrefixError:
+            continue          # une entrée abîmée ne doit pas emporter toute la palette
+        key = (item["recto"], item["verso"])
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(item)
+    return items[:EMOJI_MAX_PREFIXES]
+
+
+def _write_emoji_prefixes(items):
+    """Écriture atomique : le fichier lu par une autre requête reste entier."""
+    fd, tmp_path = tempfile.mkstemp(dir=".", prefix=EMOJI_FILE + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(items, f, indent=4, ensure_ascii=False)
+        os.replace(tmp_path, EMOJI_FILE)
+    except BaseException:
+        remove_quietly(tmp_path)
+        raise
+
+
+@contextmanager
+def locked_emoji_prefixes():
+    """Charge, cède, puis réécrit la palette sous verrou exclusif.
+
+        with locked_emoji_prefixes() as items:
+            items.append(...)      # modifié sur place
+    """
+    with open(EMOJI_LOCK_FILE, "w") as lf:
+        if fcntl is not None:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            items = _read_emoji_prefixes()
+            yield items
+            _write_emoji_prefixes(items)
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+
+def load_emoji_prefixes():
+    return _read_emoji_prefixes()
+
+
+@app.context_processor
+def inject_emoji_prefixes():
+    """La palette est lue à chaque rendu : les pages ouvertes ailleurs voient
+    la liste à jour dès leur prochain chargement, sans redémarrage."""
+    return {"emoji_prefixes": load_emoji_prefixes()}
+
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -1438,6 +1572,72 @@ def api_advance_count():
         "days": days,
         "min_box": min_box,
     })
+
+# ── Palette des préfixes emoji ───────────────────────────────────────────────
+# L'éditeur vit dans le formulaire de création : il parle en JSON pour ne pas
+# soumettre la carte en cours de saisie. Chaque réponse renvoie la palette
+# complète, que le client redessine — inutile de deviner l'état côté navigateur.
+
+def _emoji_payload(items, message=None):
+    payload = {"prefixes": items, "max": EMOJI_MAX_PREFIXES}
+    if message:
+        payload["message"] = message
+    return jsonify(payload)
+
+
+@app.route("/api/emoji_prefixes")
+@login_required
+def api_emoji_prefixes():
+    return _emoji_payload(load_emoji_prefixes())
+
+
+@app.route("/api/emoji_prefixes", methods=["POST"])
+@login_required
+def api_emoji_prefixes_update():
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+
+    if action == "reset":
+        with locked_emoji_prefixes() as items:
+            items[:] = [dict(item) for item in DEFAULT_EMOJI_PREFIXES]
+            saved = list(items)
+        return _emoji_payload(saved, "Palette réinitialisée.")
+
+    if action == "add":
+        try:
+            new_item = clean_emoji_prefix(data)
+        except EmojiPrefixError as exc:
+            return jsonify({"error": str(exc)}), 400
+        # Le refus se décide sous verrou mais se renvoie après : sortir du bloc
+        # par un return réécrirait le fichier pour rien.
+        error = None
+        with locked_emoji_prefixes() as items:
+            if len(items) >= EMOJI_MAX_PREFIXES:
+                error = "Palette pleine (%d pastilles)." % EMOJI_MAX_PREFIXES
+            elif any(i["recto"] == new_item["recto"] and i["verso"] == new_item["verso"] for i in items):
+                error = "Cette pastille existe déjà."
+            else:
+                items.append(new_item)
+            saved = list(items)
+        if error:
+            return jsonify({"error": error}), 400
+        return _emoji_payload(saved, "Pastille ajoutée.")
+
+    if action == "delete":
+        recto = (data.get("recto") or "").strip()
+        verso = (data.get("verso") or "").strip() or recto
+        found = False
+        with locked_emoji_prefixes() as items:
+            kept = [i for i in items if not (i["recto"] == recto and i["verso"] == verso)]
+            found = len(kept) != len(items)
+            items[:] = kept
+            saved = list(items)
+        if not found:
+            return jsonify({"error": "Pastille introuvable."}), 404
+        return _emoji_payload(saved, "Pastille supprimée.")
+
+    return jsonify({"error": "Action inconnue."}), 400
+
 
 # ── Backups ──────────────────────────────────────────────────────────────────
 

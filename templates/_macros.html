@@ -15,35 +15,66 @@
 {% endif %}
 {% endmacro %}
 
-{# Palette des préfixes emoji — pour en ajouter/retirer un, éditez cette liste.
-   Format : (emoji du recto, emoji du verso, libellé court, nom pour l'infobulle).
-   Deux emojis identiques = le même marqueur sur les deux faces. Deux emojis
-   distincts = une pastille à sens : le premier clic pose l'ordre affiché, le
-   deuxième l'inverse, le troisième efface (voir le script dans base.html).
-   Libellé vide = les drapeaux se suffisent à eux-mêmes, seule l'infobulle reste. #}
-{% set emoji_prefixes = [
-    ('🇬🇧', '🇫🇷', '',        'une langue par face — recliquez pour inverser le sens'),
-    ('📖', '📖', 'DÉF',     'Définition'),
-    ('📜', '📜', 'HIST',    'Histoire'),
-    ('👤', '👤', 'PERSO',   'Personnage — figure historique ou importante'),
-    ('🗺️', '🗺️', 'GÉO',     'Géographie'),
-    ('🎨', '🎨', 'TAB',     'Tableau — peinture et son auteur'),
-    ('💡', '💡', 'CONCEPT', 'Concept'),
-] %}
+{# ── Palette des préfixes emoji ────────────────────────────────────────────
+   La liste n'est plus écrite ici : elle vient du fichier emoji_prefixes.json
+   via le context processor `inject_emoji_prefixes` (app2.py), et se modifie
+   depuis le bouton ✏️ de la rangée. D'où le `with context` des imports dans
+   create.html / edit.html — le macro lit `emoji_prefixes` dans le contexte.
 
-{# Rangée unique de pastilles : un clic préfixe les DEUX textareas d'un coup. #}
+   Une entrée : {recto, verso, short, name}. Deux emojis identiques = le même
+   marqueur sur les deux faces. Deux emojis distincts = une pastille à sens :
+   le premier clic pose l'ordre affiché, le deuxième l'inverse, le troisième
+   efface (voir le script dans base.html). #}
+
+{# Rangée unique de pastilles : un clic préfixe les DEUX textareas d'un coup.
+   Le bouton ✏️ vit hors de .emoji-row : la rangée se grise quand les deux
+   faces sont des images, l'éditeur de palette doit rester accessible. #}
 {% macro emoji_prefix_row(recto_target='recto_text', verso_target='verso_text') %}
 <div class="form-group emoji-field">
-    <div class="emoji-row" data-recto-target="{{ recto_target }}" data-verso-target="{{ verso_target }}">
-        {% for recto_emoji, verso_emoji, short, name in emoji_prefixes %}
-        <button type="button" class="emoji-chip"
-                data-recto="{{ recto_emoji }}" data-verso="{{ verso_emoji }}"
-                title="{% if recto_emoji == verso_emoji %}Préfixer les deux faces par {{ recto_emoji }} ({{ name }}){% else %}Préfixer les faces par {{ recto_emoji }} et {{ verso_emoji }} ({{ name }}){% endif %}">
-            <span class="emo">{{ recto_emoji }}</span>
-            {%- if verso_emoji != recto_emoji %}<span class="sep">→</span><span class="emo">{{ verso_emoji }}</span>{% endif %}
-            {%- if short %}<span class="lbl">{{ short }}</span>{% endif %}
-        </button>
-        {% endfor %}
+    <div class="emoji-bar">
+        <div class="emoji-row" data-recto-target="{{ recto_target }}" data-verso-target="{{ verso_target }}">
+            {% for p in emoji_prefixes %}{{ emoji_chip(p) }}{% endfor %}
+        </div>
+        <button type="button" class="emoji-tool" data-emoji-toggle
+                aria-expanded="false" title="Modifier la palette d'emojis">✏️</button>
+    </div>
+
+    {# Éditeur replié. Pas de <form> ici : le macro est appelé DANS le
+       formulaire de la carte, et un formulaire imbriqué est invalide — tout
+       passe donc par fetch (voir base.html). Les champs n'ont volontairement
+       pas de `name` : ils ne doivent pas partir avec la carte. #}
+    <div class="emoji-editor" data-emoji-editor hidden>
+        <p class="emoji-editor-title">Palette — retirez ✕ ou ajoutez une pastille</p>
+        <div class="emoji-editor-list" data-emoji-list></div>
+        <div class="emoji-editor-add">
+            <input type="text" class="emoji-in" data-emoji-new-recto maxlength="16"
+                   placeholder="🇬🇧" aria-label="Emoji du recto" autocomplete="off">
+            <span class="emoji-editor-arrow">→</span>
+            <input type="text" class="emoji-in" data-emoji-new-verso maxlength="16"
+                   placeholder="idem" aria-label="Emoji du verso — vide : le même qu'au recto" autocomplete="off">
+            <input type="text" class="emoji-in emoji-in-short" data-emoji-new-short maxlength="10"
+                   placeholder="LIBELLÉ" aria-label="Libellé court, facultatif" autocomplete="off">
+            <button type="button" class="btn btn-sm emoji-editor-add-btn" data-emoji-add>Ajouter</button>
+        </div>
+        <input type="text" class="emoji-in emoji-in-name" data-emoji-new-name maxlength="80"
+               placeholder="Infobulle (facultatif)" aria-label="Infobulle" autocomplete="off">
+        <div class="emoji-editor-foot">
+            <span class="emoji-editor-msg" data-emoji-msg role="status"></span>
+            <button type="button" class="emoji-editor-reset" data-emoji-reset>Réinitialiser</button>
+        </div>
     </div>
 </div>
 {% endmacro %}
+
+{# Une pastille. data-short / data-name permettent au script de redessiner la
+   rangée à l'identique après une modification de la palette. #}
+{% macro emoji_chip(p) %}
+<button type="button" class="emoji-chip"
+        data-recto="{{ p.recto }}" data-verso="{{ p.verso }}"
+        data-short="{{ p.short }}" data-name="{{ p.name }}"
+        title="{% if p.recto == p.verso %}Préfixer les deux faces par {{ p.recto }} ({{ p.name }}){% else %}Préfixer les faces par {{ p.recto }} et {{ p.verso }} ({{ p.name }}){% endif %}">
+    <span class="emo">{{ p.recto }}</span>
+    {%- if p.verso != p.recto %}<span class="sep">→</span><span class="emo">{{ p.verso }}</span>{% endif %}
+    {%- if p.short %}<span class="lbl">{{ p.short }}</span>{% endif %}
+</button>
+{%- endmacro %}

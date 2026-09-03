@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% from '_macros.html' import render_content, emoji_prefix_row %}
+{% from '_macros.html' import render_content, emoji_prefix_row with context %}
 
 {% macro image_field(face, path) %}
     {% if path %}

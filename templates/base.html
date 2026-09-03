@@ -511,6 +511,152 @@ body.review-mode .container { padding-bottom: 120px; }
     color: var(--text);
 }
 
+/* Éditeur de palette — le ✏️ vit hors de .emoji-row, qui se grise (is-locked)
+   quand les deux faces sont des images : la palette reste modifiable. */
+.emoji-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+.emoji-bar .emoji-row { flex: 1; min-width: 0; }
+.emoji-tool {
+    flex: none;
+    padding: 5px 9px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text2);
+    font-size: 0.88rem;
+    line-height: 1.1;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.emoji-tool:hover { border-color: var(--border-hover); color: var(--text); }
+.emoji-tool[aria-expanded="true"] {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--text);
+}
+.emoji-editor {
+    margin-top: 10px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.emoji-editor-title {
+    font-size: 0.72rem;
+    color: var(--text2);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+}
+.emoji-editor-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.emoji-editor-list:empty::after {
+    content: 'Palette vide — ajoutez une pastille ci-dessous.';
+    font-size: 0.82rem;
+    color: var(--text2);
+}
+/* Une pastille de l'éditeur : l'aperçu, puis le ✕ qui la retire. */
+.emoji-del {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px 5px 9px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.1;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.emoji-del .lbl {
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+.emoji-del .sep { font-size: 0.62rem; }
+.emoji-del .x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.06);
+    font-size: 0.68rem;
+}
+.emoji-del:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+.emoji-del:hover .x { background: var(--danger); color: #fff; }
+.emoji-del[disabled] { opacity: .45; pointer-events: none; }
+.emoji-editor-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.emoji-editor-arrow { color: var(--text2); font-size: 0.8rem; }
+/* Ces champs vivent dans un .form-group : sans ça, ils prendraient 100 %. */
+.emoji-field input.emoji-in {
+    width: 4.5rem;
+    flex: none;
+    padding: 9px 10px;
+    text-align: center;
+    font-size: 1rem;
+}
+.emoji-field input.emoji-in-short {
+    width: 7rem;
+    text-align: left;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+}
+.emoji-field input.emoji-in-name {
+    width: 100%;
+    margin-top: 8px;
+    text-align: left;
+    font-size: 0.82rem;
+}
+.emoji-editor-add-btn { flex: none; }
+.emoji-editor-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+.emoji-editor-msg {
+    font-size: 0.8rem;
+    color: var(--text2);
+    min-height: 1em;
+}
+.emoji-editor-msg.is-error { color: var(--danger); }
+.emoji-editor-msg.is-ok { color: var(--accent2); }
+.emoji-editor-reset {
+    flex: none;
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.emoji-editor-reset:hover { color: var(--text); }
+
 /* Recto / verso panels — colour-codes which face you are filling in */
 .face-panel {
     padding: 16px 16px 0;
@@ -971,19 +1117,79 @@ body.review-mode .container { padding-bottom: 120px; }
    Une pastille porte un emoji par face. Identiques (📖 des deux côtés) : elle
    bascule posé / retiré. Distincts (🇬🇧 → 🇫🇷) : elle a un sens, et les clics
    font le tour — 🇬🇧/🇫🇷, puis 🇫🇷/🇬🇧, puis rien. Cliquer une autre pastille
-   remplace le marqueur en place. ──────────────────────────────────────────── */
+   remplace le marqueur en place.
+
+   La palette elle-même se modifie via le ✏️ : l'éditeur parle à
+   /api/emoji_prefixes, redessine la rangée, puis la recâble (setupRow). ── */
 (function () {
-    document.querySelectorAll('.emoji-row[data-recto-target]').forEach(function (row) {
+    /* Une rangée redessinée doit oublier les écouteurs de sa vie d'avant. */
+    var wired = new WeakMap();
+
+    function span(cls, text) {
+        var s = document.createElement('span');
+        s.className = cls;
+        s.textContent = text;
+        return s;
+    }
+
+    /* Même infobulle que le macro Jinja emoji_chip — les deux doivent se suivre. */
+    function chipTitle(p) {
+        return p.recto === p.verso
+            ? 'Préfixer les deux faces par ' + p.recto + ' (' + p.name + ')'
+            : 'Préfixer les faces par ' + p.recto + ' et ' + p.verso + ' (' + p.name + ')';
+    }
+
+    /* Le corps commun d'une pastille : l'emoji, la flèche si les faces
+       diffèrent, le libellé s'il y en a un. */
+    function fillFaces(node, p) {
+        node.appendChild(span('emo', p.recto));
+        if (p.verso !== p.recto) {
+            node.appendChild(span('sep', '→'));
+            node.appendChild(span('emo', p.verso));
+        }
+        if (p.short) node.appendChild(span('lbl', p.short));
+    }
+
+    function makeChip(p) {
+        var b = document.createElement('button');
+        b.type = 'button';                       /* dans le formulaire de la carte : ne pas soumettre */
+        b.className = 'emoji-chip';
+        b.dataset.recto = p.recto;
+        b.dataset.verso = p.verso;
+        b.dataset.short = p.short || '';
+        b.dataset.name = p.name || '';
+        b.title = chipTitle(p);
+        fillFaces(b, p);
+        return b;
+    }
+
+    /* La palette telle qu'elle est affichée — sert d'état de départ à l'éditeur
+       sans attendre le réseau. */
+    function paletteFromRow(row) {
+        return Array.prototype.map.call(row.querySelectorAll('.emoji-chip'), function (chip) {
+            return {
+                recto: chip.dataset.recto,
+                verso: chip.dataset.verso,
+                short: chip.dataset.short || '',
+                name: chip.dataset.name || ''
+            };
+        });
+    }
+
+    function setupRow(row) {
         var faces = ['recto', 'verso'].map(function (face) {
             return document.querySelector('textarea[name="' + row.dataset[face + 'Target'] + '"]');
         });
         if (!faces[0] || !faces[1]) return;
 
+        var previous = wired.get(row);
+        if (previous) previous.forEach(function (off) { off(); });
+
         var palette = [];   // tous les marqueurs : ceux qu'un clic doit savoir retirer
         var items = Array.prototype.map.call(row.querySelectorAll('.emoji-chip'), function (chip) {
             var recto = chip.dataset.recto, verso = chip.dataset.verso;
             [recto, verso].forEach(function (emoji) {
-                if (palette.indexOf(emoji) === -1) palette.push(emoji);
+                if (emoji && palette.indexOf(emoji) === -1) palette.push(emoji);
             });
             return {
                 chip: chip,
@@ -993,6 +1199,9 @@ body.review-mode .container { padding-bottom: 120px; }
                 next: 0
             };
         });
+        /* Le plus long d'abord : un marqueur qui en commence un autre le
+           tronquerait à la lecture. */
+        palette.sort(function (a, b) { return b.length - a.length; });
 
         /* Sépare "🇬🇧 texte" en son préfixe et le reste. */
         function split(ta) {
@@ -1046,11 +1255,19 @@ body.review-mode .container { padding-bottom: 120px; }
 
         /* On rend la main au champ que l'utilisateur éditait, pas à la pastille. */
         var lastFocused = null;
+        var offs = [];
         faces.forEach(function (ta) {
-            ta.addEventListener('focus', function () { lastFocused = ta; });
+            function onFocus() { lastFocused = ta; }
+            ta.addEventListener('focus', onFocus);
             ta.addEventListener('input', refresh);
             ta.addEventListener('facelock', refresh);   // une image vient d'arriver / partir
+            offs.push(function () {
+                ta.removeEventListener('focus', onFocus);
+                ta.removeEventListener('input', refresh);
+                ta.removeEventListener('facelock', refresh);
+            });
         });
+        wired.set(row, offs);
 
         items.forEach(function (item) {
             item.chip.addEventListener('click', function () {
@@ -1065,7 +1282,123 @@ body.review-mode .container { padding-bottom: 120px; }
         });
 
         refresh();
-    });
+    }
+
+    /* ── Éditeur de palette ────────────────────────────────────────────────
+       Ajouter / retirer une pastille sans quitter la carte en cours de saisie :
+       tout passe par fetch, et le serveur renvoie la palette entière que l'on
+       redessine — le navigateur n'a pas à deviner l'état. ── */
+    function setupEditor(field) {
+        var row = field.querySelector('.emoji-row[data-recto-target]');
+        var toggle = field.querySelector('[data-emoji-toggle]');
+        var editor = field.querySelector('[data-emoji-editor]');
+        if (!row || !toggle || !editor) return;
+
+        var list = editor.querySelector('[data-emoji-list]');
+        var msg = editor.querySelector('[data-emoji-msg]');
+        var fields = ['recto', 'verso', 'short', 'name'].map(function (key) {
+            return { key: key, input: editor.querySelector('[data-emoji-new-' + key + ']') };
+        }).filter(function (f) { return f.input; });
+        var busy = false;
+
+        function say(text, kind) {
+            msg.textContent = text || '';
+            msg.classList.toggle('is-error', kind === 'error');
+            msg.classList.toggle('is-ok', kind === 'ok');
+        }
+
+        function renderList(prefixes) {
+            list.textContent = '';
+            prefixes.forEach(function (p) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'emoji-del';
+                b.title = 'Retirer ' + p.recto + (p.verso !== p.recto ? ' → ' + p.verso : '') + ' de la palette';
+                fillFaces(b, p);
+                b.appendChild(span('x', '✕'));
+                b.addEventListener('click', function () {
+                    send({ action: 'delete', recto: p.recto, verso: p.verso });
+                });
+                list.appendChild(b);
+            });
+        }
+
+        /* Une seule source : la liste du serveur redessine la rangée ET
+           l'éditeur, puis la rangée est recâblée. */
+        function apply(prefixes) {
+            row.textContent = '';
+            prefixes.forEach(function (p) { row.appendChild(makeChip(p)); });
+            setupRow(row);
+            renderList(prefixes);
+        }
+
+        function send(body, done) {
+            if (busy) return;
+            busy = true;
+            say('…');
+            fetch('/api/emoji_prefixes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (data) {
+                    return { ok: r.ok, data: data };
+                });
+            }).then(function (res) {
+                if (!res.ok || !res.data.prefixes) {
+                    say(res.data.error || 'Modification refusée.', 'error');
+                    return;
+                }
+                apply(res.data.prefixes);
+                say(res.data.message || '', 'ok');
+                if (done) done();
+            }).catch(function () {
+                say('Modification impossible — vérifiez la connexion.', 'error');
+            }).then(function () { busy = false; });
+        }
+
+        function add() {
+            var body = { action: 'add' };
+            fields.forEach(function (f) { body[f.key] = f.input.value; });
+            send(body, function () {
+                fields.forEach(function (f) { f.input.value = ''; });
+            });
+        }
+
+        fields.forEach(function (f) {
+            /* Entrée dans un champ texte soumettrait le formulaire de la carte :
+               ici, elle ajoute la pastille. */
+            f.input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); add(); }
+            });
+        });
+        editor.querySelector('[data-emoji-add]').addEventListener('click', add);
+        editor.querySelector('[data-emoji-reset]').addEventListener('click', function () {
+            if (confirm('Rétablir la palette d\'origine ? Vos pastilles ajoutées seront perdues.')) {
+                send({ action: 'reset' });
+            }
+        });
+
+        var refreshed = false;
+        toggle.addEventListener('click', function () {
+            var opening = editor.hidden;
+            editor.hidden = !opening;
+            toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            if (!opening) return;
+            renderList(paletteFromRow(row));   /* affichage immédiat, sans réseau */
+            if (refreshed) return;
+            refreshed = true;
+            /* Puis on se cale sur le serveur : la palette a pu changer ailleurs
+               (autre onglet, téléphone) depuis le rendu de la page. */
+            fetch('/api/emoji_prefixes')
+                .then(function (r) { return r.json(); })
+                .then(function (data) { if (data.prefixes) apply(data.prefixes); })
+                .catch(function () { /* la palette affichée reste utilisable */ });
+        });
+    }
+
+    document.querySelectorAll('.emoji-row[data-recto-target]').forEach(setupRow);
+    document.querySelectorAll('.emoji-field').forEach(setupEditor);
 })();
 </script>
 </body>
