@@ -130,6 +130,52 @@ def box_style(box):
         for name, (s1, s60, l1, l60) in BOX_TONES.items()
     )
 
+# ─── Loi d'intervalle ────────────────────────────────────────────────────────
+# Combien de jours séparent deux révisions d'une carte en boîte n ?
+#
+# Historiquement l'intervalle valait le numéro de boîte : boîte 20 → 20 jours.
+# Cette règle linéaire récompense mal une carte solide — une bonne réponse en
+# boîte 20 n'achetait qu'un seul jour de plus (+5 %), alors que le principe de
+# la répétition espacée veut qu'un rappel réussi *multiplie* le délai tenable.
+#
+# On garde donc le linéaire tant que la carte s'installe (jusqu'à
+# BOX_LINEAR_UNTIL), puis on accélère. La forme retenue est continue au seuil :
+#
+#     intervalle(n) = seuil × (n / seuil) ** puissance
+#
+# En n = seuil elle vaut exactement le seuil, et l'accélération s'installe
+# progressivement — boîte 20 → 20 jours, boîte 21 → 23 jours. C'est ce qui la
+# distingue d'un simple n ** puissance, qui ferait sauter l'intervalle de 20 à
+# 96 jours d'une seule bonne réponse.
+#
+# Pour changer la loi il suffit des deux constantes ci-dessous ; les échéances
+# déjà enregistrées se recalculent ensuite avec migrate_intervals.py.
+BOX_LINEAR_UNTIL = 20      # en deçà : intervalle = numéro de boîte
+BOX_INTERVAL_POWER = 2.5   # au-delà : accélération de la courbe
+# Plafond de sécurité : on ne laisse jamais une carte dormir plus d'un an. Avec
+# les réglages actuels la boîte 60 culmine à 312 jours, donc il ne mord pas —
+# il est là pour rattraper une puissance montée trop haut par la suite.
+BOX_INTERVAL_CAP = 365
+
+
+def box_interval(box):
+    """Nombre de jours avant la prochaine révision d'une carte en boîte `box`.
+
+    Tolère une boîte absente ou illisible (repli sur 1) et la borne à BOX_MAX,
+    comme _box_progress : cette fonction est appelée sur des données venues du
+    disque et d'un formulaire, elle ne doit jamais lever."""
+    try:
+        b = int(box)
+    except (TypeError, ValueError):
+        b = 1
+    b = max(1, min(BOX_MAX, b))
+    if b <= BOX_LINEAR_UNTIL:
+        days = b
+    else:
+        days = round(BOX_LINEAR_UNTIL * (b / BOX_LINEAR_UNTIL) ** BOX_INTERVAL_POWER)
+    return min(days, BOX_INTERVAL_CAP)
+
+
 # ─── Server-side review session storage (avoids cookie size limits) ──────────
 
 def _review_path():
@@ -756,7 +802,7 @@ def review_answer(result):
                 # pass → no change
                 if result != "pass":
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
-                    all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                    all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
     save_review_state(cards, idx + 1, False,
                       correct=correct, incorrect=incorrect, pass_count=pass_count,
@@ -1052,7 +1098,7 @@ def review_grid_answer():
                 else:
                     all_cards[i]["box"] = max(1, c["box"] - 1)
                 all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
-                all_cards[i]["next_review_date"] = (now + timedelta(days=all_cards[i]["box"])).strftime("%Y-%m-%d")
+                all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
                 all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
 
     save_grid_state(cards, idx + batch, batch,
@@ -1175,7 +1221,7 @@ def card_edit(card_id):
             all_cards[idx]["box"] = new_box
             base = all_cards[idx].get("last_reviewed_date") or all_cards[idx].get("creation_date")
             base_dt = datetime.strptime(base, "%Y-%m-%d") if base else datetime.now()
-            all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=new_box)).strftime("%Y-%m-%d")
+            all_cards[idx]["next_review_date"] = (base_dt + timedelta(days=box_interval(new_box))).strftime("%Y-%m-%d")
 
         # Recto / Verso — une image n'est touchée que sur un geste explicite ;
         # une nouvelle image (upload ou URL) remplace le texte de sa face.
