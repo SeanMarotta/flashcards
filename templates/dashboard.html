@@ -215,8 +215,13 @@ const a = (hex, alpha) => hex.length === 7
 
 Chart.defaults.color = C.text2;
 Chart.defaults.font.family = "DM Sans, system-ui, sans-serif";
-Chart.defaults.animation =
-    matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 400 };
+// Aucune animation d'apparition : pendant qu'elle dure, les barres montent
+// depuis zéro et la page affiche des valeurs qui ne sont pas les siennes. Sur
+// huit graphiques dont un nuage de plusieurs centaines de points, cette montée
+// peut durer assez longtemps pour être lue — ou photographiée — de travers.
+Chart.defaults.animation = false;
+Chart.defaults.animations = false;
+Chart.defaults.transitions = { active: { animation: { duration: 0 } } };
 
 // Grille et axes discrets ; les infobulles sont actives partout par défaut.
 const axes = (extra = {}) => ({
@@ -272,14 +277,19 @@ const legendOn = { display: true, position: 'bottom',
     // Rayon proportionnel à la racine du compte : c'est l'AIRE qui doit suivre
     // la quantité, pas le rayon, sinon les grosses cellules écrasent tout.
     const rMax = Math.sqrt(p.max_n);
+    // Rayons calculés une fois pour toutes plutôt qu'à chaque image : en option
+    // scriptable, Chart.js rappelle la fonction pour chaque point à chaque
+    // rendu, ce qui alourdit inutilement un nuage de plusieurs centaines de
+    // cellules.
+    const rayons = p.cloud.map(d => 2.5 + 9 * Math.sqrt(d.n) / rMax);
     new Chart(document.getElementById('progressionChart'), {
         type: 'scatter',
         data: {
             datasets: [
                 { label: 'Cartes',
                   data: p.cloud.map(d => ({ x: d.x, y: d.y, n: d.n })),
-                  pointRadius: c => c.raw ? 2.5 + 9 * Math.sqrt(c.raw.n) / rMax : 3,
-                  pointHoverRadius: c => c.raw ? 4 + 9 * Math.sqrt(c.raw.n) / rMax : 5,
+                  pointRadius: rayons,
+                  pointHoverRadius: rayons.map(r => r + 2),
                   backgroundColor: a(C.accent, .3),
                   borderColor: a(C.accent, .55), borderWidth: 1,
                   order: 2 },
@@ -381,7 +391,7 @@ new Chart(document.getElementById('rateChart'), {
                 borderWidth: 2, tension: .25, fill: true, spanGaps: true,
                 // Une tranche peu fournie s'affiche en creux : le point est là,
                 // mais il ne prétend pas au même poids qu'une tranche solide.
-                pointRadius: c => c.raw === null ? 0 : 5,
+                pointRadius: r.map(b => b.rate === null ? 0 : 5),
                 pointBackgroundColor: r.map(b => b.n >= 30 ? C.accent : C.surface),
                 pointBorderColor: C.accent, pointBorderWidth: 2,
             }],
