@@ -621,6 +621,122 @@ def get_leech_cards(cards=None):
     return out
 
 
+# ─── Données des graphiques ──────────────────────────────────────────────────
+
+def forecast_data(days=90, cards=None):
+    """Le retard accumulé, puis la charge programmée jour par jour.
+
+    Le retard est compté à part et non fondu dans la première barre : c'est une
+    dette, pas une journée de travail — et c'est la seule chose qu'un graphique
+    tourné vers l'avenir ne montre jamais."""
+    cards = load_flashcards() if cards is None else cards
+    today = datetime.now().date()
+    horizon = today + timedelta(days=days)
+    overdue = 0
+    per_day = {}
+    for c in cards:
+        raw = c.get("next_review_date")
+        if not raw:
+            continue
+        try:
+            d = datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if d <= today:
+            overdue += 1
+        elif d <= horizon:
+            per_day[d.isoformat()] = per_day.get(d.isoformat(), 0) + 1
+    series = [{"date": (today + timedelta(days=i)).isoformat(),
+               "count": per_day.get((today + timedelta(days=i)).isoformat(), 0)}
+              for i in range(1, days + 1)]
+    # Régime stable : ce que le paquet redemanderait chaque jour si les
+    # échéances étaient parfaitement étalées. La ligne de référence du graphique.
+    steady = sum(1.0 / box_interval(c.get("box", 1)) for c in cards)
+    return {"overdue": overdue, "days": series, "steady": round(steady, 1),
+            "horizon": days}
+
+
+def progression_cloud(cards=None):
+    """Chaque carte située par son âge et sa boîte, face à la progression idéale.
+
+    Agrégé par semaine d'âge : 5 930 cartes tiennent en ~600 cellules, ce qui
+    évite de tracer un point par carte. La courbe idéale est celle d'une carte
+    jamais ratée — tout ce qui est nettement en dessous a trébuché en chemin."""
+    cards = load_flashcards() if cards is None else cards
+    today = datetime.now().date()
+    cells = {}
+    max_age = 0
+    for c in cards:
+        try:
+            age = (today - datetime.strptime(c["creation_date"], "%Y-%m-%d").date()).days
+        except (KeyError, TypeError, ValueError):
+            continue
+        if age < 0:
+            continue
+        max_age = max(max_age, age)
+        key = (age // 7 * 7, c.get("box", 1))
+        cells[key] = cells.get(key, 0) + 1
+    cloud = [{"x": x, "y": y, "n": n} for (x, y), n in sorted(cells.items())]
+    ideal = [{"x": BOX_CUMULATIVE_DAYS[b], "y": b}
+             for b in range(1, BOX_MAX + 1)
+             if BOX_CUMULATIVE_DAYS[b] <= max_age]
+    return {"cloud": cloud, "ideal": ideal, "max_age": max_age,
+            "max_n": max((c["n"] for c in cloud), default=1)}
+
+
+# Tranches d'intervalle pour la courbe de rétention. Bornes en jours, incluses.
+RETENTION_BUCKETS = [(1, 1), (2, 3), (4, 7), (8, 14), (15, 30),
+                     (31, 60), (61, 120), (121, 10**6)]
+
+
+def retention_by_interval():
+    """Taux de réussite selon le temps écoulé depuis la révision précédente.
+
+    Une carte répondue alors qu'elle était en boîte b venait de tenir
+    box_interval(b) jours : c'est l'intervalle qu'elle a « survécu ». Regrouper
+    les réponses par cette durée donne la courbe d'oubli réelle du paquet — la
+    mesure qui dit si la loi d'intervalle est trop ambitieuse. Si le taux
+    s'effondre au-delà d'une tranche, c'est là qu'il faut freiner."""
+    tallies = {b: [0, 0] for b in RETENTION_BUCKETS}   # [réussites, tranchées]
+    for e in load_reviews():
+        if e.get("result") not in ("correct", "incorrect"):
+            continue
+        try:
+            iv = box_interval(e.get("from", 1))
+        except Exception:
+            continue
+        for lo, hi in RETENTION_BUCKETS:
+            if lo <= iv <= hi:
+                tallies[(lo, hi)][1] += 1
+                if e["result"] == "correct":
+                    tallies[(lo, hi)][0] += 1
+                break
+    out = []
+    for lo, hi in RETENTION_BUCKETS:
+        ok, n = tallies[(lo, hi)]
+        label = f"{lo} j" if lo == hi else (f"{lo}+ j" if hi >= 10**6 else f"{lo}–{hi} j")
+        out.append({"label": label, "n": n,
+                    "rate": round(ok / n * 100, 1) if n else None})
+    return out
+
+
+def review_heatmap(days=364):
+    """Nombre de réponses par jour sur l'année écoulée, pour le calendrier.
+
+    Contrairement au calendrier de création, celui-ci compte les révisions —
+    l'habitude, pas la collection."""
+    counts = {}
+    for e in load_reviews():
+        d = e.get("ts", "")[:10]
+        if d:
+            counts[d] = counts.get(d, 0) + 1
+    end = datetime.now().date()
+    start = end - timedelta(days=days)
+    return [{"date": (start + timedelta(days=i)).isoformat(),
+             "count": counts.get((start + timedelta(days=i)).isoformat(), 0)}
+            for i in range(days + 1)]
+
+
 # ─── Palette des préfixes emoji ──────────────────────────────────────────────
 # Les pastilles proposées au-dessus des champs de création / d'édition. La liste
 # vit dans un fichier à part pour être modifiable depuis l'app (bouton ✏️ de la
@@ -1845,13 +1961,17 @@ def dashboard():
     total = len(cards)
     if total == 0:
         return render_template("dashboard.html", title="Dashboard", active="dashboard", body_class="",
-                               total=0, mastery=0, long_term_ratio=0,
+                               total=0, median_interval=0, long_term_ratio=0,
                                box_data=[], timeline_data=[], workload_data=[],
                                activity_data=[], stage_data=[],
-                               creation_heatmap=[], rs={"total": 0}, leech_count=0)
+                               creation_heatmap=[], rs={"total": 0}, leech_count=0,
+                               forecast={"overdue": 0, "days": [], "steady": 0, "horizon": 0},
+                               progression={"cloud": [], "ideal": [], "max_age": 0, "max_n": 1},
+                               retention=[], review_calendar=[],
+                               box_threshold=BOX_LINEAR_UNTIL)
 
-    box_sum = sum(c["box"] for c in cards)
-    mastery = (box_sum / (total * 60)) * 100
+    intervals = sorted(box_interval(c.get("box", 1)) for c in cards)
+    median_interval = intervals[len(intervals) // 2]
     long_term = sum(1 for c in cards if c["box"] >= 20)
     long_term_ratio = (long_term / total) * 100
 
@@ -1895,21 +2015,31 @@ def dashboard():
     reviewed_counts = Counter(reviewed_dates)
     activity_data = [{"date": d, "count": reviewed_counts.get(d, 0)} for d in last_30]
 
-    # ── NEW: Stage distribution (Donut) ───────────────────────────────────────
-    stage_data = {
-        "Débutant (1–5)":       sum(1 for c in cards if 1 <= c["box"] <= 5),
-        "Intermédiaire (6–19)": sum(1 for c in cards if 6 <= c["box"] <= 19),
-        "Avancé (20–59)":       sum(1 for c in cards if 20 <= c["box"] <= 59),
-        "Maîtrisé (60)":        sum(1 for c in cards if c["box"] >= 60),
-    }
+    # Répartition par intervalle plutôt que par numéro de boîte : depuis que la
+    # loi accélère au-delà du seuil, une boîte ne dit plus à elle seule combien
+    # de temps une carte tient. Les anciennes tranches étaient d'ailleurs calées
+    # sur une échelle de 60 boîtes dont la dernière ne se remplissait jamais.
+    STAGE_BANDS = [("Moins d'une semaine", 0, 6), ("1 à 4 semaines", 7, 29),
+                   ("1 à 2 mois", 30, 59), ("2 mois et plus", 60, 10**9)]
+    card_intervals = [box_interval(c.get("box", 1)) for c in cards]
+    # Une LISTE de paires, pas un dict : le filtre tojson de Flask trie les clés
+    # d'un dictionnaire, ce qui rendait les tranches dans l'ordre alphabétique
+    # au lieu de l'ordre croissant des intervalles.
+    stage_data = [[label, sum(1 for iv in card_intervals if lo <= iv <= hi)]
+                  for label, lo, hi in STAGE_BANDS]
 
     return render_template(
         "dashboard.html", title="Dashboard", active="dashboard", body_class="",
-        total=total, mastery=mastery, long_term_ratio=long_term_ratio,
+        total=total, median_interval=median_interval, long_term_ratio=long_term_ratio,
         box_data=box_data, timeline_data=cumulative, workload_data=workload,
         activity_data=activity_data, stage_data=stage_data,
         creation_heatmap=creation_heatmap,
-        rs=review_stats(), leech_count=len(get_leech_cards(cards))
+        rs=review_stats(), leech_count=len(get_leech_cards(cards)),
+        forecast=forecast_data(90, cards),
+        progression=progression_cloud(cards),
+        retention=retention_by_interval(),
+        review_calendar=review_heatmap(),
+        box_threshold=BOX_LINEAR_UNTIL,
     )
 
 # ── API for search / filter (AJAX) ──────────────────────────────────────────

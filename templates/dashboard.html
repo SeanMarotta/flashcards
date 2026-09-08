@@ -9,39 +9,23 @@
 </div>
 {% else %}
 
+{# ── Compteurs : l'état du paquet ─────────────────────────────────────── #}
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-value">{{ "%.1f"|format(mastery) }}%</div>
-        <div class="stat-label">Maîtrise</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{ "%.1f"|format(long_term_ratio) }}%</div>
-        <div class="stat-label">Long terme</div>
-    </div>
     <div class="stat-card">
         <div class="stat-value">{{ total }}</div>
         <div class="stat-label">Cartes</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ median_interval }} j</div>
+        <div class="stat-label">Intervalle médian</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.0f"|format(long_term_ratio) }}%</div>
+        <div class="stat-label">Boîte 20+</div>
+    </div>
 </div>
 
-{% if leech_count %}
-<a href="/manage?filter=leeches" class="chart-card"
-   style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;">
-    <span style="font-size:1.6rem;">🪤</span>
-    <span style="flex:1;">
-        <strong style="display:block;">{{ leech_count }} carte{{ "s" if leech_count > 1 }} rétive{{ "s" if leech_count > 1 }}</strong>
-        <span style="font-size:.85rem;color:var(--text2);">
-            Elles reviennent sans s'installer — à reformuler plutôt qu'à réviser.
-        </span>
-    </span>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-</a>
-{% endif %}
-
-{# ── Journal des révisions ───────────────────────────────────────────────
-   Ces chiffres viennent de reviews.jsonl, alimenté à chaque réponse. Ils
-   n'existent donc qu'à partir de la première révision suivant sa mise en
-   service — d'où l'état vide ci-dessous plutôt qu'une page de zéros. #}
+{# ── Compteurs : le journal des révisions ─────────────────────────────── #}
 {% if rs.total %}
 <div class="stats-grid">
     <div class="stat-card">
@@ -57,11 +41,56 @@
         <div class="stat-label">Aujourd'hui</div>
     </div>
 </div>
+{% endif %}
 
+{% if leech_count %}
+<a href="/manage?filter=leeches" class="chart-card"
+   style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;">
+    <span style="font-size:1.6rem;">🪤</span>
+    <span style="flex:1;">
+        <strong style="display:block;">{{ leech_count }} carte{{ "s" if leech_count > 1 }} rétive{{ "s" if leech_count > 1 }}</strong>
+        <span style="font-size:.85rem;color:var(--text2);">
+            Elles reviennent sans s'installer — à reformuler plutôt qu'à réviser.
+        </span>
+    </span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endif %}
+
+{# ── Charge : le retard est une dette, pas une journée de travail ─────── #}
+<div class="chart-card">
+    <h3>Retard et charge à venir</h3>
+    <div class="callout {% if forecast.overdue > forecast.steady * 2 %}callout-warn{% endif %}">
+        <span class="callout-num">{{ forecast.overdue }}</span>
+        <span class="callout-txt">
+            carte{{ "s" if forecast.overdue > 1 }} en retard ou due{{ "s" if forecast.overdue > 1 }} aujourd'hui
+            {%- if forecast.steady %} — soit {{ "%.1f"|format(forecast.overdue / forecast.steady) }} journée{{ "s" if forecast.overdue > forecast.steady }} de révision au rythme d'équilibre{% endif %}.
+        </span>
+    </div>
+    <canvas id="forecastChart" height="200"></canvas>
+    <p class="chart-note">
+        Les {{ forecast.horizon }} prochains jours, hors retard. La ligne pointillée marque
+        le régime stable — {{ forecast.steady }} cartes par jour, ce que le paquet
+        redemanderait si les échéances étaient parfaitement étalées.
+    </p>
+</div>
+
+{# ── Le graphique le plus révélateur : où en est chaque carte ─────────── #}
+<div class="chart-card">
+    <h3>Progression des cartes</h3>
+    <canvas id="progressionChart" height="240"></canvas>
+    <p class="chart-note">
+        Chaque bulle regroupe les cartes de même âge et de même boîte ; sa taille
+        dit combien. La ligne est la trajectoire d'une carte jamais ratée — tout
+        ce qui s'en écarte vers le bas a trébuché en chemin.
+    </p>
+</div>
+
+{% if rs.total %}
 <div class="chart-card">
     <h3>Réponses par jour — {{ rs.window_days }} derniers jours</h3>
     <canvas id="answersChart" height="200"></canvas>
-    <p style="margin-top:10px;font-size:.8rem;color:var(--text2);">
+    <p class="chart-note">
         {{ rs.answers_window }} réponse{{ "s" if rs.answers_window > 1 }} sur la période
         · {{ rs.total }} depuis le {{ rs.first_day }}
     </p>
@@ -70,19 +99,42 @@
 <div class="chart-card">
     <h3>Taux de réussite — {{ rs.window_days }} derniers jours</h3>
     <canvas id="rateChart" height="200"></canvas>
-    <p style="margin-top:10px;font-size:.8rem;color:var(--text2);">
+    <p class="chart-note">
         Les cartes passées sont exclues du calcul : elles ne sont ni sues ni ratées.
         {%- if rs.success_rate_window is not none %}
         Moyenne sur la période : {{ "%.0f"|format(rs.success_rate_window) }} %.
         {%- endif %}
     </p>
 </div>
+
+<div class="chart-card">
+    <h3>Rétention selon l'intervalle</h3>
+    <canvas id="retentionChart" height="200"></canvas>
+    <p class="chart-note">
+        Taux de réussite selon le temps qu'une carte venait de passer sans être
+        revue. C'est la courbe d'oubli réelle du paquet : si elle s'effondre
+        au-delà d'une tranche, c'est là que la loi d'intervalle va trop vite.
+        Le nombre de réponses de chaque tranche apparaît au survol — une tranche
+        peu fournie ne veut encore rien dire — son point est alors dessiné en
+        creux. L'axe vertical ne part pas de zéro : il est calé sous la valeur
+        la plus basse, pour que les écarts se lisent.
+    </p>
+</div>
+
+<div class="chart-card">
+    <h3>Calendrier de révision — 12 derniers mois</h3>
+    <div style="overflow-x:auto;padding-bottom:4px;">
+        <canvas id="reviewCalendar"></canvas>
+    </div>
+    <p class="chart-note">Une case par jour, d'autant plus vive que vous avez répondu à des cartes.</p>
+</div>
 {% else %}
 <div class="chart-card">
     <h3>Historique des révisions</h3>
     <p style="font-size:.9rem;color:var(--text2);line-height:1.6;">
         Le journal est vide : il enregistre chaque réponse à partir de maintenant.
-        Taux de réussite, série de jours et courbe de progression apparaîtront ici
+        Quatre graphiques attendent ici — réponses par jour, taux de réussite,
+        rétention selon l'intervalle et calendrier de révision — et apparaîtront
         dès votre première révision.
     </p>
     <p style="font-size:.85rem;color:var(--text2);margin-top:10px;">
@@ -95,292 +147,407 @@
 <div class="chart-card">
     <h3>Cartes par boîte</h3>
     <canvas id="boxChart" height="200"></canvas>
+    <p class="chart-note">
+        Au-delà de la boîte {{ box_threshold }}, l'intervalle cesse d'être le numéro
+        de boîte et accélère — les deux teintes marquent ce changement de régime.
+    </p>
 </div>
 
 <div class="chart-card">
-    <h3>Croissance du savoir</h3>
+    <h3>Répartition par intervalle</h3>
+    <canvas id="stageChart" height="96"></canvas>
+    <p class="chart-note">
+        Combien de temps les cartes tiennent entre deux révisions. C'est
+        l'intervalle qui est lu, pas le numéro de boîte : depuis que la loi
+        accélère au-delà de la boîte {{ box_threshold }}, les deux ne se
+        confondent plus.
+    </p>
+</div>
+
+<div class="chart-card">
+    <h3>Croissance du paquet</h3>
     <canvas id="timelineChart" height="200"></canvas>
+    <p class="chart-note">Nombre de cartes créées, cumulé depuis le début.</p>
 </div>
 
 <div class="chart-card">
     <h3>Calendrier de création — 12 derniers mois</h3>
-    <div id="heatmapWrap" style="overflow-x:auto;padding-bottom:4px;">
-        <canvas id="heatmapChart"></canvas>
+    <div style="overflow-x:auto;padding-bottom:4px;">
+        <canvas id="creationCalendar"></canvas>
     </div>
 </div>
 
-<div class="chart-card">
-    <h3>Charge cognitive future</h3>
-    <canvas id="workloadChart" height="200"></canvas>
-</div>
-
-<div class="chart-card">
-    <h3>Activité de révision — 30 derniers jours</h3>
-    <canvas id="activityChart" height="200"></canvas>
-</div>
-
-<div class="chart-card">
-    <h3>Stades d'apprentissage</h3>
-    <canvas id="stageChart" height="220"></canvas>
-</div>
+<style>
+.chart-note { margin-top:10px; font-size:.8rem; color:var(--text2); line-height:1.55; }
+.callout {
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    padding:12px 14px; margin-bottom:16px;
+    background:var(--surface2); border-left:3px solid var(--accent);
+    border-radius:var(--radius-sm);
+}
+.callout-warn { border-left-color:var(--warning); }
+.callout-num { font-size:1.5rem; font-weight:600; line-height:1; }
+.callout-warn .callout-num { color:var(--warning); }
+.callout-txt { font-size:.85rem; color:var(--text2); flex:1; min-width:180px; }
+</style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const colors = { accent: '#7f5af0', accent2: '#2cb67d', border: '#2a2a32', text2: '#94929d', surface2: '#1e1e24', danger: '#e53170', warning: '#fbbf24' };
-const defaults = { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: colors.text2, maxTicksLimit: 8 }, grid: { color: colors.border } }, y: { ticks: { color: colors.text2 }, grid: { color: colors.border } } } };
+// ── Palette ────────────────────────────────────────────────────────────
+// Lue sur les variables CSS du thème : les graphiques suivent l'app si elle
+// change de couleurs, au lieu d'en garder une copie qui dérive.
+const css = getComputedStyle(document.documentElement);
+const v = (name, fallback) => (css.getPropertyValue(name).trim() || fallback);
+const C = {
+    accent:  v('--accent',  '#8b5cf6'),   // teinte de magnitude (séquentielle)
+    ok:      v('--accent2', '#34d399'),   // état : réussi
+    ko:      v('--danger',  '#f43f5e'),   // état : raté
+    warn:    v('--warning', '#f59e0b'),
+    text:    v('--text',    '#ececef'),
+    text2:   v('--text2',   '#71717a'),
+    border:  v('--border',  'rgba(255,255,255,.06)'),
+    surface: v('--surface2','#1a1a1f'),
+};
+// Une couleur hex + un alpha 0–1, sans dépendance.
+const a = (hex, alpha) => hex.length === 7
+    ? hex + Math.round(alpha * 255).toString(16).padStart(2, '0')
+    : hex;
 
-// Box chart
-const boxData = {{ box_data | tojson }};
-new Chart(document.getElementById('boxChart'), {
-    type: 'bar',
-    data: { labels: boxData.map(d => d[0]), datasets: [{ data: boxData.map(d => d[1]), backgroundColor: colors.accent + '88', borderColor: colors.accent, borderWidth: 1, borderRadius: 4 }] },
-    options: defaults
+Chart.defaults.color = C.text2;
+Chart.defaults.font.family = "DM Sans, system-ui, sans-serif";
+Chart.defaults.animation =
+    matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 400 };
+
+// Grille et axes discrets ; les infobulles sont actives partout par défaut.
+const axes = (extra = {}) => ({
+    x: { ticks: { color: C.text2, maxTicksLimit: 8 }, grid: { color: C.border }, ...(extra.x || {}) },
+    y: { ticks: { color: C.text2 }, grid: { color: C.border }, beginAtZero: true, ...(extra.y || {}) },
 });
-
-// Timeline chart
-const tlData = {{ timeline_data | tojson }};
-new Chart(document.getElementById('timelineChart'), {
-    type: 'line',
-    data: { labels: tlData.map(d => d.date), datasets: [{ data: tlData.map(d => d.count), borderColor: colors.accent2, backgroundColor: colors.accent2 + '15', fill: true, tension: 0.3, pointRadius: 0 }] },
-    options: defaults
+const base = (extra = {}) => ({
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false },
+               tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                          titleColor: C.text, bodyColor: C.text2, padding: 10, displayColors: true,
+                          filter: i => i.raw !== null && i.raw !== undefined } },
+    scales: axes(),
+    ...extra,
 });
+const legendOn = { display: true, position: 'bottom',
+                   labels: { color: C.text2, boxWidth: 12, boxHeight: 12, padding: 14, usePointStyle: true } };
 
-// ── Creation heatmap ───────────────────────────────────────────────────
-(function() {
-    const hmRaw = {{ creation_heatmap | tojson }};
-    if (!hmRaw.length) return;
-
-    const COLS = 53, ROWS = 7, CELL = 13, GAP = 3;
-    const PAD_LEFT = 28, PAD_TOP = 22, PAD_BOTTOM = 20;
-    const W = PAD_LEFT + COLS * (CELL + GAP);
-    const H = PAD_TOP + ROWS * (CELL + GAP) + PAD_BOTTOM;
-
-    const canvas = document.getElementById('heatmapChart');
-    canvas.width  = W;
-    canvas.height = H;
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
-    const ctx = canvas.getContext('2d');
-
-    const maxCount = Math.max(...hmRaw.map(d => d.count), 1);
-    const logMax = Math.log1p(maxCount);
-    const dataMap = {};
-    hmRaw.forEach(d => dataMap[d.date] = d.count);
-
-    const startDate = new Date(hmRaw[0].date + 'T00:00:00');
-    const dow = startDate.getDay();
-    const offset = (dow === 0 ? 6 : dow - 1);
-    startDate.setDate(startDate.getDate() - offset);
-
-    const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
-    const DAY_NAMES   = ['L','M','M','J','V','S','D'];
-
-    ctx.fillStyle = '#94929d';
-    ctx.font = '10px DM Sans, sans-serif';
-    ctx.textAlign = 'right';
-    for (let r = 0; r < ROWS; r++) {
-        if (r % 2 === 0) {
-            const y = PAD_TOP + r * (CELL + GAP) + CELL - 2;
-            ctx.fillText(DAY_NAMES[r], PAD_LEFT - 4, y);
-        }
-    }
-
-    let prevMonth = -1;
-    for (let col = 0; col < COLS; col++) {
-        for (let row = 0; row < ROWS; row++) {
-            const d = new Date(startDate);
-            d.setDate(startDate.getDate() + col * 7 + row);
-            const ds = d.toISOString().slice(0, 10);
-            const count = dataMap[ds] || 0;
-            const x = PAD_LEFT + col * (CELL + GAP);
-            const y = PAD_TOP  + row * (CELL + GAP);
-
-            if (row === 0) {
-                const m = d.getMonth();
-                if (m !== prevMonth) {
-                    ctx.fillStyle = '#94929d';
-                    ctx.font = '10px DM Sans, sans-serif';
-                    ctx.textAlign = 'left';
-                    ctx.fillText(MONTH_NAMES[m], x, PAD_TOP - 6);
-                    prevMonth = m;
-                }
-            }
-
-            const ratio = count === 0 ? 0 : Math.log1p(count) / logMax;
-            let fill;
-            if (count === 0) {
-                fill = '#1e1e24';
-            } else if (ratio < 0.25) {
-                fill = '#2cb67d33';
-            } else if (ratio < 0.5) {
-                fill = '#2cb67d77';
-            } else if (ratio < 0.75) {
-                fill = '#2cb67dbb';
-            } else {
-                fill = '#2cb67d';
-            }
-            ctx.fillStyle = fill;
-            ctx.beginPath();
-            ctx.roundRect(x, y, CELL, CELL, 3);
-            ctx.fill();
-        }
-    }
-
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:fixed;background:#16161a;border:1px solid #2a2a32;color:#e8e6e3;font-size:11px;padding:5px 9px;border-radius:7px;pointer-events:none;display:none;z-index:999;font-family:DM Sans,sans-serif;';
-    document.body.appendChild(tooltip);
-
-    canvas.addEventListener('mousemove', function(e) {
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const col = Math.floor((mx - PAD_LEFT) / (CELL + GAP));
-        const row = Math.floor((my - PAD_TOP)  / (CELL + GAP));
-        if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
-            const d = new Date(startDate);
-            d.setDate(startDate.getDate() + col * 7 + row);
-            const ds = d.toISOString().slice(0, 10);
-            const count = dataMap[ds] || 0;
-            tooltip.style.display = 'block';
-            tooltip.style.left = (e.clientX + 12) + 'px';
-            tooltip.style.top  = (e.clientY - 28) + 'px';
-            tooltip.innerHTML = `<strong>${count} carte${count !== 1 ? 's' : ''}</strong> — ${ds}`;
-        } else {
-            tooltip.style.display = 'none';
-        }
+// ── Retard et charge à venir ───────────────────────────────────────────
+// Une seule mesure (cartes/jour), une seule échelle. Le régime stable est une
+// ligne de référence, pas une seconde série : il ne se lit pas, il se compare.
+(function () {
+    const f = {{ forecast | tojson }};
+    if (!f.days.length) return;
+    const jour = s => s.slice(8) + '/' + s.slice(5, 7);
+    new Chart(document.getElementById('forecastChart'), {
+        type: 'bar',
+        data: {
+            labels: f.days.map(d => jour(d.date)),
+            datasets: [
+                { label: 'Cartes dues', data: f.days.map(d => d.count),
+                  backgroundColor: a(C.accent, .55), borderColor: C.accent,
+                  borderWidth: 1, borderRadius: 3, order: 2 },
+                { label: 'Régime stable (' + f.steady + '/j)', type: 'line',
+                  data: f.days.map(() => f.steady), borderColor: C.text2,
+                  borderDash: [5, 4], borderWidth: 2, pointRadius: 0, fill: false,
+                  pointStyle: 'line', order: 1 },
+            ],
+        },
+        options: base({ plugins: { legend: { ...legendOn, reverse: true },
+            tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                       titleColor: C.text, bodyColor: C.text2, padding: 10 } } }),
     });
-    canvas.addEventListener('mouseleave', () => tooltip.style.display = 'none');
-
-    ctx.fillStyle = '#94929d';
-    ctx.font = '10px DM Sans, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('Moins', PAD_LEFT, H - 4);
-    const legendX = PAD_LEFT + 36;
-    ['#1e1e24','#2cb67d33','#2cb67d77','#2cb67dbb','#2cb67d'].forEach((c, i) => {
-        ctx.fillStyle = c;
-        ctx.beginPath();
-        ctx.roundRect(legendX + i * (CELL + 3), H - PAD_BOTTOM + 4, CELL, CELL, 3);
-        ctx.fill();
-    });
-    ctx.fillStyle = '#94929d';
-    ctx.fillText('Plus', legendX + 5 * (CELL + 3) + 2, H - 4);
 })();
 
-// Workload chart
-const wlData = {{ workload_data | tojson }};
-new Chart(document.getElementById('workloadChart'), {
-    type: 'bar',
-    data: { labels: wlData.map(d => d.date), datasets: [{ data: wlData.map(d => d.count), backgroundColor: colors.accent + '66', borderColor: colors.accent, borderWidth: 1, borderRadius: 4 }] },
-    options: defaults
-});
-
-// ── Activity chart (last 30 days) ─────────────────────────────────────
-const actData = {{ activity_data | tojson }};
-const actMax = Math.max(...actData.map(d => d.count), 1);
-new Chart(document.getElementById('activityChart'), {
-    type: 'bar',
-    data: {
-        labels: actData.map(d => d.date.slice(5)),
-        datasets: [{
-            data: actData.map(d => d.count),
-            backgroundColor: actData.map(d => {
-                const ratio = d.count / actMax;
-                return `rgba(44,182,125,${0.15 + ratio * 0.75})`;
+// ── Progression des cartes ─────────────────────────────────────────────
+// Nuage de densité (âge × boîte) et trajectoire idéale sur la MÊME échelle de
+// boîtes — deux séries, un seul axe y.
+(function () {
+    const p = {{ progression | tojson }};
+    if (!p.cloud.length) return;
+    // Rayon proportionnel à la racine du compte : c'est l'AIRE qui doit suivre
+    // la quantité, pas le rayon, sinon les grosses cellules écrasent tout.
+    const rMax = Math.sqrt(p.max_n);
+    new Chart(document.getElementById('progressionChart'), {
+        type: 'scatter',
+        data: {
+            datasets: [
+                { label: 'Cartes',
+                  data: p.cloud.map(d => ({ x: d.x, y: d.y, n: d.n })),
+                  pointRadius: c => c.raw ? 2.5 + 9 * Math.sqrt(c.raw.n) / rMax : 3,
+                  pointHoverRadius: c => c.raw ? 4 + 9 * Math.sqrt(c.raw.n) / rMax : 5,
+                  backgroundColor: a(C.accent, .3),
+                  borderColor: a(C.accent, .55), borderWidth: 1,
+                  order: 2 },
+                // Repère, donc encre de texte et non couleur de série — et
+                // dessinée par-dessus le nuage, sans quoi elle disparaît dedans.
+                { label: 'Sans jamais se tromper', type: 'line',
+                  data: p.ideal.map(d => ({ x: d.x, y: d.y })),
+                  borderColor: C.text, borderDash: [6, 4], borderWidth: 2.5,
+                  pointRadius: 0, fill: false, pointStyle: 'line', order: 1 },
+            ],
+        },
+        options: base({
+            interaction: { mode: 'nearest', intersect: true },
+            scales: axes({
+                x: { title: { display: true, text: "âge de la carte (jours)", color: C.text2 } },
+                y: { title: { display: true, text: 'boîte', color: C.text2 }, beginAtZero: true },
             }),
-            borderColor: colors.accent2,
-            borderWidth: d => d.raw > 0 ? 1 : 0,
-            borderRadius: 3,
-        }]
-    },
-    options: {
-        ...defaults,
-        scales: {
-            x: { ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
-            y: { ticks: { color: colors.text2, stepSize: 1 }, grid: { color: colors.border }, beginAtZero: true }
-        }
-    }
-});
+            plugins: {
+                legend: legendOn,
+                tooltip: {
+                    backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                    titleColor: C.text, bodyColor: C.text2, padding: 10,
+                    callbacks: {
+                        title: () => '',
+                        label: c => c.raw.n === undefined
+                            ? `boîte ${c.raw.y} atteinte en ${c.raw.x} j`
+                            : `${c.raw.n} carte${c.raw.n > 1 ? 's' : ''} · boîte ${c.raw.y} · ${c.raw.x} j`,
+                    },
+                },
+            },
+        }),
+    });
+})();
 
-// ── Journal : réponses par jour ────────────────────────────────────────
 {% if rs.total %}
+// ── Réponses par jour ──────────────────────────────────────────────────
+// Trois états d'une même réponse : empilés, ils font le total du jour.
 const rsDaily = {{ rs.daily | tojson }};
-const jour = d => d.date.slice(8) + '/' + d.date.slice(5, 7);
-
+const jourCourt = d => d.date.slice(8) + '/' + d.date.slice(5, 7);
 new Chart(document.getElementById('answersChart'), {
     type: 'bar',
     data: {
-        labels: rsDaily.map(jour),
+        labels: rsDaily.map(jourCourt),
         datasets: [
-            { label: 'Correct',   data: rsDaily.map(d => d.correct),   backgroundColor: colors.accent2, borderRadius: 3 },
-            { label: 'Faux',      data: rsDaily.map(d => d.incorrect), backgroundColor: colors.danger,  borderRadius: 3 },
-            { label: 'Passé',     data: rsDaily.map(d => d.passed),    backgroundColor: colors.surface2, borderColor: colors.border, borderWidth: 1, borderRadius: 3 },
-        ]
+            { label: 'Correct', data: rsDaily.map(d => d.correct), backgroundColor: C.ok, borderRadius: 3 },
+            { label: 'Faux',    data: rsDaily.map(d => d.incorrect), backgroundColor: C.ko, borderRadius: 3 },
+            { label: 'Passé',   data: rsDaily.map(d => d.passed), backgroundColor: a(C.text2, .45), borderRadius: 3 },
+        ],
     },
-    options: {
-        ...defaults,
-        plugins: { legend: { display: true, labels: { color: colors.text2, boxWidth: 12, padding: 14 } } },
-        scales: {
-            x: { stacked: true, ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
-            y: { stacked: true, ticks: { color: colors.text2 }, grid: { color: colors.border }, beginAtZero: true }
-        }
-    }
+    options: base({
+        plugins: { legend: legendOn,
+                   tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                              titleColor: C.text, bodyColor: C.text2, padding: 10 } },
+        scales: axes({ x: { stacked: true, ticks: { color: C.text2, maxTicksLimit: 10 } },
+                       y: { stacked: true } }),
+    }),
 });
 
-// ── Journal : taux de réussite ─────────────────────────────────────────
-// `rate` vaut null les jours sans réponse tranchée : spanGaps relie les points
-// de part et d'autre plutôt que de faire retomber la courbe à zéro.
+// ── Taux de réussite ───────────────────────────────────────────────────
+// Un jour sans réponse tranchée vaut null : la courbe l'enjambe au lieu de
+// plonger à zéro, ce qui ferait lire un effondrement là où il n'y a rien.
 new Chart(document.getElementById('rateChart'), {
     type: 'line',
     data: {
-        labels: rsDaily.map(jour),
+        labels: rsDaily.map(jourCourt),
         datasets: [{
-            data: rsDaily.map(d => d.rate),
-            borderColor: colors.accent,
-            backgroundColor: colors.accent + '22',
-            borderWidth: 2,
-            pointRadius: 3,
-            pointBackgroundColor: colors.accent,
-            tension: .3,
-            fill: true,
-            spanGaps: true,
-        }]
+            label: 'Réussite', data: rsDaily.map(d => d.rate),
+            borderColor: C.accent, backgroundColor: a(C.accent, .13),
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: C.accent,
+            tension: .3, fill: true, spanGaps: true,
+        }],
     },
-    options: {
-        ...defaults,
-        scales: {
-            x: { ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
-            y: { ticks: { color: colors.text2, callback: v => v + ' %' }, grid: { color: colors.border }, min: 0, max: 100 }
-        }
-    }
+    options: base({
+        scales: axes({ x: { ticks: { color: C.text2, maxTicksLimit: 10 } },
+                       y: { min: 0, max: 100, ticks: { color: C.text2, callback: t => t + ' %' } } }),
+        plugins: { legend: { display: false },
+                   tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                              titleColor: C.text, bodyColor: C.text2, padding: 10,
+                              callbacks: { label: c => c.raw === null ? 'aucune réponse' : c.raw + ' % de réussite' } } },
+    }),
 });
+
+// ── Rétention selon l'intervalle ───────────────────────────────────────
+// Magnitude sur une échelle ordonnée : une teinte, l'intensité suit la valeur.
+(function () {
+    const r = {{ retention | tojson }};
+    const withData = r.filter(b => b.n > 0);
+    if (!withData.length) return;
+    // Base de l'axe calée sous le point le plus bas, par pas de 10 : sur une
+    // courbe c'est licite, et sans cela tout l'écart utile se tasse en haut.
+    const bas = Math.max(0, Math.floor((Math.min(...withData.map(b => b.rate)) - 6) / 10) * 10);
+    new Chart(document.getElementById('retentionChart'), {
+        type: 'line',
+        data: {
+            labels: r.map(b => b.label),
+            datasets: [{
+                label: 'Réussite', data: r.map(b => b.rate),
+                borderColor: C.accent, backgroundColor: a(C.accent, .13),
+                borderWidth: 2, tension: .25, fill: true, spanGaps: true,
+                // Une tranche peu fournie s'affiche en creux : le point est là,
+                // mais il ne prétend pas au même poids qu'une tranche solide.
+                pointRadius: c => c.raw === null ? 0 : 5,
+                pointBackgroundColor: r.map(b => b.n >= 30 ? C.accent : C.surface),
+                pointBorderColor: C.accent, pointBorderWidth: 2,
+            }],
+        },
+        options: base({
+            interaction: { mode: 'nearest', intersect: false },
+            scales: axes({ y: { min: bas, max: 100, beginAtZero: false,
+                                ticks: { color: C.text2, callback: t => t + ' %' } } }),
+            plugins: { legend: { display: false },
+                tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                    titleColor: C.text, bodyColor: C.text2, padding: 10,
+                    callbacks: {
+                        label: c => {
+                            const b = r[c.dataIndex];
+                            if (!b.n) return 'aucune réponse dans cette tranche';
+                            return `${b.rate} % de réussite sur ${b.n} réponse${b.n > 1 ? 's' : ''}`
+                                 + (b.n < 30 ? ' (encore peu)' : '');
+                        },
+                    } } },
+        }),
+    });
+})();
 {% endif %}
 
-// ── Stage donut chart ──────────────────────────────────────────────────
-const stageRaw = {{ stage_data | tojson }};
-new Chart(document.getElementById('stageChart'), {
-    type: 'doughnut',
-    data: {
-        labels: Object.keys(stageRaw),
-        datasets: [{
-            data: Object.values(stageRaw),
-            backgroundColor: ['#e53170cc', '#fbbf24cc', colors.accent + 'cc', colors.accent2 + 'cc'],
-            borderColor:     ['#e53170',   '#fbbf24',   colors.accent,         colors.accent2],
-            borderWidth: 2,
-            hoverOffset: 6,
-        }]
-    },
-    options: {
-        responsive: true,
-        cutout: '65%',
-        plugins: {
-            legend: {
-                display: true,
-                position: 'bottom',
-                labels: { color: colors.text2, font: { size: 11 }, boxWidth: 12, padding: 10 }
+// ── Cartes par boîte ───────────────────────────────────────────────────
+// Deux séries pour un seul histogramme : la coupure au seuil est une
+// information sur la loi d'intervalle, pas une décoration.
+(function () {
+    const boxData = {{ box_data | tojson }};
+    const SEUIL = {{ box_threshold }};
+    if (!boxData.length) return;
+    new Chart(document.getElementById('boxChart'), {
+        type: 'bar',
+        data: {
+            labels: boxData.map(d => d[0]),
+            datasets: [
+                { label: 'Intervalle linéaire (≤ ' + SEUIL + ')',
+                  data: boxData.map(d => d[0] <= SEUIL ? d[1] : null),
+                  backgroundColor: a(C.accent, .22), borderColor: a(C.accent, .6),
+                  borderWidth: 1, borderRadius: 3 },
+                { label: 'Intervalle accéléré (> ' + SEUIL + ')',
+                  data: boxData.map(d => d[0] > SEUIL ? d[1] : null),
+                  backgroundColor: C.accent, borderColor: C.accent,
+                  borderWidth: 1, borderRadius: 3 },
+            ],
+        },
+        options: base({
+            plugins: { legend: legendOn,
+                tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                    titleColor: C.text, bodyColor: C.text2, padding: 10,
+                    filter: i => i.raw !== null,
+                    callbacks: { title: c => 'Boîte ' + c[0].label,
+                                 label: c => c.raw + ' cartes' } } },
+            scales: axes({ x: { stacked: true, ticks: { color: C.text2, maxTicksLimit: 12 } },
+                           y: { stacked: true } }),
+        }),
+    });
+})();
+
+// ── Stades d'apprentissage ─────────────────────────────────────────────
+// Une barre horizontale empilée plutôt qu'un anneau : les proportions se
+// comparent le long d'un axe commun, et les libellés tiennent.
+(function () {
+    // Paires [libellé, nombre], dans l'ordre croissant des intervalles.
+    const stage = {{ stage_data | tojson }};
+    if (!stage.length) return;
+    const teintes = [.22, .45, .68, .95];
+    new Chart(document.getElementById('stageChart'), {
+        type: 'bar',
+        data: {
+            labels: [''],
+            datasets: stage.map(([nom, n], i) => ({
+                label: nom, data: [n],
+                backgroundColor: a(C.accent, teintes[i] ?? .95),
+                borderColor: C.surface, borderWidth: 2, borderRadius: 3,
+            })),
+        },
+        options: base({
+            indexAxis: 'y',
+            plugins: { legend: { ...legendOn, reverse: false },
+                tooltip: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1,
+                    titleColor: C.text, bodyColor: C.text2, padding: 10,
+                    callbacks: { title: c => c[0].dataset.label, label: c => c.raw + ' cartes' } } },
+            scales: { x: { stacked: true, ticks: { color: C.text2 }, grid: { color: C.border } },
+                      y: { stacked: true, ticks: { display: false }, grid: { display: false } } },
+        }),
+    });
+})();
+
+// ── Croissance du paquet ───────────────────────────────────────────────
+(function () {
+    const tl = {{ timeline_data | tojson }};
+    if (!tl.length) return;
+    new Chart(document.getElementById('timelineChart'), {
+        type: 'line',
+        data: { labels: tl.map(d => d.date),
+                datasets: [{ label: 'Cartes', data: tl.map(d => d.count),
+                             borderColor: C.accent, backgroundColor: a(C.accent, .12),
+                             borderWidth: 2, fill: true, tension: .3, pointRadius: 0 }] },
+        options: base(),
+    });
+})();
+
+// ── Calendriers ────────────────────────────────────────────────────────
+// Même dessin pour la création et la révision : une fonction, deux appels.
+// Échelle logarithmique de l'intensité — sans elle, une journée à 400 cartes
+// écrase toutes les journées ordinaires dans la même teinte pâle.
+function drawCalendar(canvasId, data, hex) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !data.length) return;
+    const COLS = 53, ROWS = 7, CELL = 13, GAP = 3;
+    const PAD_L = 28, PAD_T = 22, PAD_B = 20;
+    const W = PAD_L + COLS * (CELL + GAP), H = PAD_T + ROWS * (CELL + GAP) + PAD_B;
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+
+    const map = {};
+    data.forEach(d => map[d.date] = d.count);
+    const logMax = Math.log1p(Math.max(...data.map(d => d.count), 1));
+
+    const start = new Date(data[0].date + 'T00:00:00');
+    const dow = start.getDay();
+    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1));
+
+    const MOIS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
+    const JOURS = ['L','M','M','J','V','S','D'];
+
+    ctx.fillStyle = C.text2;
+    ctx.font = '10px DM Sans, sans-serif';
+    ctx.textAlign = 'right';
+    for (let r = 0; r < ROWS; r += 2)
+        ctx.fillText(JOURS[r], PAD_L - 4, PAD_T + r * (CELL + GAP) + CELL - 2);
+
+    let moisPrec = -1;
+    for (let col = 0; col < COLS; col++) {
+        for (let row = 0; row < ROWS; row++) {
+            const d = new Date(start);
+            d.setDate(start.getDate() + col * 7 + row);
+            const ds = d.getFullYear() + '-'
+                     + String(d.getMonth() + 1).padStart(2, '0') + '-'
+                     + String(d.getDate()).padStart(2, '0');
+            const n = map[ds] || 0;
+            const x = PAD_L + col * (CELL + GAP), y = PAD_T + row * (CELL + GAP);
+
+            if (row === 0 && d.getMonth() !== moisPrec) {
+                ctx.fillStyle = C.text2; ctx.textAlign = 'left';
+                ctx.fillText(MOIS[d.getMonth()], x, PAD_T - 6);
+                moisPrec = d.getMonth();
+            }
+            const t = n ? .18 + .82 * (Math.log1p(n) / logMax) : 0;
+            ctx.fillStyle = n ? a(hex, t) : C.border;
+            if (ctx.roundRect) {
+                ctx.beginPath();
+                ctx.roundRect(x, y, CELL, CELL, 3);
+                ctx.fill();
+            } else {
+                ctx.fillRect(x, y, CELL, CELL);
             }
         }
     }
-});
+}
+drawCalendar('creationCalendar', {{ creation_heatmap | tojson }}, C.accent);
+{% if rs.total %}
+drawCalendar('reviewCalendar', {{ review_calendar | tojson }}, C.ok);
+{% endif %}
 </script>
 {% endif %}
 {% endblock %}
