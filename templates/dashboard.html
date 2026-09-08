@@ -24,6 +24,60 @@
     </div>
 </div>
 
+{# ── Journal des révisions ───────────────────────────────────────────────
+   Ces chiffres viennent de reviews.jsonl, alimenté à chaque réponse. Ils
+   n'existent donc qu'à partir de la première révision suivant sa mise en
+   service — d'où l'état vide ci-dessous plutôt qu'une page de zéros. #}
+{% if rs.total %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ "%.0f"|format(rs.success_rate) if rs.success_rate is not none else "—" }}%</div>
+        <div class="stat-label">Réussite</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ rs.streak }}</div>
+        <div class="stat-label">Jour{{ "s" if rs.streak > 1 }} d'affilée</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ rs.answers_today }}</div>
+        <div class="stat-label">Aujourd'hui</div>
+    </div>
+</div>
+
+<div class="chart-card">
+    <h3>Réponses par jour — {{ rs.window_days }} derniers jours</h3>
+    <canvas id="answersChart" height="200"></canvas>
+    <p style="margin-top:10px;font-size:.8rem;color:var(--text2);">
+        {{ rs.answers_window }} réponse{{ "s" if rs.answers_window > 1 }} sur la période
+        · {{ rs.total }} depuis le {{ rs.first_day }}
+    </p>
+</div>
+
+<div class="chart-card">
+    <h3>Taux de réussite — {{ rs.window_days }} derniers jours</h3>
+    <canvas id="rateChart" height="200"></canvas>
+    <p style="margin-top:10px;font-size:.8rem;color:var(--text2);">
+        Les cartes passées sont exclues du calcul : elles ne sont ni sues ni ratées.
+        {%- if rs.success_rate_window is not none %}
+        Moyenne sur la période : {{ "%.0f"|format(rs.success_rate_window) }} %.
+        {%- endif %}
+    </p>
+</div>
+{% else %}
+<div class="chart-card">
+    <h3>Historique des révisions</h3>
+    <p style="font-size:.9rem;color:var(--text2);line-height:1.6;">
+        Le journal est vide : il enregistre chaque réponse à partir de maintenant.
+        Taux de réussite, série de jours et courbe de progression apparaîtront ici
+        dès votre première révision.
+    </p>
+    <p style="font-size:.85rem;color:var(--text2);margin-top:10px;">
+        Les révisions passées ne peuvent pas être reconstituées : jusqu'ici, seule
+        la date de la <em>dernière</em> révision de chaque carte était conservée.
+    </p>
+</div>
+{% endif %}
+
 <div class="chart-card">
     <h3>Cartes par boîte</h3>
     <canvas id="boxChart" height="200"></canvas>
@@ -232,6 +286,60 @@ new Chart(document.getElementById('activityChart'), {
         }
     }
 });
+
+// ── Journal : réponses par jour ────────────────────────────────────────
+{% if rs.total %}
+const rsDaily = {{ rs.daily | tojson }};
+const jour = d => d.date.slice(8) + '/' + d.date.slice(5, 7);
+
+new Chart(document.getElementById('answersChart'), {
+    type: 'bar',
+    data: {
+        labels: rsDaily.map(jour),
+        datasets: [
+            { label: 'Correct',   data: rsDaily.map(d => d.correct),   backgroundColor: colors.accent2, borderRadius: 3 },
+            { label: 'Faux',      data: rsDaily.map(d => d.incorrect), backgroundColor: colors.danger,  borderRadius: 3 },
+            { label: 'Passé',     data: rsDaily.map(d => d.passed),    backgroundColor: colors.surface2, borderColor: colors.border, borderWidth: 1, borderRadius: 3 },
+        ]
+    },
+    options: {
+        ...defaults,
+        plugins: { legend: { display: true, labels: { color: colors.text2, boxWidth: 12, padding: 14 } } },
+        scales: {
+            x: { stacked: true, ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
+            y: { stacked: true, ticks: { color: colors.text2 }, grid: { color: colors.border }, beginAtZero: true }
+        }
+    }
+});
+
+// ── Journal : taux de réussite ─────────────────────────────────────────
+// `rate` vaut null les jours sans réponse tranchée : spanGaps relie les points
+// de part et d'autre plutôt que de faire retomber la courbe à zéro.
+new Chart(document.getElementById('rateChart'), {
+    type: 'line',
+    data: {
+        labels: rsDaily.map(jour),
+        datasets: [{
+            data: rsDaily.map(d => d.rate),
+            borderColor: colors.accent,
+            backgroundColor: colors.accent + '22',
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: colors.accent,
+            tension: .3,
+            fill: true,
+            spanGaps: true,
+        }]
+    },
+    options: {
+        ...defaults,
+        scales: {
+            x: { ticks: { color: colors.text2, maxTicksLimit: 10 }, grid: { color: colors.border } },
+            y: { ticks: { color: colors.text2, callback: v => v + ' %' }, grid: { color: colors.border }, min: 0, max: 100 }
+        }
+    }
+});
+{% endif %}
 
 // ── Stage donut chart ──────────────────────────────────────────────────
 const stageRaw = {{ stage_data | tojson }};

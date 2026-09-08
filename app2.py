@@ -354,6 +354,154 @@ def locked_flashcards():
             if fcntl is not None:
                 fcntl.flock(lf, fcntl.LOCK_UN)
 
+# ─── Journal des révisions ───────────────────────────────────────────────────
+# Une carte ne garde qu'une seule `last_reviewed_date`, écrasée à chaque
+# réponse : impossible de savoir combien de fois elle a été ratée, ni de tracer
+# une courbe de progression. Ce journal comble le trou — une ligne JSON ajoutée
+# par réponse, jamais réécrite.
+#
+# L'ajout est l'écriture la moins chère qui soit (quelques dizaines d'octets en
+# fin de fichier, contre 2,4 Mo pour flashcards.json) et la plus sûre : une
+# coupure en plein vol ne peut abîmer que la dernière ligne, que la lecture
+# ignore. Le journal est donc écrit HORS du verrou des cartes.
+#
+# Une ligne :
+#   {"ts": "2026-09-08T14:23:11", "card": "<uuid>", "result": "correct",
+#    "from": 20, "to": 21, "mode": "focus", "face": "recto"}
+#
+# `result` vaut "correct", "incorrect", "pass" — ou "undo", qui annule la
+# dernière réponse enregistrée pour cette carte (voir load_reviews).
+REVIEWS_FILE = "reviews.jsonl"
+
+
+def log_review(card_id, result, box_from, box_to, mode, face=None):
+    """Ajoute une ligne au journal. N'échoue jamais bruyamment : perdre une
+    ligne de statistiques ne doit pas faire perdre une réponse à l'utilisateur."""
+    entry = {
+        "ts": datetime.now().isoformat(timespec="seconds"),
+        "card": card_id,
+        "result": result,
+        "from": box_from,
+        "to": box_to,
+        "mode": mode,
+    }
+    if face:
+        entry["face"] = face
+    try:
+        with open(REVIEWS_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def load_reviews(since=None):
+    """Le journal, annulations résolues, du plus ancien au plus récent.
+
+    `since` : une date "YYYY-MM-DD" en deçà de laquelle on ne garde rien — le
+    fichier grossit d'environ 400 lignes par jour, autant ne pas tout charger
+    pour un graphique sur 30 jours.
+
+    Une entrée "undo" retire la dernière réponse enregistrée pour la même carte,
+    de sorte que le journal reste strictement en ajout tout en racontant ce qui
+    s'est réellement passé. Les lignes illisibles (écriture interrompue) sont
+    ignorées."""
+    if not os.path.exists(REVIEWS_FILE):
+        return []
+    entries = []
+    last_by_card = {}      # card_id -> position dans `entries` de sa dernière réponse
+    try:
+        with open(REVIEWS_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue          # ligne tronquée : on passe
+                if not isinstance(e, dict) or "card" not in e:
+                    continue
+                cid = e["card"]
+                if e.get("result") == "undo":
+                    pos = last_by_card.pop(cid, None)
+                    if pos is not None:
+                        entries[pos] = None
+                    continue
+                last_by_card[cid] = len(entries)
+                entries.append(e)
+    except OSError:
+        return []
+    kept = [e for e in entries if e is not None]
+    if since:
+        kept = [e for e in kept if e.get("ts", "") >= since]
+    return kept
+
+
+def review_stats(days=30):
+    """Ce que le journal des révisions permet de dire, prêt pour le gabarit.
+
+    Tout se calcule en une seule lecture du fichier. `pass` n'entre jamais dans
+    un taux de réussite : une carte passée n'est ni sue ni ratée, la compter
+    ferait baisser le taux sans qu'aucune réponse ait été fausse."""
+    entries = load_reviews()
+    if not entries:
+        return {"total": 0}
+
+    today = datetime.now().date()
+    window_start = today - timedelta(days=days - 1)
+
+    def rate(rows):
+        """Taux de réussite en %, sur les seules réponses tranchées."""
+        ok = sum(1 for e in rows if e.get("result") == "correct")
+        ko = sum(1 for e in rows if e.get("result") == "incorrect")
+        return (ok / (ok + ko) * 100) if (ok + ko) else None
+
+    # Répartition par jour, sur toute l'histoire (sert au streak et à la fenêtre).
+    by_day = {}
+    for e in entries:
+        by_day.setdefault(e.get("ts", "")[:10], []).append(e)
+
+    # Fenêtre glissante : un point par jour, y compris les jours sans révision —
+    # un trou dans la série est une information, pas une absence de donnée.
+    daily = []
+    for i in range(days):
+        d = window_start + timedelta(days=i)
+        ds = d.isoformat()
+        rows = by_day.get(ds, [])
+        daily.append({
+            "date": ds,
+            "correct": sum(1 for e in rows if e.get("result") == "correct"),
+            "incorrect": sum(1 for e in rows if e.get("result") == "incorrect"),
+            "passed": sum(1 for e in rows if e.get("result") == "pass"),
+            "rate": rate(rows),
+        })
+
+    # Série de jours consécutifs. Ne pas avoir encore révisé aujourd'hui ne casse
+    # pas la série : on part de la veille tant que la journée est en cours.
+    cursor = today if by_day.get(today.isoformat()) else today - timedelta(days=1)
+    streak = 0
+    while by_day.get(cursor.isoformat()):
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    window = [e for e in entries if e.get("ts", "")[:10] >= window_start.isoformat()]
+    graded = [e for e in entries if e.get("result") in ("correct", "incorrect")]
+
+    return {
+        "total": len(entries),
+        "graded": len(graded),
+        "days_covered": len(by_day),
+        "first_day": min(by_day) if by_day else None,
+        "success_rate": rate(entries),
+        "success_rate_window": rate(window),
+        "answers_today": len(by_day.get(today.isoformat(), [])),
+        "answers_window": len(window),
+        "streak": streak,
+        "daily": daily,
+        "window_days": days,
+    }
+
+
 # ─── Palette des préfixes emoji ──────────────────────────────────────────────
 # Les pastilles proposées au-dessus des champs de création / d'édition. La liste
 # vit dans un fichier à part pour être modifiable depuis l'app (bouton ✏️ de la
@@ -768,6 +916,8 @@ def review_answer(result):
 
     # Snapshot for undo: capture counters BEFORE incrementing
     last_action = None
+    # Ce qu'il faudra consigner au journal, une fois le verrou des cartes rendu.
+    journal = None
 
     if result == "correct":
         correct += 1
@@ -804,6 +954,14 @@ def review_answer(result):
                     all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
                     all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
                     all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
+                journal = (last_action["card_id"], last_action["previous_box"],
+                           all_cards[i]["box"], last_action["previous_current_face"])
+    if journal:
+        # La route accepte n'importe quelle chaîne et traite tout ce qui n'est ni
+        # "correct" ni "incorrect" comme un passage : le journal dit la même chose,
+        # plutôt que de consigner une valeur fantaisiste venue de l'URL.
+        logged = result if result in ("correct", "incorrect") else "pass"
+        log_review(journal[0], logged, journal[1], journal[2], "focus", face=journal[3])
     save_review_state(cards, idx + 1, False,
                       correct=correct, incorrect=incorrect, pass_count=pass_count,
                       last_action=last_action)
@@ -831,6 +989,11 @@ def review_undo():
             all_cards[i]["last_reviewed_date"] = last["previous_last_reviewed_date"]
             all_cards[i]["next_review_date"]   = last["previous_next_review_date"]
             all_cards[i]["current_face"]       = last["previous_current_face"]
+
+    # Le journal reste en ajout : on n'efface pas la réponse annulée, on écrit
+    # son annulation. load_reviews() se charge de la faire disparaître.
+    log_review(last["card_id"], "undo", last.get("previous_box"),
+               last.get("previous_box"), "focus")
 
     # Restore session counters and rewind index by 1
     save_review_state(
@@ -1081,6 +1244,7 @@ def review_grid_answer():
     # Champs du formulaire : grade_<id> = "ok" | "no" | "" (vide → passée)
     grades = {cid: request.form.get(f"grade_{cid}", "") for cid in batch_ids}
 
+    journal = []          # consigné après la remise du verrou des cartes
     with locked_flashcards() as all_cards:
         card_index = index_by_id(all_cards)
         now = datetime.now()
@@ -1091,8 +1255,12 @@ def review_grid_answer():
                 incorrect += 1
             else:
                 pass_count += 1           # non notée = passée (aucun changement de boîte)
-            if g in ("ok", "no") and cid in card_index:
-                i, c = card_index[cid]
+            if cid not in card_index:
+                continue
+            i, c = card_index[cid]
+            box_before = c["box"]
+            face_shown = c.get("current_face", "recto")
+            if g in ("ok", "no"):
                 if g == "ok":
                     all_cards[i]["box"] = min(60, c["box"] + 1)
                 else:
@@ -1100,6 +1268,11 @@ def review_grid_answer():
                 all_cards[i]["last_reviewed_date"] = now.strftime("%Y-%m-%d")
                 all_cards[i]["next_review_date"] = (now + timedelta(days=box_interval(all_cards[i]["box"]))).strftime("%Y-%m-%d")
                 all_cards[i]["current_face"] = "verso" if c.get("current_face", "recto") == "recto" else "recto"
+            journal.append((cid, {"ok": "correct", "no": "incorrect"}.get(g, "pass"),
+                            box_before, all_cards[i]["box"], face_shown))
+
+    for cid, res, box_from, box_to, face in journal:
+        log_review(cid, res, box_from, box_to, "grid", face=face)
 
     save_grid_state(cards, idx + batch, batch,
                     correct=correct, incorrect=incorrect, pass_count=pass_count)
@@ -1526,7 +1699,7 @@ def dashboard():
                                total=0, mastery=0, long_term_ratio=0,
                                box_data=[], timeline_data=[], workload_data=[],
                                activity_data=[], stage_data=[],
-                               creation_heatmap=[])
+                               creation_heatmap=[], rs={"total": 0})
 
     box_sum = sum(c["box"] for c in cards)
     mastery = (box_sum / (total * 60)) * 100
@@ -1586,7 +1759,8 @@ def dashboard():
         total=total, mastery=mastery, long_term_ratio=long_term_ratio,
         box_data=box_data, timeline_data=cumulative, workload_data=workload,
         activity_data=activity_data, stage_data=stage_data,
-        creation_heatmap=creation_heatmap
+        creation_heatmap=creation_heatmap,
+        rs=review_stats()
     )
 
 # ── API for search / filter (AJAX) ──────────────────────────────────────────
