@@ -78,3 +78,19 @@
     {%- if p.short %}<span class="lbl">{{ p.short }}</span>{% endif %}
 </button>
 {%- endmacro %}
+
+{# Une ligne de la liste « Gérer ». `note` affiche, s'il y a lieu, la raison
+   pour laquelle la carte figure dans cette liste (retard, échecs…). #}
+{% macro card_row(card, note='') %}
+<a href="/card/{{ card.id }}" class="card-list-item">
+    {% if card.marked %}<span class="marked-icon">🔖</span>{% endif %}
+    {% if card.recto_path and card.recto_path.startswith('http') %}
+        <img src="{{ card.recto_path }}" class="thumb" loading="lazy" alt="">
+    {% elif card.recto_path %}
+        <img src="/{{ card.recto_path }}" class="thumb" loading="lazy" alt="">
+    {% endif %}
+    <span class="preview">{{ card.recto_text or '🖼️ Image' }}</span>
+    {% if note %}<span class="badge" style="margin-left:auto;margin-right:8px;white-space:nowrap;">{{ note }}</span>{% endif %}
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endmacro %}

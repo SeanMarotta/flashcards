@@ -373,6 +373,9 @@ def locked_flashcards():
 # dernière réponse enregistrée pour cette carte (voir load_reviews).
 REVIEWS_FILE = "reviews.jsonl"
 
+# Dernière lecture analysée du journal, datée par (mtime, taille) du fichier.
+_reviews_cache = {"stamp": None, "entries": []}
+
 
 def log_review(card_id, result, box_from, box_to, mode, face=None):
     """Ajoute une ligne au journal. N'échoue jamais bruyamment : perdre une
@@ -407,6 +410,19 @@ def load_reviews(since=None):
     ignorées."""
     if not os.path.exists(REVIEWS_FILE):
         return []
+    # Le journal ne fait que grandir (~400 lignes par jour) et plusieurs vues le
+    # lisent dans la même requête. On garde la dernière analyse en mémoire, datée
+    # par la taille et la date du fichier : un ajout invalide le cache, une
+    # relecture à l'identique ne coûte rien.
+    try:
+        stamp = os.stat(REVIEWS_FILE)
+        stamp = (stamp.st_mtime, stamp.st_size)
+    except OSError:
+        return []
+    if _reviews_cache.get("stamp") == stamp:
+        kept = _reviews_cache["entries"]
+        return [e for e in kept if e.get("ts", "") >= since] if since else kept
+
     entries = []
     last_by_card = {}      # card_id -> position dans `entries` de sa dernière réponse
     try:
@@ -432,8 +448,9 @@ def load_reviews(since=None):
     except OSError:
         return []
     kept = [e for e in entries if e is not None]
+    _reviews_cache["stamp"], _reviews_cache["entries"] = stamp, kept
     if since:
-        kept = [e for e in kept if e.get("ts", "") >= since]
+        return [e for e in kept if e.get("ts", "") >= since]
     return kept
 
 
@@ -500,6 +517,108 @@ def review_stats(days=30):
         "daily": daily,
         "window_days": days,
     }
+
+
+# ─── Cartes rétives ──────────────────────────────────────────────────────────
+# Une carte rétive (« leech ») est une carte qui revient sans jamais s'installer :
+# on la rate, elle redescend d'une boîte, on la revoit, on la rate encore. Elle
+# occupe la révision quotidienne sans rien apporter, et le remède n'est pas de la
+# réviser davantage — c'est de la reformuler, de la scinder, ou de la supprimer.
+#
+# Deux signaux la désignent, et ils ne se recouvrent pas :
+#
+#   • le RETARD DE PROGRESSION, lisible dans les cartes elles-mêmes. En partant
+#     de la boîte 1 sans jamais se tromper, une carte atteint la boîte n après
+#     un temps connu (la somme des intervalles). Comparer la boîte qu'elle
+#     devrait avoir à son âge et celle qu'elle a vraiment donne le nombre de
+#     boîtes perdues en échecs. Ce signal fonctionne sur l'historique existant.
+#
+#   • les ÉCHECS AU JOURNAL, précis mais seulement à partir de la mise en
+#     service de reviews.jsonl : nombre de « incorrect » sur la carte, et série
+#     d'échecs consécutifs — celle-ci désigne une carte qui décroche maintenant,
+#     bien avant que le retard n'ait eu le temps de se creuser.
+LEECH_MIN_LAG = 10       # boîtes de retard sur la progression idéale
+LEECH_MIN_FAILS = 5      # échecs cumulés au journal
+LEECH_FAIL_STREAK = 3    # échecs consécutifs sur les dernières réponses
+LEECH_MIN_AGE = 30       # jours : en deçà, une carte n'a pas eu sa chance
+
+# Jours cumulés pour atteindre chaque boîte sans jamais se tromper.
+# BOX_CUMULATIVE_DAYS[n] = temps nécessaire pour arriver en boîte n.
+BOX_CUMULATIVE_DAYS = [0, 0]
+for _b in range(1, BOX_MAX + 1):
+    BOX_CUMULATIVE_DAYS.append(BOX_CUMULATIVE_DAYS[-1] + box_interval(_b))
+
+
+def expected_box(age_days):
+    """La boîte qu'une carte de cet âge aurait atteinte sans jamais être ratée."""
+    b = 1
+    while b < BOX_MAX and BOX_CUMULATIVE_DAYS[b + 1] <= age_days:
+        b += 1
+    return b
+
+
+def progression_lag(card, today=None):
+    """Boîtes perdues en échecs, ou None si la carte n'est pas jugeable
+    (jamais révisée, trop jeune, ou date de création absente/illisible)."""
+    if not card.get("last_reviewed_date"):
+        return None
+    try:
+        born = datetime.strptime(card["creation_date"], "%Y-%m-%d").date()
+    except (KeyError, TypeError, ValueError):
+        return None
+    age = ((today or datetime.now().date()) - born).days
+    if age < LEECH_MIN_AGE:
+        return None
+    return expected_box(age) - card.get("box", 1)
+
+
+def card_failure_counts():
+    """Par carte, ce que le journal sait de ses échecs :
+    {card_id: {"fails": n, "graded": n, "streak": n}} — `streak` étant le nombre
+    d'échecs consécutifs les plus récents (0 si la dernière réponse est bonne)."""
+    stats = {}
+    for e in load_reviews():
+        res = e.get("result")
+        if res not in ("correct", "incorrect"):
+            continue          # une carte passée ne dit rien de sa difficulté
+        s = stats.setdefault(e["card"], {"fails": 0, "graded": 0, "streak": 0})
+        s["graded"] += 1
+        if res == "incorrect":
+            s["fails"] += 1
+            s["streak"] += 1
+        else:
+            s["streak"] = 0
+    return stats
+
+
+def get_leech_cards(cards=None):
+    """Les cartes rétives, la plus préoccupante d'abord.
+
+    Renvoie une liste de dicts {card, lag, fails, graded, streak, reasons}, où
+    `reasons` énumère les signaux qui se sont déclenchés — pour que l'écran dise
+    *pourquoi* une carte est là, et pas seulement qu'elle y est."""
+    cards = load_flashcards() if cards is None else cards
+    failures = card_failure_counts()
+    today = datetime.now().date()
+    out = []
+    for c in cards:
+        lag = progression_lag(c, today)
+        f = failures.get(c["id"], {"fails": 0, "graded": 0, "streak": 0})
+        reasons = []
+        if lag is not None and lag >= LEECH_MIN_LAG:
+            reasons.append(f"{lag} boîtes de retard")
+        if f["fails"] >= LEECH_MIN_FAILS:
+            reasons.append(f"{f['fails']} échecs")
+        if f["streak"] >= LEECH_FAIL_STREAK:
+            reasons.append(f"{f['streak']} échecs d'affilée")
+        if not reasons:
+            continue
+        out.append({"card": c, "lag": lag or 0, "fails": f["fails"],
+                    "graded": f["graded"], "streak": f["streak"],
+                    "reasons": reasons})
+    # Les échecs consécutifs passent devant : c'est le signal le plus actuel.
+    out.sort(key=lambda x: (x["streak"], x["fails"], x["lag"]), reverse=True)
+    return out
 
 
 # ─── Palette des préfixes emoji ──────────────────────────────────────────────
@@ -1303,10 +1422,40 @@ def manage():
     else:
         cards_in_box = []
 
+    # La liste détaillée n'est calculée que si on l'affiche ; le compteur, lui,
+    # est nécessaire à chaque rendu pour la pastille du filtre.
+    leeches = get_leech_cards(all_cards)
     never_count = sum(1 for c in all_cards if not c.get("last_reviewed_date"))
     return render_template("manage.html", title="Gérer", active="manage", body_class="",
                            boxes=boxes, selected_box=selected_box,
-                           cards=cards_in_box, filter_mode=filter_mode, never_count=never_count)
+                           cards=cards_in_box, filter_mode=filter_mode,
+                           never_count=never_count,
+                           leeches=leeches if filter_mode == "leeches" else [],
+                           leech_count=len(leeches))
+
+
+@app.route("/manage/mark_leeches", methods=["POST"])
+@login_required
+def mark_leeches():
+    """Marque toutes les cartes rétives d'un coup, pour les reprendre ensuite
+    dans le mode de révision « cartes marquées » qui existe déjà."""
+    with locked_flashcards() as all_cards:
+        ids = {x["card"]["id"] for x in get_leech_cards(all_cards)}
+        deja = 0
+        for c in all_cards:
+            if c["id"] in ids:
+                if c.get("marked"):
+                    deja += 1
+                c["marked"] = True
+    nouvelles = len(ids) - deja
+    if not ids:
+        flash("Aucune carte rétive à marquer.", "info")
+    elif nouvelles:
+        flash(f"🔖 {nouvelles} carte(s) marquée(s)"
+              + (f" ({deja} l'étaient déjà)." if deja else "."), "success")
+    else:
+        flash(f"Ces {deja} carte(s) étaient déjà marquées.", "info")
+    return redirect(url_for("manage", filter="leeches"))
 
 @app.route("/card/<card_id>")
 @login_required
@@ -1699,7 +1848,7 @@ def dashboard():
                                total=0, mastery=0, long_term_ratio=0,
                                box_data=[], timeline_data=[], workload_data=[],
                                activity_data=[], stage_data=[],
-                               creation_heatmap=[], rs={"total": 0})
+                               creation_heatmap=[], rs={"total": 0}, leech_count=0)
 
     box_sum = sum(c["box"] for c in cards)
     mastery = (box_sum / (total * 60)) * 100
@@ -1760,7 +1909,7 @@ def dashboard():
         box_data=box_data, timeline_data=cumulative, workload_data=workload,
         activity_data=activity_data, stage_data=stage_data,
         creation_heatmap=creation_heatmap,
-        rs=review_stats()
+        rs=review_stats(), leech_count=len(get_leech_cards(cards))
     )
 
 # ── API for search / filter (AJAX) ──────────────────────────────────────────

@@ -51,6 +51,13 @@ rclone copy "$REPO_DIR/audios"          "$REMOTE/audios"  "${RCLONE_OPTS[@]}"
 # Le JSON courant (écrasé à chaque fois = toujours la dernière version).
 rclone copy "$REPO_DIR/flashcards.json" "$REMOTE/"        "${RCLONE_OPTS[@]}"
 
+# Le journal des révisions : il ne fait que grandir, et contrairement aux cartes
+# il n'a AUCUN autre filet — ni instantané dans backups/, ni reconstruction
+# possible. Une fois perdu, l'historique l'est définitivement.
+if [ -f "$REPO_DIR/reviews.jsonl" ]; then
+  rclone copy "$REPO_DIR/reviews.jsonl" "$REMOTE/"        "${RCLONE_OPTS[@]}"
+fi
+
 # Les snapshots datés que l'app génère elle-même dans backups/ : ça nous donne
 # tout l'historique du JSON dans le cloud, sans effort.
 rclone copy "$REPO_DIR/backups"         "$REMOTE/backups" "${RCLONE_OPTS[@]}"

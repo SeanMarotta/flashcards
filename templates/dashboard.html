@@ -24,6 +24,20 @@
     </div>
 </div>
 
+{% if leech_count %}
+<a href="/manage?filter=leeches" class="chart-card"
+   style="display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;">
+    <span style="font-size:1.6rem;">🪤</span>
+    <span style="flex:1;">
+        <strong style="display:block;">{{ leech_count }} carte{{ "s" if leech_count > 1 }} rétive{{ "s" if leech_count > 1 }}</strong>
+        <span style="font-size:.85rem;color:var(--text2);">
+            Elles reviennent sans s'installer — à reformuler plutôt qu'à réviser.
+        </span>
+    </span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+</a>
+{% endif %}
+
 {# ── Journal des révisions ───────────────────────────────────────────────
    Ces chiffres viennent de reviews.jsonl, alimenté à chaque réponse. Ils
    n'existent donc qu'à partir de la première révision suivant sa mise en
