@@ -1208,6 +1208,34 @@ def order_cards(cards, order, all_cards=None, first_theme=None):
     return cards
 
 
+MANAGE_PAGE_SIZE = 100
+
+
+def untagged_cards(cards=None, palette=None):
+    """Les cartes sans préfixe emoji, rangées pour être étiquetées.
+
+    L'ordre est alphabétique sur le texte affiché, accents ignorés : il
+    regroupe les familles — les sept « Château d'… » se suivent — et c'est ce
+    qui rend le classement rapide, puisqu'un même marqueur s'applique alors à
+    toute une série. Les cartes sans aucun texte (deux faces en image) ferment
+    la marche : rien ne les rapproche les unes des autres."""
+    palette = load_emoji_prefixes() if palette is None else palette
+    cards = load_flashcards() if cards is None else cards
+    sans = [c for c in cards if card_theme_rank(c, palette) == len(palette)]
+    sans.sort(key=lambda c: (0, _fold(c.get("recto_text") or c.get("verso_text")))
+              if (c.get("recto_text") or c.get("verso_text")) else (1, ""))
+    return sans
+
+
+def paginate(items, page, size=MANAGE_PAGE_SIZE):
+    """Découpe en pages et borne le numéro demandé.
+    Renvoie (tranche, page effective, nombre de pages)."""
+    pages = max(1, (len(items) + size - 1) // size)
+    page = max(1, min(pages, page or 1))
+    start = (page - 1) * size
+    return items[start:start + size], page, pages
+
+
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -1720,6 +1748,8 @@ def manage():
 
     if filter_mode == "never_reviewed":
         cards_in_box = [c for c in all_cards if not c.get("last_reviewed_date")]
+    elif filter_mode == "untagged":
+        cards_in_box = []          # servi à part, paginé
     elif selected_box is not None:
         cards_in_box = [c for c in all_cards if c["box"] == selected_box]
     else:
@@ -1729,6 +1759,20 @@ def manage():
     # est nécessaire à chaque rendu pour la pastille du filtre.
     leeches = get_leech_cards(all_cards)
     never_count = sum(1 for c in all_cards if not c.get("last_reviewed_date"))
+
+    # 5 419 cartes sans thème sur 5 930 : les rendre d'un bloc ferait une page de
+    # plusieurs mégaoctets. Seule la pastille a besoin d'un chiffre à chaque
+    # rendu — on ne trie et ne découpe que si la liste est réellement affichée,
+    # le repliage alphabétique de 5 400 textes coûtant bien plus que le compte.
+    palette = load_emoji_prefixes()
+    rank_none = len(palette)
+    untagged_count = sum(1 for c in all_cards
+                         if card_theme_rank(c, palette) == rank_none)
+    if filter_mode == "untagged":
+        untagged_page, page_num, page_count = paginate(
+            untagged_cards(all_cards, palette), request.args.get("page", 1, type=int))
+    else:
+        untagged_page, page_num, page_count = [], 1, 1
     return render_template("manage.html", title="Gérer", active="manage", body_class="",
                            boxes=boxes, selected_box=selected_box,
                            cards=cards_in_box, filter_mode=filter_mode,
@@ -1736,7 +1780,9 @@ def manage():
                            leeches=leeches if filter_mode == "leeches" else [],
                            leech_count=len(leeches),
                            q=query, results=found, results_total=found_total,
-                           total_cards=len(all_cards))
+                           total_cards=len(all_cards),
+                           untagged=untagged_page, untagged_count=untagged_count,
+                           page_num=page_num, page_count=page_count)
 
 
 @app.route("/manage/search")

@@ -19,9 +19,24 @@
             aria-label="Effacer la recherche" {% if not q %}hidden{% endif %}>×</button>
 </form>
 
+{% macro pager() %}
+{% if page_count > 1 %}
+<nav class="pager" aria-label="Pages">
+    {% if page_num > 1 %}
+    <a class="btn btn-ghost" href="/manage?filter={{ filter_mode }}&amp;page={{ page_num - 1 }}">← Précédente</a>
+    {% else %}<span class="btn btn-ghost is-off">← Précédente</span>{% endif %}
+    <span class="pager-pos">Page {{ page_num }} sur {{ page_count }}</span>
+    {% if page_num < page_count %}
+    <a class="btn btn-ghost" href="/manage?filter={{ filter_mode }}&amp;page={{ page_num + 1 }}">Suivante →</a>
+    {% else %}<span class="btn btn-ghost is-off">Suivante →</span>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
 {% macro filter_link(mode, icon, label, count, tone) %}
-<a href="/manage?filter={{ mode }}"
+<a href="{% if filter_mode == mode %}/manage{% else %}/manage?filter={{ mode }}{% endif %}"
    class="card-list-item {% if filter_mode == mode %}active{% endif %}"
+   {% if filter_mode == mode %}title="Retirer le filtre"{% endif %}
    style="margin-bottom:10px;border-color:{% if filter_mode == mode %}var(--{{ tone }}){% else %}var(--border){% endif %};background:{% if filter_mode == mode %}var(--surface2){% else %}transparent{% endif %}">
     <span style="font-size:1.1rem;">{{ icon }}</span>
     <span class="preview" style="color:{% if filter_mode == mode %}var(--{{ tone }}){% else %}var(--text){% endif %}">{{ label }}</span>
@@ -33,8 +48,9 @@
 <div id="browse" {% if q %}hidden{% endif %}>
 {% if never_count %}{{ filter_link('never_reviewed', '🕳️', 'Jamais révisées', never_count, 'danger') }}{% endif %}
 {% if leech_count %}{{ filter_link('leeches', '🪤', 'Cartes rétives', leech_count, 'warning') }}{% endif %}
+{% if untagged_count %}{{ filter_link('untagged', '▫️', 'Sans thème', untagged_count, 'accent') }}{% endif %}
 
-{% if boxes %}
+{% if boxes and not filter_mode %}
 <p class="section-title" style="margin-top:16px;">Boîtes</p>
 <div class="box-grid">
     {% for box in boxes %}
@@ -44,7 +60,7 @@
     </a>
     {% endfor %}
 </div>
-{% else %}
+{% elif not boxes %}
 <div class="empty-state">
     <div class="icon">📭</div>
     <p>Aucune carte. Créez-en une !</p>
@@ -68,6 +84,18 @@
 {% for item in leeches %}
 {{ card_row(item.card, item.reasons|join(' · ')) }}
 {% endfor %}
+
+{% elif filter_mode == 'untagged' %}
+<p class="section-title">▫️ Sans thème — {{ untagged_count }}</p>
+<p style="font-size:.85rem;color:var(--text2);line-height:1.6;margin-bottom:14px;">
+    Ces cartes ne portent aucun préfixe emoji : elles échappent au tri par
+    thème et à toute révision ciblée. Elles sont rangées par ordre alphabétique,
+    ce qui regroupe les familles — les châteaux se suivent, les pays aussi — et
+    permet d'appliquer le même marqueur à toute une série. Ouvrez une carte pour
+    l'étiqueter ; elle quitte alors cette liste.
+</p>
+{% for card in untagged %}{{ card_row(card) }}{% endfor %}
+{{ pager() }}
 
 {% elif filter_mode == 'never_reviewed' %}
 <p class="section-title">🕳️ Jamais révisées — {{ cards|length }} cartes</p>
@@ -119,6 +147,17 @@
    vide. Même piège pour tout élément à qui l'on donne un display explicite. */
 .search-clear[hidden] { display: none; }
 .searching { opacity: .5; transition: opacity var(--transition); }
+.pager {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-top: 18px; flex-wrap: wrap;
+}
+/* .btn porte width:100% dans base.html — sans le neutraliser, chaque bouton
+   prend toute la largeur et le pagineur se déplie sur trois lignes. */
+.pager .btn { width: auto; flex: 0 0 auto; padding: 10px 16px; font-size: .85rem; }
+.pager .is-off { opacity: .35; pointer-events: none; }
+.pager-pos {
+    font-size: .82rem; color: var(--text2); font-variant-numeric: tabular-nums;
+}
 </style>
 
 <script>
