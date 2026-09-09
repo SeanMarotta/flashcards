@@ -4,6 +4,21 @@
 
 <h2 style="font-size:1.2rem;margin-bottom:16px;">🗂️ Gérer les cartes</h2>
 
+{# ── Recherche ────────────────────────────────────────────────────────────
+   Le formulaire fonctionne seul : sans JavaScript, Entrée recharge /manage?q=…
+   Le script ci-dessous ne fait que remplacer la liste sans recharger. #}
+<form class="search-bar" action="/manage" method="get" role="search">
+    <svg class="search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.7" y2="16.7"/>
+    </svg>
+    <input type="search" id="q" name="q" value="{{ q }}" autocomplete="off"
+           enterkeyhint="search" aria-label="Rechercher une carte"
+           placeholder="Rechercher parmi {{ total_cards }} cartes…">
+    <button type="button" id="clearSearch" class="search-clear"
+            aria-label="Effacer la recherche" {% if not q %}hidden{% endif %}>×</button>
+</form>
+
 {% macro filter_link(mode, icon, label, count, tone) %}
 <a href="/manage?filter={{ mode }}"
    class="card-list-item {% if filter_mode == mode %}active{% endif %}"
@@ -15,6 +30,7 @@
 </a>
 {% endmacro %}
 
+<div id="browse" {% if q %}hidden{% endif %}>
 {% if never_count %}{{ filter_link('never_reviewed', '🕳️', 'Jamais révisées', never_count, 'danger') }}{% endif %}
 {% if leech_count %}{{ filter_link('leeches', '🪤', 'Cartes rétives', leech_count, 'warning') }}{% endif %}
 
@@ -61,4 +77,116 @@
 <p class="section-title">Boîte {{ selected_box }} — {{ cards|length }} cartes</p>
 {% for card in cards %}{{ card_row(card) }}{% endfor %}
 {% endif %}
+</div>{# /browse #}
+
+<div id="results" {% if not q %}hidden{% endif %}>
+    <p class="section-title" id="resultsTitle">
+        {{ results_total }} résultat{{ "s" if results_total > 1 }} pour « {{ q }} »
+    </p>
+    <div id="resultsList">
+        {# `cards` désigne déjà la liste filtrée par boîte dans cette page :
+           on rebaptise explicitement, sans quoi l'include reçoit la mauvaise. #}
+        {% if q %}{% with cards = results, total = results_total %}
+            {% include '_card_rows.html' %}
+        {% endwith %}{% endif %}
+    </div>
+</div>
+
+<style>
+.search-bar { position: relative; display: flex; align-items: center; margin-bottom: 16px; }
+.search-bar .search-icon { position: absolute; left: 13px; color: var(--text2); pointer-events: none; }
+.search-bar input {
+    width: 100%; padding: 12px 40px 12px 38px;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-family: inherit; font-size: .95rem; transition: border-color var(--transition);
+    -webkit-appearance: none; appearance: none;
+}
+.search-bar input::placeholder { color: var(--text2); }
+.search-bar input:focus { outline: none; border-color: var(--accent); }
+/* La croix native de input[type=search] varie d'un navigateur à l'autre ; on
+   pose la nôtre pour que le geste soit le même partout. */
+.search-bar input::-webkit-search-cancel-button { display: none; }
+.search-clear {
+    position: absolute; right: 8px; width: 28px; height: 28px;
+    display: grid; place-items: center;
+    background: none; border: 0; border-radius: 50%;
+    color: var(--text2); font-size: 1.35rem; line-height: 1; cursor: pointer;
+}
+.search-clear:hover { color: var(--text); background: var(--surface2); }
+/* `display: grid` ci-dessus l'emporte sur le display:none que l'attribut
+   `hidden` applique : sans cette règle, la croix reste visible sur un champ
+   vide. Même piège pour tout élément à qui l'on donne un display explicite. */
+.search-clear[hidden] { display: none; }
+.searching { opacity: .5; transition: opacity var(--transition); }
+</style>
+
+<script>
+(function () {
+    const champ = document.getElementById('q');
+    const zoneResultats = document.getElementById('results');
+    const liste = document.getElementById('resultsList');
+    const titre = document.getElementById('resultsTitle');
+    const parcourir = document.getElementById('browse');
+    const croix = document.getElementById('clearSearch');
+    let minuteur, requeteEnCours, dernierEnvoi = champ.value.trim();
+
+    function afficher(q) {
+        const cherche = q.length > 0;
+        zoneResultats.hidden = !cherche;
+        parcourir.hidden = cherche;
+        croix.hidden = !cherche;
+    }
+
+    async function chercher(q) {
+        // Une requête plus ancienne qui reviendrait après une plus récente
+        // écraserait le bon résultat : on annule la précédente à chaque fois.
+        if (requeteEnCours) requeteEnCours.abort();
+        const ctrl = new AbortController();
+        requeteEnCours = ctrl;
+        liste.classList.add('searching');
+        try {
+            const r = await fetch('/manage/search?q=' + encodeURIComponent(q), { signal: ctrl.signal });
+            if (!r.ok) throw new Error(r.status);
+            liste.innerHTML = await r.text();
+            const n = liste.querySelectorAll('.card-list-item').length;
+            const total = liste.querySelector('[data-total]');
+            titre.textContent = (total ? total.dataset.total : n)
+                + ' résultat' + (n > 1 ? 's' : '') + ' pour « ' + q + ' »';
+        } catch (e) {
+            if (e.name === 'AbortError') return;      // remplacée par une frappe plus récente
+            liste.innerHTML = '<div class="empty-state" style="padding:24px 16px;">'
+                + '<div class="icon">⚠️</div><p>Recherche indisponible. Réessayez.</p></div>';
+            titre.textContent = 'Recherche';
+        } finally {
+            if (requeteEnCours === ctrl) { liste.classList.remove('searching'); requeteEnCours = null; }
+        }
+    }
+
+    function programmer() {
+        const q = champ.value.trim();
+        afficher(q);
+        clearTimeout(minuteur);
+        // L'URL suit la recherche : la page reste partageable et rechargeable,
+        // sans empiler une entrée d'historique par lettre tapée.
+        const url = q ? '/manage?q=' + encodeURIComponent(q) : '/manage';
+        history.replaceState(null, '', url);
+        if (!q) { dernierEnvoi = ''; return; }
+        minuteur = setTimeout(() => {
+            if (q === dernierEnvoi) return;           // rien de neuf à demander
+            dernierEnvoi = q;
+            chercher(q);
+        }, 220);
+    }
+
+    champ.addEventListener('input', programmer);
+    croix.addEventListener('click', () => { champ.value = ''; programmer(); champ.focus(); });
+    // Le rechargement est déjà fait côté serveur : Entrée ne doit rien relancer.
+    champ.form.addEventListener('submit', e => { e.preventDefault(); programmer(); });
+    // Échap vide le champ, comme partout ailleurs.
+    champ.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && champ.value) { e.preventDefault(); champ.value = ''; programmer(); }
+    });
+})();
+</script>
 {% endblock %}

@@ -12,6 +12,7 @@ import json
 import math
 import os
 import tempfile
+import unicodedata
 import uuid
 import random
 import zipfile
@@ -735,6 +736,59 @@ def review_heatmap(days=364):
     return [{"date": (start + timedelta(days=i)).isoformat(),
              "count": counts.get((start + timedelta(days=i)).isoformat(), 0)}
             for i in range(days + 1)]
+
+
+# ─── Recherche de cartes ─────────────────────────────────────────────────────
+
+def _fold(text):
+    """Minuscules sans accents, pour comparer « Élysée » et « elysee ».
+
+    Un paquet français sans cela est à moitié introuvable : « chateau » ne
+    ramène qu'une carte sur les quarante-cinq qui portent « château »."""
+    if not text:
+        return ""
+    return "".join(ch for ch in unicodedata.normalize("NFD", text.lower())
+                   if unicodedata.category(ch) != "Mn")
+
+
+SEARCH_LIMIT = 100
+
+
+def search_cards(query, cards=None, limit=SEARCH_LIMIT):
+    """Cherche `query` dans les deux faces. Renvoie (résultats, total trouvé).
+
+    Les résultats sont classés du plus franc au plus lointain : une face qui
+    vaut exactement la recherche, puis celle qui commence par elle, puis un mot
+    qui commence par elle, puis le reste. Sans ce classement, chercher « par »
+    noie « Paris » sous quatre cents cartes qui contiennent « par » au milieu
+    d'un mot.
+
+    Les cartes dont les deux faces sont des images n'ont aucun texte à comparer
+    (360 sur 5 930 aujourd'hui) : elles ne peuvent pas être trouvées ainsi."""
+    q = _fold(query).strip()
+    if not q:
+        return [], 0
+    cards = load_flashcards() if cards is None else cards
+    trouves = []
+    for c in cards:
+        faces = (_fold(c.get("recto_text")), _fold(c.get("verso_text")))
+        rang = None
+        for f in faces:
+            if not f or q not in f:
+                continue
+            if f == q:
+                r = 0
+            elif f.startswith(q):
+                r = 1
+            elif any(mot.startswith(q) for mot in f.split()):
+                r = 2
+            else:
+                r = 3
+            rang = r if rang is None else min(rang, r)
+        if rang is not None:
+            trouves.append((rang, faces[0] or faces[1], c))
+    trouves.sort(key=lambda t: (t[0], t[1]))
+    return [c for _, _, c in trouves[:limit]], len(trouves)
 
 
 # ─── Palette des préfixes emoji ──────────────────────────────────────────────
@@ -1530,6 +1584,12 @@ def manage():
     boxes = sorted(set(c["box"] for c in all_cards))
     selected_box = request.args.get("box", type=int)
     filter_mode = request.args.get("filter", "")
+    query = request.args.get("q", "").strip()
+
+    # La recherche prend le pas sur les autres vues : on la sert au chargement
+    # pour qu'une URL ?q=… reste partageable et survive à un rechargement, le
+    # JavaScript ne faisant ensuite qu'actualiser la liste sans recharger.
+    found, found_total = search_cards(query, all_cards) if query else ([], 0)
 
     if filter_mode == "never_reviewed":
         cards_in_box = [c for c in all_cards if not c.get("last_reviewed_date")]
@@ -1547,7 +1607,22 @@ def manage():
                            cards=cards_in_box, filter_mode=filter_mode,
                            never_count=never_count,
                            leeches=leeches if filter_mode == "leeches" else [],
-                           leech_count=len(leeches))
+                           leech_count=len(leeches),
+                           q=query, results=found, results_total=found_total,
+                           total_cards=len(all_cards))
+
+
+@app.route("/manage/search")
+@login_required
+def manage_search():
+    """Les lignes de résultat seules, pour la recherche en direct.
+
+    Renvoie du HTML et non du JSON : le gabarit d'une ligne reste ainsi défini
+    une seule fois, dans le macro card_row, au lieu d'être réécrit en
+    JavaScript et de dériver au premier changement."""
+    query = request.args.get("q", "").strip()
+    found, total = search_cards(query, None) if query else ([], 0)
+    return render_template("_card_rows.html", cards=found, total=total, q=query)
 
 
 @app.route("/manage/mark_leeches", methods=["POST"])
@@ -2047,15 +2122,16 @@ def dashboard():
 @app.route("/api/cards")
 @login_required
 def api_cards():
-    q = request.args.get("q", "").lower()
+    q = request.args.get("q", "")
     box = request.args.get("box", type=int)
     cards = load_flashcards()
     if box is not None:
         cards = [c for c in cards if c["box"] == box]
     if q:
-        cards = [c for c in cards if q in (c.get("recto_text") or "").lower() or q in (c.get("verso_text") or "").lower()]
-    truncated = len(cards) > 100
-    return jsonify({"cards": cards[:100], "truncated": truncated, "total": len(cards)})
+        found, total = search_cards(q, cards)
+    else:
+        found, total = cards[:SEARCH_LIMIT], len(cards)
+    return jsonify({"cards": found, "truncated": total > len(found), "total": total})
 
 @app.route("/api/advance_count")
 @login_required

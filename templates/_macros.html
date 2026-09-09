@@ -89,7 +89,11 @@
     {% elif card.recto_path %}
         <img src="/{{ card.recto_path }}" class="thumb" loading="lazy" alt="">
     {% endif %}
-    <span class="preview">{{ card.recto_text or '🖼️ Image' }}</span>
+    {# Beaucoup de cartes ont une image au recto et leur texte au verso :
+       s'arrêter au recto afficherait « Image » sur des lignes parfaitement
+       identifiables, et masquerait ce qui a fait ressortir la carte d'une
+       recherche. On se rabat donc sur l'autre face avant de renoncer. #}
+    <span class="preview">{{ card.recto_text or card.verso_text or '🖼️ Image' }}</span>
     {% if note %}<span class="badge" style="margin-left:auto;margin-right:8px;white-space:nowrap;">{{ note }}</span>{% endif %}
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
 </a>

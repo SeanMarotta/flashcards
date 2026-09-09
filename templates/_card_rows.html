@@ -1,0 +1,23 @@
+{# Les lignes de résultat, seules — servies telles quelles à la recherche en
+   direct (/manage/search) et incluses par manage.html au chargement. Le
+   gabarit d'une ligne n'existe ainsi qu'à un seul endroit. #}
+{% from '_macros.html' import card_row %}
+{% if cards %}
+<span data-total="{{ total }}" hidden></span>
+{% for card in cards %}{{ card_row(card, 'Boîte %d'|format(card.box)) }}{% endfor %}
+{% if total > cards|length %}
+<p style="font-size:.8rem;color:var(--text2);margin-top:12px;">
+    {{ total }} cartes correspondent — les {{ cards|length }} plus proches sont affichées.
+    Précisez la recherche pour resserrer.
+</p>
+{% endif %}
+{% else %}
+<div class="empty-state" style="padding:28px 16px;">
+    <div class="icon">🔍</div>
+    <p>Aucune carte ne contient « {{ q }} ».</p>
+    <p style="font-size:.82rem;color:var(--text2);margin-top:8px;">
+        La recherche porte sur le texte des deux faces. Les cartes dont les deux
+        faces sont des images n'ont pas de texte à comparer.
+    </p>
+</div>
+{% endif %}
