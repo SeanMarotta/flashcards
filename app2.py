@@ -1085,6 +1085,78 @@ def cards_for_mode(mode):
                 "Aucune carte à anticiper avec ces réglages.")
     return [], "Aucune carte à réviser !"
 
+# ─── Ordre des cartes d'une séance ───────────────────────────────────────────
+# La séance était toujours tirée au hasard. C'est le bon défaut — il évite
+# d'apprendre l'ordre plutôt que les cartes — mais il n'est pas toujours ce
+# qu'on veut : avec un retard accumulé, on préfère attaquer par le plus ancien ;
+# après un gros import, par les cartes fragiles ; et il est parfois plus efficace
+# d'enchaîner un thème que de sauter de la géographie à l'anglais.
+#
+# Chaque ordre est d'abord mélangé, PUIS trié : le tri de Python est stable,
+# donc les ex æquo — et il y en a beaucoup, 390 cartes en boîte 20 — sortent
+# dans un ordre différent à chaque séance au lieu de se figer.
+REVIEW_ORDERS = [
+    ("random",   "Aléatoire",              "l'ordre change à chaque séance"),
+    ("overdue",  "Les plus en retard",     "on rattrape par le plus ancien"),
+    ("box_asc",  "Boîte croissante",       "les plus fragiles d'abord"),
+    ("box_desc", "Boîte décroissante",     "les mieux sues d'abord"),
+    ("theme",    "Par thème",              "regroupées par préfixe emoji"),
+    ("leech",    "Cartes rétives d'abord", "les plus résistantes tant qu'on est frais"),
+    ("recent",   "Ajout récent d'abord",   "pour consolider ce qu'on vient de créer"),
+]
+REVIEW_ORDER_KEYS = {k for k, _, _ in REVIEW_ORDERS}
+DEFAULT_REVIEW_ORDER = "random"
+
+
+def review_order():
+    """L'ordre demandé en query string, ramené à une valeur connue."""
+    asked = request.args.get("order", DEFAULT_REVIEW_ORDER)
+    return asked if asked in REVIEW_ORDER_KEYS else DEFAULT_REVIEW_ORDER
+
+
+def card_theme_rank(card, palette=None):
+    """Rang du thème d'une carte dans la palette, ou len(palette) si sans thème.
+
+    Le thème se lit sur le préfixe emoji, cherché sur les DEUX faces : une paire
+    orientée comme 🇬🇧/🇫🇷 pose un marqueur différent de chaque côté, et les deux
+    désignent le même thème — la langue. Les cartes sans marqueur ferment la
+    marche plutôt que d'ouvrir : ce sont les plus nombreuses (5 419 sur 5 930)."""
+    palette = load_emoji_prefixes() if palette is None else palette
+    for i, entry in enumerate(palette):
+        for face in ("recto_text", "verso_text"):
+            text = (card.get(face) or "").strip()
+            if not text:
+                continue
+            for marker in (entry.get("recto"), entry.get("verso")):
+                if marker and text.startswith(marker):
+                    return i
+    return len(palette)
+
+
+def order_cards(cards, order, all_cards=None):
+    """Range la liste d'une séance selon `order`. Modifie et renvoie la liste."""
+    random.shuffle(cards)               # départage les ex æquo, séance après séance
+    if order == "overdue":
+        # Chaîne vide pour une échéance absente : elle passe donc en tête, ce qui
+        # est le bon endroit pour une carte dont on ne sait pas quand elle est due.
+        cards.sort(key=lambda c: c.get("next_review_date") or "")
+    elif order == "box_asc":
+        cards.sort(key=lambda c: c.get("box", 1))
+    elif order == "box_desc":
+        cards.sort(key=lambda c: -c.get("box", 1))
+    elif order == "theme":
+        palette = load_emoji_prefixes()
+        cards.sort(key=lambda c: card_theme_rank(c, palette))
+    elif order == "leech":
+        # Les rétives d'abord, la plus préoccupante en tête ; le reste ensuite.
+        rangs = {x["card"]["id"]: i
+                 for i, x in enumerate(get_leech_cards(all_cards))}
+        cards.sort(key=lambda c: rangs.get(c["id"], len(rangs)))
+    elif order == "recent":
+        cards.sort(key=lambda c: c.get("creation_date") or "", reverse=True)
+    return cards
+
+
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -1136,7 +1208,9 @@ def index():
                            advance_count=len(advance),
                            advance_days=ADVANCE_DEFAULT_DAYS,
                            advance_min_box=ADVANCE_DEFAULT_MIN_BOX,
-                           advance_max_days=ADVANCE_MAX_DAYS)
+                           advance_max_days=ADVANCE_MAX_DAYS,
+                           review_orders=REVIEW_ORDERS,
+                           default_order=DEFAULT_REVIEW_ORDER)
 
 # ── Review session ───────────────────────────────────────────────────────────
 
@@ -1145,7 +1219,7 @@ def index():
 def review_start(mode):
     cleanup_stale_sessions()
     cards, empty_message = cards_for_mode(mode)
-    random.shuffle(cards)
+    order_cards(cards, review_order())
     if not cards:
         flash(empty_message, "info")
         return redirect(url_for("index"))
@@ -1475,7 +1549,7 @@ def review_grid_start(mode):
     batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
     batch = max(2, min(24, batch))
     cards, empty_message = cards_for_mode(mode)
-    random.shuffle(cards)
+    order_cards(cards, review_order())
     if not cards:
         flash(empty_message, "info")
         return redirect(url_for("index"))

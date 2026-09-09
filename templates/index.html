@@ -97,9 +97,42 @@
 .mbtn.is-off{ opacity:.35; pointer-events:none; }
 
 @media (max-width:380px){ .deck-actions{ grid-template-columns:1fr; } }
+.order-bar {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px;
+    padding: 12px 14px; margin-bottom: 4px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.order-field { display: flex; align-items: center; gap: 9px; }
+.order-field > span {
+    font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text2);
+}
+.order-field select {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 7px 10px; font-family: inherit; font-size: .9rem;
+}
+.order-field select:focus { outline: none; border-color: var(--accent); }
+.order-hint { font-size: .8rem; color: var(--text2); flex: 1; min-width: 150px; margin: 0; }
 </style>
 
 <div class="home">
+    {# ── Ordre des cartes ─────────────────────────────────────────────────
+       Un seul réglage pour les trois paquets et les deux modes : il n'y a
+       aucune raison de vouloir un ordre en Focus et un autre en Grille. #}
+    <div class="order-bar">
+        <label class="order-field">
+            <span>Ordre</span>
+            <select id="order-select">
+                {% for key, label, hint in review_orders %}
+                <option value="{{ key }}" {% if key == default_order %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <p class="order-hint" id="order-hint"></p>
+    </div>
+
     {# ── Révision du jour ── #}
     <div class="deck">
         <div class="deck-head">
@@ -110,11 +143,11 @@
             </div>
         </div>
         <div class="deck-actions">
-            <a href="/review/start/daily" class="mbtn">
+            <a href="/review/start/daily" class="mbtn js-review">
                 <span class="mi">◎</span>
                 <span><b>Focus</b><i>une carte à la fois</i></span>
             </a>
-            <a href="/review/grid/start/daily" class="mbtn">
+            <a href="/review/grid/start/daily" class="mbtn js-review">
                 <span class="mi">▦</span>
                 <span><b>Grille</b><i>plusieurs cartes</i></span>
             </a>
@@ -131,11 +164,11 @@
             </div>
         </div>
         <div class="deck-actions">
-            <a href="/review/start/marked" class="mbtn">
+            <a href="/review/start/marked" class="mbtn js-review">
                 <span class="mi">◎</span>
                 <span><b>Focus</b><i>une carte à la fois</i></span>
             </a>
-            <a href="/review/grid/start/marked" class="mbtn">
+            <a href="/review/grid/start/marked" class="mbtn js-review">
                 <span class="mi">▦</span>
                 <span><b>Grille</b><i>plusieurs cartes</i></span>
             </a>
@@ -202,6 +235,7 @@
         const q = query();
         focusEl.href = '/review/start/advance?' + q;
         gridEl.href  = '/review/grid/start/advance?' + q;
+        appliquer();          // ces deux href viennent d'être réécrits sans l'ordre
         fetch('/api/advance_count?' + q)
             .then(r => r.json())
             .then(d => {
@@ -220,6 +254,43 @@
     function schedule() { clearTimeout(timer); timer = setTimeout(refresh, 200); }
     daysEl.addEventListener('change', schedule);
     boxEl.addEventListener('input', schedule);
+
+    // ── Ordre des cartes ────────────────────────────────────────────────
+    const ORDER_HINTS = {{ review_orders | map(attribute=2) | list | tojson }};
+    const ORDER_KEYS  = {{ review_orders | map(attribute=0) | list | tojson }};
+    const orderEl = document.getElementById('order-select');
+    const hintEl  = document.getElementById('order-hint');
+    const DEFAUT  = {{ default_order | tojson }};
+
+    // Le choix est un confort local, pas une donnée : il vit dans le
+    // navigateur. Un stockage indisponible (navigation privée) ne doit pas
+    // empêcher la page de fonctionner, d'où les try/catch.
+    function lire() {
+        try { return localStorage.getItem('reviewOrder'); } catch (e) { return null; }
+    }
+    function ecrire(v) {
+        try { localStorage.setItem('reviewOrder', v); } catch (e) { /* sans effet */ }
+    }
+
+    function appliquer() {
+        const ordre = orderEl.value;
+        hintEl.textContent = ORDER_HINTS[ORDER_KEYS.indexOf(ordre)] || '';
+        ecrire(ordre);
+        // Les liens d'anticipation portent déjà days/min_box : on ajoute le
+        // paramètre au lieu de réécrire la requête, sinon on les casse.
+        document.querySelectorAll('a.js-review, #adv-focus, #adv-grid').forEach(a => {
+            const u = new URL(a.getAttribute('href'), location.origin);
+            if (ordre === DEFAUT) u.searchParams.delete('order');
+            else u.searchParams.set('order', ordre);
+            a.setAttribute('href', u.pathname + (u.search || ''));
+        });
+    }
+
+    const memorise = lire();
+    if (memorise && ORDER_KEYS.includes(memorise)) orderEl.value = memorise;
+    orderEl.addEventListener('change', appliquer);
+
+    appliquer();
     refresh();
 })();
 </script>
