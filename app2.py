@@ -1114,6 +1114,31 @@ def review_order():
     return asked if asked in REVIEW_ORDER_KEYS else DEFAULT_REVIEW_ORDER
 
 
+def review_first_theme():
+    """Le marqueur du thème à placer en tête, ou None.
+
+    Désigné par son emoji de recto plutôt que par son rang : la palette est
+    modifiable depuis l'app, un rang mémorisé dans le navigateur désignerait un
+    autre thème après un réordonnancement. Un marqueur qui n'existe plus est
+    simplement ignoré."""
+    marker = request.args.get("theme", "").strip()
+    if not marker:
+        return None
+    return marker if any(p.get("recto") == marker
+                         for p in load_emoji_prefixes()) else None
+
+
+def theme_counts(cards=None, palette=None):
+    """Nombre de cartes par thème, dans l'ordre de la palette, plus les sans-thème.
+    Renvoie [(entrée de palette, compte), …, (None, compte des sans-thème)]."""
+    palette = load_emoji_prefixes() if palette is None else palette
+    cards = load_flashcards() if cards is None else cards
+    counts = [0] * (len(palette) + 1)
+    for c in cards:
+        counts[card_theme_rank(c, palette)] += 1
+    return list(zip(palette, counts)) + [(None, counts[-1])]
+
+
 def card_theme_rank(card, palette=None):
     """Rang du thème d'une carte dans la palette, ou len(palette) si sans thème.
 
@@ -1133,8 +1158,12 @@ def card_theme_rank(card, palette=None):
     return len(palette)
 
 
-def order_cards(cards, order, all_cards=None):
-    """Range la liste d'une séance selon `order`. Modifie et renvoie la liste."""
+def order_cards(cards, order, all_cards=None, first_theme=None):
+    """Range la liste d'une séance selon `order`. Modifie et renvoie la liste.
+
+    `first_theme` (un emoji de recto de la palette) ne vaut que pour l'ordre
+    « par thème » : ce thème ouvre la séance, les autres suivent dans l'ordre de
+    la palette, les cartes sans marqueur ferment toujours la marche."""
     random.shuffle(cards)               # départage les ex æquo, séance après séance
     if order == "overdue":
         # Chaîne vide pour une échéance absente : elle passe donc en tête, ce qui
@@ -1146,7 +1175,15 @@ def order_cards(cards, order, all_cards=None):
         cards.sort(key=lambda c: -c.get("box", 1))
     elif order == "theme":
         palette = load_emoji_prefixes()
-        cards.sort(key=lambda c: card_theme_rank(c, palette))
+        tete = next((i for i, p in enumerate(palette)
+                     if p.get("recto") == first_theme), None) if first_theme else None
+        if tete is None:
+            cards.sort(key=lambda c: card_theme_rank(c, palette))
+        else:
+            # Le thème choisi vaut -1 : il passe devant tout le reste, qui garde
+            # son ordre de palette, et les sans-thème restent en dernier.
+            cards.sort(key=lambda c: (lambda r: -1 if r == tete else r)(
+                card_theme_rank(c, palette)))
     elif order == "leech":
         # Les rétives d'abord, la plus préoccupante en tête ; le reste ensuite.
         rangs = {x["card"]["id"]: i
@@ -1210,7 +1247,8 @@ def index():
                            advance_min_box=ADVANCE_DEFAULT_MIN_BOX,
                            advance_max_days=ADVANCE_MAX_DAYS,
                            review_orders=REVIEW_ORDERS,
-                           default_order=DEFAULT_REVIEW_ORDER)
+                           default_order=DEFAULT_REVIEW_ORDER,
+                           theme_counts=theme_counts(all_cards))
 
 # ── Review session ───────────────────────────────────────────────────────────
 
@@ -1219,7 +1257,7 @@ def index():
 def review_start(mode):
     cleanup_stale_sessions()
     cards, empty_message = cards_for_mode(mode)
-    order_cards(cards, review_order())
+    order_cards(cards, review_order(), first_theme=review_first_theme())
     if not cards:
         flash(empty_message, "info")
         return redirect(url_for("index"))
@@ -1549,7 +1587,7 @@ def review_grid_start(mode):
     batch = request.args.get("size", GRID_DEFAULT_BATCH, type=int)
     batch = max(2, min(24, batch))
     cards, empty_message = cards_for_mode(mode)
-    order_cards(cards, review_order())
+    order_cards(cards, review_order(), first_theme=review_first_theme())
     if not cards:
         flash(empty_message, "info")
         return redirect(url_for("index"))

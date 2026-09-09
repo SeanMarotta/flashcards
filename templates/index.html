@@ -104,6 +104,9 @@
     border-radius: var(--radius);
 }
 .order-field { display: flex; align-items: center; gap: 9px; }
+/* `display: flex` ci-dessus l'emporte sur le display:none que pose l'attribut
+   `hidden` : sans cette règle, le sélecteur de thème reste visible. */
+.order-field[hidden] { display: none; }
 .order-field > span {
     font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
     color: var(--text2);
@@ -128,6 +131,18 @@
                 {% for key, label, hint in review_orders %}
                 <option value="{{ key }}" {% if key == default_order %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
+            </select>
+        </label>
+        <label class="order-field" id="theme-field" hidden>
+            <span>En premier</span>
+            <select id="theme-select">
+                <option value="">Ordre de la palette</option>
+                {% for entry, n in theme_counts %}{% if entry and n %}
+                <option value="{{ entry.recto }}">
+                    {{ entry.recto }}{% if entry.verso != entry.recto %}{{ entry.verso }}{% endif %}
+                    {{ entry.short or entry.name.split('—')[0].strip() }} — {{ n }}
+                </option>
+                {% endif %}{% endfor %}
             </select>
         </label>
         <p class="order-hint" id="order-hint"></p>
@@ -258,9 +273,11 @@
     // ── Ordre des cartes ────────────────────────────────────────────────
     const ORDER_HINTS = {{ review_orders | map(attribute=2) | list | tojson }};
     const ORDER_KEYS  = {{ review_orders | map(attribute=0) | list | tojson }};
-    const orderEl = document.getElementById('order-select');
-    const hintEl  = document.getElementById('order-hint');
-    const DEFAUT  = {{ default_order | tojson }};
+    const orderEl    = document.getElementById('order-select');
+    const themeField = document.getElementById('theme-field');
+    const themeEl    = document.getElementById('theme-select');
+    const hintEl     = document.getElementById('order-hint');
+    const DEFAUT     = {{ default_order | tojson }};
 
     // Le choix est un confort local, pas une donnée : il vit dans le
     // navigateur. Un stockage indisponible (navigation privée) ne doit pas
@@ -271,24 +288,43 @@
     function ecrire(v) {
         try { localStorage.setItem('reviewOrder', v); } catch (e) { /* sans effet */ }
     }
+    function lireTheme() {
+        try { return localStorage.getItem('reviewTheme'); } catch (e) { return null; }
+    }
+    function ecrireTheme(v) {
+        try { localStorage.setItem('reviewTheme', v || ''); } catch (e) { /* sans effet */ }
+    }
 
     function appliquer() {
         const ordre = orderEl.value;
-        hintEl.textContent = ORDER_HINTS[ORDER_KEYS.indexOf(ordre)] || '';
+        const parTheme = ordre === 'theme';
+        themeField.hidden = !parTheme;
+        const theme = parTheme ? themeEl.value : '';
+        hintEl.textContent = parTheme && theme
+            ? 'ce thème ouvre la séance, les autres suivent'
+            : (ORDER_HINTS[ORDER_KEYS.indexOf(ordre)] || '');
         ecrire(ordre);
+        ecrireTheme(theme);
         // Les liens d'anticipation portent déjà days/min_box : on ajoute le
         // paramètre au lieu de réécrire la requête, sinon on les casse.
         document.querySelectorAll('a.js-review, #adv-focus, #adv-grid').forEach(a => {
             const u = new URL(a.getAttribute('href'), location.origin);
             if (ordre === DEFAUT) u.searchParams.delete('order');
             else u.searchParams.set('order', ordre);
+            if (theme) u.searchParams.set('theme', theme);
+            else u.searchParams.delete('theme');
             a.setAttribute('href', u.pathname + (u.search || ''));
         });
     }
 
     const memorise = lire();
     if (memorise && ORDER_KEYS.includes(memorise)) orderEl.value = memorise;
+    // Un thème mémorisé qui a disparu de la palette est ignoré : le select
+    // refuse la valeur et retombe de lui-même sur « Ordre de la palette ».
+    const themeMemorise = lireTheme();
+    if (themeMemorise) themeEl.value = themeMemorise;
     orderEl.addEventListener('change', appliquer);
+    themeEl.addEventListener('change', appliquer);
 
     appliquer();
     refresh();
