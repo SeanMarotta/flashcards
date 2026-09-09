@@ -137,11 +137,15 @@
             <span>En premier</span>
             <select id="theme-select">
                 <option value="">Ordre de la palette</option>
-                {% for entry, n in theme_counts %}{% if entry and n %}
+                {% for entry, n in theme_counts %}{% if n %}
+                {% if entry %}
                 <option value="{{ entry.recto }}">
                     {{ entry.recto }}{% if entry.verso != entry.recto %}{{ entry.verso }}{% endif %}
                     {{ entry.short or entry.name.split('—')[0].strip() }} — {{ n }}
                 </option>
+                {% else %}
+                <option value="{{ theme_none }}">▫️ Sans thème — {{ n }}</option>
+                {% endif %}
                 {% endif %}{% endfor %}
             </select>
         </label>

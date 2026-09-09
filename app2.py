@@ -1114,16 +1114,24 @@ def review_order():
     return asked if asked in REVIEW_ORDER_KEYS else DEFAULT_REVIEW_ORDER
 
 
-def review_first_theme():
-    """Le marqueur du thème à placer en tête, ou None.
+# Les cartes sans marqueur forment un thème comme les autres — de loin le plus
+# nombreux (5 419 sur 5 930). Le désigner permet de les enchaîner pour les
+# classer, au lieu de les subir en fin de liste.
+THEME_NONE = "none"
 
-    Désigné par son emoji de recto plutôt que par son rang : la palette est
-    modifiable depuis l'app, un rang mémorisé dans le navigateur désignerait un
-    autre thème après un réordonnancement. Un marqueur qui n'existe plus est
-    simplement ignoré."""
+
+def review_first_theme():
+    """Le thème à placer en tête, ou None pour l'ordre de la palette.
+
+    Un thème de la palette est désigné par son emoji de recto plutôt que par son
+    rang : la palette est modifiable depuis l'app, un rang mémorisé dans le
+    navigateur désignerait un autre thème après un réordonnancement. La valeur
+    THEME_NONE désigne les cartes sans marqueur. Tout le reste est ignoré."""
     marker = request.args.get("theme", "").strip()
     if not marker:
         return None
+    if marker == THEME_NONE:
+        return THEME_NONE
     return marker if any(p.get("recto") == marker
                          for p in load_emoji_prefixes()) else None
 
@@ -1175,13 +1183,19 @@ def order_cards(cards, order, all_cards=None, first_theme=None):
         cards.sort(key=lambda c: -c.get("box", 1))
     elif order == "theme":
         palette = load_emoji_prefixes()
-        tete = next((i for i, p in enumerate(palette)
-                     if p.get("recto") == first_theme), None) if first_theme else None
+        if first_theme == THEME_NONE:
+            tete = len(palette)          # le rang que card_theme_rank donne aux sans-marqueur
+        elif first_theme:
+            tete = next((i for i, p in enumerate(palette)
+                         if p.get("recto") == first_theme), None)
+        else:
+            tete = None
         if tete is None:
             cards.sort(key=lambda c: card_theme_rank(c, palette))
         else:
             # Le thème choisi vaut -1 : il passe devant tout le reste, qui garde
-            # son ordre de palette, et les sans-thème restent en dernier.
+            # son ordre de palette. Les sans-marqueur ferment la marche, sauf
+            # quand ce sont eux qu'on a mis en tête.
             cards.sort(key=lambda c: (lambda r: -1 if r == tete else r)(
                 card_theme_rank(c, palette)))
     elif order == "leech":
@@ -1248,7 +1262,8 @@ def index():
                            advance_max_days=ADVANCE_MAX_DAYS,
                            review_orders=REVIEW_ORDERS,
                            default_order=DEFAULT_REVIEW_ORDER,
-                           theme_counts=theme_counts(all_cards))
+                           theme_counts=theme_counts(all_cards),
+                           theme_none=THEME_NONE)
 
 # ── Review session ───────────────────────────────────────────────────────────
 
