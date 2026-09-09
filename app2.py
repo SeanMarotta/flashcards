@@ -1236,6 +1236,45 @@ def paginate(items, page, size=MANAGE_PAGE_SIZE):
     return items[start:start + size], page, pages
 
 
+def theme_markers(palette=None):
+    """Tous les marqueurs de la palette, le plus long d'abord.
+
+    L'ordre compte : un marqueur qui en commence un autre le tronquerait à la
+    lecture. C'est la même précaution que côté formulaire, dans base.html."""
+    palette = load_emoji_prefixes() if palette is None else palette
+    markers = {m for p in palette for m in (p.get("recto"), p.get("verso")) if m}
+    return sorted(markers, key=len, reverse=True)
+
+
+def strip_theme_prefix(text, markers):
+    """Le texte sans son marqueur de tête, s'il en porte un."""
+    for m in markers:
+        if text.startswith(m):
+            return text[len(m):].lstrip(" \t")
+    return text
+
+
+def apply_theme(card, entry, markers):
+    """Pose le marqueur du thème sur les faces de la carte qui portent du texte.
+
+    Une face en image n'a rien à marquer et n'est pas touchée — exactement ce que
+    fait la rangée de pastilles du formulaire. Un marqueur déjà présent est
+    remplacé plutôt que doublé. Renvoie True si au moins une face a changé."""
+    touched = False
+    for face, marker in (("recto_text", entry.get("recto")),
+                         ("verso_text", entry.get("verso"))):
+        text = card.get(face)
+        if not text or not marker:
+            continue
+        # lstrip : certaines cartes commencent par une espace, qui donnerait
+        # « 🗺️  Texte » à deux espaces une fois le marqueur collé devant.
+        neuf = f"{marker} {strip_theme_prefix(text, markers).lstrip()}"
+        if neuf != text:
+            card[face] = neuf
+            touched = True
+    return touched
+
+
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -1796,6 +1835,39 @@ def manage_search():
     query = request.args.get("q", "").strip()
     found, total = search_cards(query, None) if query else ([], 0)
     return render_template("_card_rows.html", cards=found, total=total, q=query)
+
+
+@app.route("/manage/tag", methods=["POST"])
+@login_required
+def manage_tag():
+    """Pose un thème sur plusieurs cartes d'un coup.
+
+    Étiqueter 5 419 cartes une par une par le formulaire demandait cinq gestes
+    chacune. Ici, une sélection et un clic — et comme la liste est rangée par
+    ordre alphabétique, une sélection couvre souvent toute une famille."""
+    marker = (request.form.get("marker") or "").strip()
+    ids = [i for i in request.form.getlist("ids") if i]
+    palette = load_emoji_prefixes()
+    entry = next((p for p in palette if p.get("recto") == marker), None)
+    if entry is None:
+        return jsonify(error="Thème inconnu."), 400
+    if not ids:
+        return jsonify(error="Aucune carte sélectionnée."), 400
+
+    markers = theme_markers(palette)
+    wanted = set(ids)
+    tagged, skipped = [], 0
+    with locked_flashcards() as all_cards:
+        for c in all_cards:
+            if c["id"] not in wanted:
+                continue
+            if apply_theme(c, entry, markers):
+                tagged.append(c["id"])
+            else:
+                skipped += 1        # deux faces en image : rien à marquer
+    return jsonify(tagged=tagged, skipped=skipped,
+                   remaining=len(untagged_cards(None, palette)),
+                   label=entry.get("short") or entry.get("name", ""))
 
 
 @app.route("/manage/mark_leeches", methods=["POST"])

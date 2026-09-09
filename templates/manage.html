@@ -94,8 +94,41 @@
     permet d'appliquer le même marqueur à toute une série. Ouvrez une carte pour
     l'étiqueter ; elle quitte alors cette liste.
 </p>
-{% for card in untagged %}{{ card_row(card) }}{% endfor %}
+<div class="pick-tools">
+    <label class="pick-all"><input type="checkbox" id="pickAll"> Tout cocher sur cette page</label>
+    <span class="pick-tip">Maj+clic pour cocher une plage</span>
+</div>
+<div id="pickList">
+{% for card in untagged %}
+<div class="pick-row" data-id="{{ card.id }}">
+    <label class="pick-box">
+        <input type="checkbox" class="pick" value="{{ card.id }}"
+               {% if not (card.recto_text or card.verso_text) %}disabled
+               title="Deux faces en image : aucun texte à marquer"{% endif %}>
+    </label>
+    {{ card_row(card) }}
+</div>
+{% endfor %}
+</div>
 {{ pager() }}
+
+{# Barre d'action : n'apparaît qu'une fois une carte cochée. #}
+<div class="tagbar" id="tagbar" hidden>
+    <div class="tagbar-head">
+        <strong id="tagCount">0 sélectionnée</strong>
+        <button type="button" class="tagbar-clear" id="tagClear">Tout décocher</button>
+    </div>
+    <div class="tagbar-chips">
+        {% for entry in emoji_prefixes %}
+        <button type="button" class="emoji-chip" data-marker="{{ entry.recto }}"
+                title="{{ entry.name }}">
+            <span class="emo">{{ entry.recto }}</span>
+            {%- if entry.verso != entry.recto %}<span class="sep">→</span><span class="emo">{{ entry.verso }}</span>{% endif %}
+            {%- if entry.short %}<span class="lbl">{{ entry.short }}</span>{% endif %}
+        </button>
+        {% endfor %}
+    </div>
+</div>
 
 {% elif filter_mode == 'never_reviewed' %}
 <p class="section-title">🕳️ Jamais révisées — {{ cards|length }} cartes</p>
@@ -158,6 +191,50 @@
 .pager-pos {
     font-size: .82rem; color: var(--text2); font-variant-numeric: tabular-nums;
 }
+
+/* ── Étiquetage en lot ─────────────────────────────────────────────────── */
+.pick-tools {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.pick-all { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--text2); }
+.pick-all input { width: 17px; height: 17px; accent-color: var(--accent); }
+.pick-tip { font-size: .75rem; color: var(--text2); opacity: .8; }
+@media (hover: none) { .pick-tip { display: none; } }
+
+.pick-row { display: flex; align-items: stretch; gap: 8px; }
+.pick-row > .card-list-item { flex: 1; min-width: 0; }
+/* Cible tactile large : sur téléphone, viser une case de 17 px est pénible. */
+.pick-box {
+    display: grid; place-items: center; min-width: 44px; cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+.pick-box:hover { background: var(--surface2); }
+.pick-box input { width: 19px; height: 19px; accent-color: var(--accent); cursor: pointer; }
+.pick-box input:disabled { cursor: not-allowed; opacity: .3; }
+.pick-row.is-picked > .card-list-item { border-color: var(--accent); background: var(--accent-glow); }
+.pick-row.is-done { opacity: 0; transform: translateX(14px); transition: all .28s ease; }
+
+.tagbar {
+    /* Au-dessus de la barre de navigation, qui est fixe et en z-index 100.
+       --nav-h est mesurée au chargement : la nav grandit de la zone de sécurité
+       sur les téléphones à encoche, une valeur en dur serait fausse là-bas. */
+    position: sticky; bottom: calc(var(--nav-h, 69px) + 8px); z-index: 105;
+    margin: 16px -4px 0; padding: 12px 14px;
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: 0 -6px 24px -12px rgba(0,0,0,.8);
+}
+.tagbar[hidden] { display: none; }
+.tagbar-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.tagbar-head strong { font-size: .92rem; }
+.tagbar-clear {
+    background: none; border: 0; color: var(--text2); cursor: pointer;
+    font-family: inherit; font-size: .82rem; text-decoration: underline;
+}
+.tagbar-clear:hover { color: var(--text); }
+.tagbar-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagbar.is-busy { opacity: .55; pointer-events: none; }
 </style>
 
 <script>
@@ -219,6 +296,7 @@
     }
 
     champ.addEventListener('input', programmer);
+    initEtiquetage();
     croix.addEventListener('click', () => { champ.value = ''; programmer(); champ.focus(); });
     // Le rechargement est déjà fait côté serveur : Entrée ne doit rien relancer.
     champ.form.addEventListener('submit', e => { e.preventDefault(); programmer(); });
@@ -226,6 +304,100 @@
     champ.addEventListener('keydown', e => {
         if (e.key === 'Escape' && champ.value) { e.preventDefault(); champ.value = ''; programmer(); }
     });
+
+// ── Étiquetage en lot ───────────────────────────────────────────────────
+// Cocher une ou plusieurs cartes, puis une pastille : le thème est posé sur
+// toutes d'un coup. Comme la liste est rangée alphabétiquement, une plage
+// couvre souvent une famille entière — d'où la sélection au Maj+clic.
+function initEtiquetage() {
+    const liste = document.getElementById('pickList');
+    if (!liste) return;                       // autre vue que « Sans thème »
+    const barre   = document.getElementById('tagbar');
+    const nav = document.querySelector('.bottomnav');
+    if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+    const compte  = document.getElementById('tagCount');
+    const toutBtn = document.getElementById('pickAll');
+    const videBtn = document.getElementById('tagClear');
+    const badge   = document.querySelector('a.card-list-item.active .badge');
+    let dernier = null;                       // ancre de la sélection par plage
+
+    const cases = () => [...liste.querySelectorAll('input.pick:not(:disabled)')];
+    const cochees = () => cases().filter(i => i.checked);
+
+    function rafraichir() {
+        const n = cochees().length;
+        barre.hidden = n === 0;
+        compte.textContent = n + ' sélectionnée' + (n > 1 ? 's' : '');
+        const total = cases().length;
+        toutBtn.checked = n > 0 && n === total;
+        toutBtn.indeterminate = n > 0 && n < total;
+        cases().forEach(i => i.closest('.pick-row').classList.toggle('is-picked', i.checked));
+    }
+
+    liste.addEventListener('click', e => {
+        const boite = e.target.closest('input.pick');
+        if (!boite) return;
+        if (e.shiftKey && dernier && dernier !== boite) {
+            const tous = cases();
+            const [a, b] = [tous.indexOf(dernier), tous.indexOf(boite)].sort((x, y) => x - y);
+            for (let i = a; i <= b; i++) tous[i].checked = boite.checked;
+        }
+        dernier = boite;
+        rafraichir();
+    });
+
+    toutBtn.addEventListener('change', () => {
+        cases().forEach(i => { i.checked = toutBtn.checked; });
+        dernier = null;
+        rafraichir();
+    });
+    videBtn.addEventListener('click', () => {
+        cases().forEach(i => { i.checked = false; });
+        dernier = null;
+        rafraichir();
+    });
+
+    barre.querySelectorAll('.emoji-chip').forEach(chip => {
+        chip.addEventListener('click', async () => {
+            const ids = cochees().map(i => i.value);
+            if (!ids.length) return;
+            barre.classList.add('is-busy');
+            const corps = new URLSearchParams();
+            corps.set('marker', chip.dataset.marker);
+            ids.forEach(id => corps.append('ids', id));
+            try {
+                const r = await fetch('/manage/tag', { method: 'POST', body: corps });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error || r.status);
+                // Les cartes marquées quittent la liste : elles ne sont plus
+                // sans thème. On les retire sur place plutôt que de recharger,
+                // pour ne pas perdre la position dans 55 pages.
+                d.tagged.forEach(id => {
+                    const ligne = liste.querySelector('.pick-row[data-id="' + CSS.escape(id) + '"]');
+                    if (!ligne) return;
+                    ligne.classList.add('is-done');
+                    setTimeout(() => ligne.remove(), 300);
+                });
+                if (badge) badge.textContent = d.remaining;
+                if (d.skipped) {
+                    compte.textContent = d.skipped + ' carte(s) sans texte à marquer';
+                    setTimeout(rafraichir, 2200);
+                }
+                setTimeout(() => {
+                    rafraichir();
+                    // Page vidée : on va chercher la suivante.
+                    if (!cases().length) location.reload();
+                }, 320);
+            } catch (err) {
+                compte.textContent = 'Échec — réessayez';
+            } finally {
+                barre.classList.remove('is-busy');
+            }
+        });
+    });
+
+    rafraichir();
+}
 })();
 </script>
 {% endblock %}
